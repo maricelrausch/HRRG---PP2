@@ -1,5 +1,4 @@
 # 🏥 Chatbot de apoyo al triage hospitalario
----
 
 ## 👥 Equipo de trabajo
 
