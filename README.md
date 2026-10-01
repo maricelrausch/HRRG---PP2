@@ -1,5 +1,14 @@
 # 🏥 Chatbot de apoyo al triage hospitalario
+---
 
+## 👥 Equipo de trabajo
+
+- Darío Martínez
+- Maricel Rausch
+- Tomás Alderete
+- Bárbara Rigoni
+---
+  
 ## 📌 Descripción
 
 Este repositorio corresponde al desarrollo de un **proyecto colaborativo basado en Inteligencia Artificial**, orientado a brindar apoyo en procesos de **triage hospitalario**.
