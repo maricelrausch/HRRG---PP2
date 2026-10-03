@@ -6,6 +6,7 @@
 - Maricel Rausch
 - Tomás Alderete
 - Bárbara Rigoni
+  
 ---
   
 ## 📌 Descripción
@@ -55,16 +56,63 @@ Se priorizarán aspectos relacionados con:
 Inicialmente se contempla trabajar con:
 
 - **Python**
-- **Inteligencia Artificial Generativa**
-- **MedGemma**
-- **Git**
+- **Google Drive**
+- **Google Meet**
+- **Trello**
+- **Instagantt**
 - **GitHub**
-
-> Las tecnologías definitivas serán establecidas durante el desarrollo del proyecto.
 
 ---
 
-## 🚧 Estado del proyecto
+
+## Proceso de análisis
+
+Descripción general de lo realizado:
+
+- Exploración de datos (EDA)  
+- Limpieza de datos  
+- Transformaciones realizadas  
+- Creación de visualizaciones  
+
+---
+
+## Resultados principales
+
+Resumen de los hallazgos más importantes:
+
+- Hallazgo 1  
+- Hallazgo 2  
+- Hallazgo 3  
+
+---
+
+## Visualizaciones
+
+(Incluir imágenes del dashboard o gráficos)
+
+---
+
+## Conclusiones
+
+Síntesis final del análisis:
+
+- Qué se descubrió  
+- Qué implicancias tiene  
+- Posibles líneas futuras  
+
+---
+
+## Archivos del proyecto
+
+Descripción breve de la estructura del repositorio:
+
+---
+
+## Contactos
+ 
+---
+
+## 🚧 Estado actual del proyecto
 
 🟡 **Proyecto en etapa de planificación y definición.**
 
