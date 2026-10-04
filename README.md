@@ -74,17 +74,6 @@ Desarrollar y validar un módulo de Triage Asistido por Inteligencia Artificial 
 
 ## Resultados principales
 
-Descripción general de lo realizado:
-
-- Exploración de datos (EDA)  
-- Limpieza de datos  
-- Transformaciones realizadas  
-- Creación de visualizaciones  
-
----
-
-## Resultados principales
-
 _Se completará al finalizar los Sprints 2 y 3._
 - Hallazgo 1
 - Hallazgo 2
