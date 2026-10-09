@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'"
+  >
+
+  <title>HRRG · Ingreso de triage</title>
+
+  <link rel="stylesheet" href="estilos.css">
+  <script defer src="validacion.js"></script>
+  <script defer src="formulario.js"></script>
+</head>
+
+<body>
+  <header class="encabezado">
+    <div class="encabezado-contenido">
+      <div class="brand">
+        <div class="logo-container">
+          <img
+            src="img/logo-hrrg.png"
+            alt="Hospital Regional Río Grande"
+            class="logo-hrrg"
+            width="140"
+          >
+        </div>
+
+        <div class="brand-text">
+          <strong>TRIAGE ASISTIDO</strong>
+          <span>Prototipo de asistencia al profesional</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+<main>
+<div class="intro"><div><p class="eyebrow">INGRESO DEL EPISODIO</p><h1><h1>Ingreso de datos de triage</h1></h1><p class="muted">Cargá los datos disponibles y revisalos antes de compartirlos con el siguiente módulo.</p></div><button type="button" id="sample" class="secondary">Cargar ejemplo ficticio</button></div>
+<div class="banner"><strong>Sin clasificación clínica.</strong> Este formulario valida el formato y los rangos propuestos en el diccionario del 07/10/2026. No consulta a Ollama ni guarda casos automáticamente.</div>
+<noscript>Activá JavaScript para usar el formulario. No se envían datos a ningún servidor.</noscript>
+<div class="layout">
+<form id="triage" novalidate>
+<section class="section"><div class="sectiontitle"><span class="number">01</span><div><h2>Episodio</h2><p>Usamos un identificador aleatorio, sin datos personales.</p></div></div>
+<div class="fields three">
+<div class="field"><label for="codigo_episodio">Código de episodio</label><input id="codigo_episodio" readonly aria-describedby="code-help"><small id="code-help">Generado localmente. Formato provisional.</small></div>
+<div class="field"><label for="edad">Edad <span class="expected">Esperado</span></label><div class="unit"><input id="edad" type="text" inputmode="numeric" aria-describedby="edad-help edad-error"><span>años</span></div><small id="edad-help">Entero · 0 a 110</small><span class="error" id="edad-error"></span></div>
+<div class="field"><label for="sexo">Sexo <span class="expected">Esperado</span></label><select id="sexo" aria-describedby="sexo-help sexo-error"><option value="">Sin cargar</option><option value="M">M</option><option value="F">F</option><option value="X">X · Otro o no informado</option></select><small id="sexo-help">Opciones exactas del diccionario.</small><span class="error" id="sexo-error"></span></div>
+</div></section>
+<section class="section"><div class="sectiontitle"><span class="number">02</span><div><h2>Motivo de consulta</h2><p>Relato del paciente o acompañante, sin identificación.</p></div></div>
+<label for="motivo_consulta">Descripción <span class="expected">Esperado</span></label><textarea id="motivo_consulta" rows="4" placeholder="Describí el motivo y el tiempo de evolución, si se conoce." aria-describedby="motivo-help motivo_consulta-error"></textarea><small id="motivo-help">No incluyas nombres, apellidos, DNI, teléfono, domicilio ni datos administrativos.</small><span class="error" id="motivo_consulta-error"></span>
+</section>
+<section class="section"><div class="sectiontitle"><span class="number">03</span><div><h2>Signos vitales</h2><p>Si una medición no está disponible, dejá el campo vacío.</p></div></div><div class="fields three" id="vitals"></div><p class="footnote">Los rangos detectan posibles errores de carga; no definen gravedad y están pendientes de validación hospitalaria.</p></section>
+<section class="section"><div class="sectiontitle"><span class="number">04</span><div><h2>Conciencia y dolor</h2><p>Registrá los valores observados, sin inferir los faltantes.</p></div></div><div class="fields three" id="consciousness"></div><div class="field"><label for="localizacion_dolor">Localización del dolor <span class="optional">Opcional</span></label><input id="localizacion_dolor" type="text" aria-describedby="localizacion_dolor-error"><span class="error" id="localizacion_dolor-error"></span></div></section>
+<section class="section"><div class="sectiontitle"><span class="number">05</span><div><h2>Banderas rojas y antecedentes</h2><p>Marcar una opción no asigna una prioridad clínica.</p></div></div>
+<div class="fields two"><fieldset id="banderas_rojas"><legend>Banderas rojas</legend><div class="choices" id="flags"></div><label class="check none"><input type="checkbox" id="banderas_rojas_none">Ninguna de las opciones, tras revisión</label><small>Sin selección ni confirmación = no informado.</small><span class="error" id="banderas_rojas-error"></span></fieldset>
+<fieldset id="antecedentes"><legend>Antecedentes</legend><div class="choices" id="history"></div><label class="check none"><input type="checkbox" id="antecedentes_none">Ninguna de las opciones, tras revisión</label><small>Las listas son parciales y deben validarse con el hospital.</small><span class="error" id="antecedentes-error"></span></fieldset></div>
+<label for="antecedentes_otros">Otros antecedentes <span class="optional">Opcional</span></label><textarea id="antecedentes_otros" rows="2" aria-describedby="antecedentes_otros-error"></textarea><span class="error" id="antecedentes_otros-error"></span>
+</section>
+<section class="section"><div class="sectiontitle"><span class="number">06</span><div><h2>Revisión de la carga</h2><p>Los campos esperados vacíos se informan como faltantes y permiten continuar.</p></div></div>
+<label class="check"><input type="checkbox" id="contradiction">Detecté una contradicción entre el relato y los signos vitales.</label>
+<p id="contradiction-note" class="notice" hidden>Información insuficiente. Revisá el caso antes de preparar los datos. El formulario no detecta contradicciones clínicas automáticamente.</p>
+<label class="check"><input type="checkbox" id="privacy">Confirmo que es un caso ficticio y revisé todos los textos para eliminar datos personales.</label>
+<small>La detección automática de identificadores es parcial. No garantiza anonimización.</small>
+<div id="errors-summary" class="notice" role="alert" hidden></div>
+<div class="actions"><button type="submit" class="primary">Revisar datos</button><button type="button" id="reset" class="secondary">Nuevo episodio</button></div>
+</section>
+</form>
+<aside><div class="asidebox"><p class="eyebrow">ESTADO DE LA CARGA</p><h2 id="count">0 de 11 campos esperados</h2><progress id="progress" max="11" value="0" aria-label="Campos esperados cargados"></progress><p class="muted">Completitud de carga, no nivel de riesgo.</p><h3>Datos esperados pendientes</h3><ul id="pending"></ul><p id="inputstate" aria-live="polite"></p></div><div class="asideplain"><h3>Cómo completar</h3><ul><li>Vacío significa sin información.</li><li>El cero se conserva cuando es válido.</li><li>Ingresá números sin unidades.</li><li>Temperatura admite coma o punto.</li><li>Revisá valores fuera de rango; no los cambies para forzar la validación.</li></ul></div></aside>
+</div>
+<section id="review" class="section review" hidden aria-labelledby="reviewtitle"><p class="eyebrow">VISTA PREVIA</p><h2 id="reviewtitle">Datos preparados para integración</h2><p id="reviewstate"></p><div class="table-scroll"><table><thead><tr><th>Campo del diccionario</th><th>Dato cargado</th></tr></thead><tbody id="reviewrows"></tbody></table></div>
+<details><summary>Ver JSON de entrada</summary><pre id="json"></pre></details>
+<p class="footnote">El archivo contiene únicamente los campos de entrada del diccionario. El backend deberá recalcular los faltantes y validar nuevamente. No se generaron color, confianza ni resultados clínicos.</p>
+<div class="actions"><button type="button" id="download" class="primary">Descargar JSON ficticio</button><button type="button" id="edit" class="secondary">Volver al formulario</button></div><p id="exportstatus" aria-live="polite"></p></section>
+</main><footer>HRRG · Formulario independiente v0.1 · Diccionario del 07/10/2026 · Sin almacenamiento automático ni conexiones externas</footer></body></html>

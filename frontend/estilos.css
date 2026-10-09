@@ -1,0 +1,792 @@
+:root{font-family:"Segoe UI",system-ui,sans-serif;color:#24343e;background:#f3f5f8;font-size:16px;line-height:1.5}*{box-sizing:border-box}body{margin:0}header{background:#172d40;color:#fff;padding:22px max(24px,calc((100% - 1220px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px}.brand{display:flex;align-items:center;gap:14px}.brandmark{display:grid;place-items:center;background:#fff;color:#172d40;border-radius:10px;width:44px;height:44px;font-size:26px;font-weight:700}.brand strong{display:block;letter-spacing:.06em;font-size:20px}.brand div>span{font-size:14px;color:#c9d6e1}.tag{border:1px solid #61788b;padding:7px 13px;border-radius:24px;font-size:13px}main{max-width:1268px;margin:auto;padding:35px 24px}.intro{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:23px}h1{font-size:34px;letter-spacing:-.03em;margin:0 0 7px}h2{font-size:21px;letter-spacing:-.015em;margin:0 0 6px}h3{font-size:16px;margin:18px 0 9px}p{margin:0 0 12px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;color:#53657c;margin:0 0 10px}.muted{color:#5c6c7c}.banner{background:#e8eef5;border-radius:9px;padding:16px 20px;margin-bottom:26px;font-size:14px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:25px;align-items:start}.section{background:#fff;border:1px solid #dfe5ed;border-radius:12px;padding:26px;margin-bottom:20px}.sectiontitle{display:flex;gap:13px;margin-bottom:24px}.sectiontitle p{font-size:14px;color:#5c6c7c;margin:0}.number{color:#425570;background:#edf1f7;min-width:33px;height:33px;display:grid;place-items:center;border-radius:8px;font-size:13px;font-weight:700}.fields{display:grid;gap:20px}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.field{margin-bottom:17px;min-width:0}label,legend{font-size:14px;font-weight:600;display:block;margin:0 0 7px}.expected,.optional{display:block;font-size:11px;font-weight:400;color:#64748b}.optional{display:inline;margin-left:7px}button,input,textarea,select{font:inherit}input:not([type=checkbox]),textarea,select{width:100%;padding:11px 12px;border:1px solid #aab8c8;background:#fff;color:#172d40;border-radius:7px;min-height:45px}input[readonly]{background:#f3f5f8;font-size:12px}textarea{resize:vertical;margin-bottom:5px}input[aria-invalid=true],textarea[aria-invalid=true],select[aria-invalid=true]{border-color:#a0253e}.unit{display:flex;align-items:center;border:1px solid #aab8c8;border-radius:7px;overflow:hidden}.unit input:not([type=checkbox]){border:0;border-radius:0;min-width:0}.unit>span{padding:0 10px;font-size:13px;white-space:nowrap;color:#55677a}.unit:has([aria-invalid=true]){border-color:#a0253e}small,.footnote{display:block;font-size:12px;color:#5d6c7c;margin-top:6px}.error{display:block;font-size:12px;color:#98283f;margin-top:5px}.footnote{margin-top:15px}.asidebox{background:#fff;border:1px solid #dfe5ed;border-radius:12px;padding:23px}.asidebox h2{font-size:21px}.asidebox p,.asidebox li,.asideplain li{font-size:13px}.asidebox ul,.asideplain ul{padding-left:18px;color:#5c6c7c}.asideplain{padding:12px 18px}progress{width:100%;height:8px;accent-color:#344f70;margin:12px 0}fieldset{margin:0 0 20px;border:1px solid #dfe5ed;border-radius:9px;padding:16px}legend{padding:0 7px}.check{display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:14px;margin:12px 0}.check input{accent-color:#344f70;width:18px;height:18px;flex-shrink:0;margin:2px 0 0}.none{border-top:1px solid #dfe5ed;padding-top:12px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}button{cursor:pointer;border-radius:8px;padding:11px 17px;border:1px solid #aab8c8;font-size:14px;font-weight:600}.primary{background:#273f5d;color:white;border-color:#273f5d}.primary:hover{background:#172d40}.secondary{background:white;color:#273f5d}.secondary:hover{background:#edf1f7}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #687fa3;outline-offset:3px}.notice{background:#f6eef0;color:#85263b;padding:14px;border-radius:8px;font-size:14px;margin:16px 0}.table-scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin:18px 0}th,td{text-align:left;padding:12px;border-bottom:1px solid #e0e6ef;overflow-wrap:anywhere}th{background:#edf1f7}td:first-child{font-family:monospace;font-size:13px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f5f8;padding:20px;font-size:13px}summary{cursor:pointer;font-weight:600;padding:12px 0}footer{max-width:1268px;margin:auto;padding:0 24px 30px;color:#64748b;font-size:12px}[hidden]{display:none!important}@media(max-width:960px){.layout{grid-template-columns:1fr}.asidebox{margin-bottom:20px}.asideplain{display:none}.three{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){header{align-items:flex-start;flex-direction:column;padding:18px}.intro{align-items:flex-start;flex-direction:column}.three,.two{grid-template-columns:1fr}.section{padding:20px}main{padding:24px 16px}h1{font-size:29px}.actions button{width:100%}.tag{font-size:12px}}@media print{header{background:white;color:black}.layout{display:block}aside,button,footer{display:none}.section{break-inside:avoid}body{background:white}}
+/* =====================================
+   PERSONALIZACIÓN VISUAL DEL FORMULARIO
+   ===================================== */
+
+:root {
+  /* Cambiá estos valores para personalizar los colores */
+  --fondo-pagina: #f1f4f8;
+  --fondo-panel: #ffffff;
+  --color-principal: #263e59;
+  --color-principal-hover: #192d43;
+  --texto-principal: #243447;
+  --texto-secundario: #617187;
+  --borde-suave: #dce3ed;
+  --fondo-seleccion: #e8eef8;
+
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: var(--fondo-pagina);
+  color: var(--texto-principal);
+}
+
+/* Encabezado */
+header {
+  background: var(--color-principal);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.brandmark {
+  width: 36px;
+  height: 36px;
+  font-size: 22px;
+  border-radius: 10px;
+}
+
+.brand strong {
+  font-size: 18px;
+}
+
+/* Ancho general y márgenes */
+main {
+  max-width: 1320px;
+  margin: auto;
+  padding: 22px;
+}
+
+.intro {
+  margin-bottom: 14px;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.intro .muted {
+  font-size: 14px;
+  color: var(--texto-secundario);
+}
+
+/* Aviso superior */
+.banner {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: #e8edf4;
+  font-size: 12px;
+}
+
+/* Paneles del formulario */
+.section {
+  background: var(--fondo-panel);
+  padding: 18px;
+  border: 1px solid var(--borde-suave);
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgb(25 45 67 / 4%);
+}
+
+.sectiontitle {
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.sectiontitle h2 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.sectiontitle p {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Número de cada sección */
+.number {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--fondo-seleccion);
+  color: var(--color-principal);
+  font-size: 12px;
+}
+
+/* Espacio entre campos */
+.fields {
+  gap: 12px;
+}
+
+.field {
+  margin-bottom: 8px;
+}
+
+/* Etiquetas */
+label,
+legend {
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.expected,
+.optional {
+  display: inline;
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--texto-secundario);
+}
+
+/* Campos de entrada */
+input:not([type="checkbox"]),
+select,
+textarea {
+  padding: 9px 11px;
+  border: 1px solid #b8c5d5;
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--texto-principal);
+  font-size: 14px;
+}
+
+input:not([type="checkbox"]),
+select {
+  min-height: 40px;
+}
+
+textarea {
+  min-height: 75px;
+}
+
+/* Unidades junto a los números */
+.unit {
+  border: 1px solid #b8c5d5;
+  border-radius: 7px;
+}
+
+.unit input:not([type="checkbox"]) {
+  border: none;
+  border-radius: 0;
+}
+
+.unit > span {
+  padding: 0 9px;
+  color: var(--texto-secundario);
+  font-size: 12px;
+}
+
+/* Ayudas debajo de los campos */
+small,
+.footnote {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--texto-secundario);
+}
+
+/* Resaltar el campo que se está editando */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #8198b9;
+  outline-offset: 2px;
+}
+
+/* Opciones de banderas rojas y antecedentes */
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.choices .check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--borde-suave);
+  border-radius: 7px;
+  background: #f8fafc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.choices .check:has(input:checked) {
+  background: var(--fondo-seleccion);
+  border-color: #768ead;
+  color: var(--color-principal);
+}
+
+.check input {
+  accent-color: var(--color-principal);
+}
+
+/* Botones */
+button {
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.primary {
+  background: var(--color-principal);
+  border-color: var(--color-principal);
+  color: #ffffff;
+}
+
+.primary:hover {
+  background: var(--color-principal-hover);
+}
+
+.secondary {
+  background: #ffffff;
+  border-color: #b8c5d5;
+  color: var(--color-principal);
+}
+
+.secondary:hover {
+  background: var(--fondo-seleccion);
+}
+
+.actions {
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* Mantener visibles los errores */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"],
+.unit:has(input[aria-invalid="true"]) {
+  border-color: #a0253e;
+}
+
+/* Adaptación a celulares */
+@media (max-width: 680px) {
+  main {
+    padding: 14px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .section {
+    padding: 15px;
+  }
+
+  input:not([type="checkbox"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .choices .check,
+  button {
+    min-height: 44px;
+  }
+}
+/* DISTRIBUCIÓN COMPACTA */
+
+/* Usar más ancho de pantalla */
+main {
+  max-width: 1400px;
+  margin: auto;
+  padding: 20px;
+}
+
+/* Formulario y resumen lateral */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 18px;
+  align-items: start;
+}
+
+/* Organizar las secciones en dos columnas */
+#triage {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* Reducir espacios dentro de cada sección */
+#triage > .section {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+}
+
+/* Signos vitales y revisión ocupan todo el ancho */
+#triage > .section:nth-of-type(3),
+#triage > .section:nth-of-type(6) {
+  grid-column: 1 / -1;
+}
+
+/* Episodio: código arriba; edad y sexo debajo */
+#triage > .section:first-of-type .fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#triage > .section:first-of-type .field:first-child {
+  grid-column: 1 / -1;
+}
+
+/* Seis signos vitales en una fila */
+#vitals {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* Alinear campos aunque alguna etiqueta ocupe dos líneas */
+#vitals .field > label {
+  min-height: 38px;
+}
+
+/* Glasgow y dolor juntos */
+#consciousness {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.fields {
+  gap: 12px;
+}
+
+.field {
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.sectiontitle {
+  margin-bottom: 12px;
+}
+
+.sectiontitle h2 {
+  font-size: 17px;
+}
+
+.sectiontitle p {
+  font-size: 12px;
+  margin: 3px 0 0;
+}
+
+#motivo_consulta {
+  min-height: 110px;
+}
+
+/* Opciones como pequeñas tarjetas seleccionables */
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choices .check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #ccd6e3;
+  border-radius: 7px;
+  background: #f7f9fc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.choices .check:has(input:checked) {
+  background: #e5ecf8;
+  border-color: #7188ad;
+  color: #263e59;
+}
+
+/* Resumen lateral más pequeño */
+.asidebox {
+  padding: 16px;
+}
+
+.asidebox h2 {
+  font-size: 18px;
+}
+
+.asideplain {
+  padding: 10px;
+}
+
+/* Pantallas medianas */
+@media (max-width: 1150px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #vitals {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #triage .fields.two {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Celulares */
+@media (max-width: 700px) {
+  main {
+    padding: 12px;
+  }
+
+  #triage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #triage > .section {
+    grid-column: 1 / -1;
+  }
+
+  #vitals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  input:not([type="checkbox"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* =====================================
+   ESTÉTICA INSPIRADA EN LOS FLYERS HRRG
+   ===================================== */
+
+:root {
+  --hrrg-azul: #007bbd;
+  --hrrg-azul-oscuro: #074f73;
+  --hrrg-celeste: #e3f3fa;
+  --hrrg-fondo: #f4f9fc;
+  --hrrg-gris: #686f74;
+  --hrrg-borde: #cce3ee;
+
+  /* Actualizar también las variables anteriores */
+  --fondo-pagina: var(--hrrg-fondo);
+  --fondo-panel: #ffffff;
+  --color-principal: var(--hrrg-azul);
+  --color-principal-hover: var(--hrrg-azul-oscuro);
+  --texto-principal: #17394d;
+  --texto-secundario: #586e7b;
+  --borde-suave: var(--hrrg-borde);
+  --fondo-seleccion: var(--hrrg-celeste);
+}
+
+body {
+  background: var(--hrrg-fondo);
+  color: var(--texto-principal);
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Encabezado blanco con detalles azules */
+header {
+  background: #ffffff;
+  color: var(--hrrg-azul-oscuro);
+  border-bottom: 4px solid var(--hrrg-azul);
+}
+
+.brand strong {
+  color: var(--hrrg-azul);
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.brand div > span {
+  color: var(--hrrg-gris);
+}
+
+.brandmark {
+  background: var(--hrrg-celeste);
+  color: var(--hrrg-azul);
+  border: 1px solid var(--hrrg-borde);
+  border-radius: 50%;
+}
+
+.tag {
+  background: var(--hrrg-celeste);
+  border-color: var(--hrrg-borde);
+  color: var(--hrrg-azul-oscuro);
+}
+
+/* Títulos */
+h1 {
+  color: var(--hrrg-azul-oscuro);
+  font-weight: 800;
+}
+
+.eyebrow {
+  color: var(--hrrg-azul);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+/* Aviso superior */
+.banner {
+  background: var(--hrrg-celeste);
+  color: var(--hrrg-azul-oscuro);
+  border: 1px solid var(--hrrg-borde);
+  border-radius: 12px;
+}
+
+/* Paneles blancos */
+.section,
+.asidebox {
+  background: #ffffff;
+  border: 1px solid var(--hrrg-borde);
+  border-radius: 14px;
+  box-shadow: 0 3px 12px rgb(7 79 115 / 5%);
+}
+
+/* Franja celeste en cada título */
+.sectiontitle {
+  padding: 9px 11px;
+  background: var(--hrrg-celeste);
+  border-radius: 8px 18px 18px 8px;
+}
+
+.sectiontitle h2 {
+  color: var(--hrrg-azul-oscuro);
+  font-weight: 750;
+}
+
+.sectiontitle p {
+  color: #466879;
+}
+
+/* Número de sección */
+.number {
+  background: var(--hrrg-azul);
+  color: #ffffff;
+  border-radius: 50%;
+  min-width: 29px;
+  height: 29px;
+  font-weight: 700;
+}
+
+/* Campos */
+input:not([type="checkbox"]),
+select,
+textarea {
+  background: #ffffff;
+  border-color: #aecfdf;
+  color: #17394d;
+}
+
+input[readonly] {
+  background: #f0f7fb;
+}
+
+.unit {
+  border-color: #aecfdf;
+  background: #f0f7fb;
+}
+
+.unit input:not([type="checkbox"]) {
+  border: none;
+}
+
+.unit > span {
+  color: var(--hrrg-azul-oscuro);
+}
+
+/* Foco visible para navegar con teclado */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #007bbd;
+  outline-offset: 2px;
+}
+
+/* Opciones seleccionables */
+.choices .check {
+  background: #f6fbfe;
+  border-color: var(--hrrg-borde);
+  color: #24485c;
+}
+
+.choices .check:has(input:checked) {
+  background: var(--hrrg-celeste);
+  border-color: var(--hrrg-azul);
+  color: var(--hrrg-azul-oscuro);
+}
+
+.check input {
+  accent-color: var(--hrrg-azul);
+}
+
+/* Botón principal */
+.primary {
+  background: var(--hrrg-azul);
+  border-color: var(--hrrg-azul);
+  color: #ffffff;
+}
+
+.primary:hover {
+  background: var(--hrrg-azul-oscuro);
+  border-color: var(--hrrg-azul-oscuro);
+}
+
+/* Botones secundarios */
+.secondary {
+  background: #ffffff;
+  border-color: var(--hrrg-azul);
+  color: var(--hrrg-azul-oscuro);
+}
+
+.secondary:hover {
+  background: var(--hrrg-celeste);
+}
+
+/* Panel de completitud */
+.asidebox h2,
+.asidebox h3,
+.asideplain h3 {
+  color: var(--hrrg-azul-oscuro);
+}
+
+progress {
+  accent-color: var(--hrrg-azul);
+}
+
+/* Tabla del resumen */
+th {
+  background: var(--hrrg-celeste);
+  color: var(--hrrg-azul-oscuro);
+}
+
+th,
+td {
+  border-bottom-color: var(--hrrg-borde);
+}
+
+/* Conservar diferenciados los errores */
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"],
+.unit:has(input[aria-invalid="true"]) {
+  border-color: #a0253e;
+}
+
+/* Encabezado azul */
+header {
+  background: #007bbd;
+  border-bottom: 4px solid #07557d;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Logo y título juntos */
+header .brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+header .logo-container {
+  background: white;
+  padding: 5px 10px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* Tamaño del logo */
+header .logo-hrrg {
+  display: block;
+  width: 140px;
+  max-width: 100%;
+  height: auto;
+}
+
+header .brand-text strong {
+  display: block;
+  color: white;
+  font-size: 20px;
+}
+
+header .brand-text span {
+  display: block;
+  color: white;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+header .tag {
+  background: #07557d;
+  color: white;
+  border: 1px solid #a8d8ee;
+}
+
+/* El encabezado y el formulario comparten el mismo ancho */
+.encabezado .encabezado-contenido,
+main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+/* Fondo del encabezado */
+header.encabezado {
+  display: block;
+  background: #007bbd;
+  border-bottom: 4px solid #07557d;
+  padding: 12px 0;
+}
+
+/* Alineación de logo y texto */
+.encabezado .brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.encabezado .logo-container {
+  flex: 0 0 auto;
+  background: white;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.encabezado .logo-hrrg {
+  display: block;
+  width: 140px;
+  height: auto;
+}
+
+.encabezado .brand-text strong {
+  display: block;
+  color: white;
+  font-size: 20px;
+}
+
+.encabezado .brand-text span {
+  display: block;
+  color: white;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Ajustes para pantallas pequeñas o zoom elevado */
+@media (max-width: 700px) {
+  .encabezado .encabezado-contenido,
+  main {
+    padding-inline: 16px;
+  }
+
+  .encabezado .brand {
+    gap: 10px;
+  }
+
+  .encabezado .logo-hrrg {
+    width: 100px;
+  }
+
+  .encabezado .brand-text strong {
+    font-size: 16px;
+  }
+}
