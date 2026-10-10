@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+
+from flask import Flask, json, render_template, request, jsonify, send_from_directory
 from ollama import chat, embed
 from PyPDF2 import PdfReader
 
@@ -9,6 +10,74 @@ import time
 
 
 app = Flask(__name__)
+
+# ------------------------------------------------
+# Usuario y Contraseña Admin // Se puede modificar para más usuarios y contraseñas // Cambiar accesos
+# ------------------------------------------------
+
+usuario = {
+    "admin": "admin123",
+    "empleado": "empleado123"
+}
+
+# ------------------------------------------------
+# Función para iniciar sesión //
+# FALTA DEFINIR LA RUTA DESDE EL FRONTEND con @app.route("/login", methods=["POST"])
+# ------------------------------------------------
+
+def iniciar_sesion(username, password):
+    if username in usuario and usuario[username] == password:
+        return True
+    else:
+        return False
+
+# ------------------------------------------------
+# HOME / No hay un index.html definido, falta para el inicio de sesión.
+# ------------------------------------------------
+
+@app.route("/")
+def inicio():
+    return send_from_directory("frontend", "formulario.html")
+
+# ------------------------------------------------
+# Formulario Paciente // verificar ruta
+# ------------------------------------------------
+
+@app.route("/frontend", methods=["GET", "POST"])
+def paciente_form():
+    if request.method == "POST":
+
+        # Datos que vienen del formulario (1)
+        codigo_episodio = request.form.get("codigo_episodio")
+        edad = request.form.get("edad")
+        sexo = request.form.get("sexo")
+
+        # Datos que vienen del formulario (2)
+        motivo_consulta = request.form.get("motivo_consulta")
+
+        # Datos que vienen del formulario (3)
+        tas = request.form.get("tas")
+        tad = request.form.get("tad")
+        frec_cardiaca = request.form.get("frec_cardiacad")
+        frec_respiratoria = request.form.get("frec_respiratoria")
+        saturacion = request.form.get("saturacion")
+        temperatura = request.form.get("temperatura")
+        
+        # Datos que vienen del formulario (4)
+        glasgow = request.form.get("glasgow")
+        dolor = request.form.get("dolor")
+        localizacion_dolor = request.form.get("localizacion_dolor")
+
+        # Datos que vienen del formulario (5)
+
+        # Guardar en un json nuevo // agregar archivo
+        with open("pacientes.json", "a") as f:
+            f.write(json.dumps({"codigo_episodio": codigo_episodio, "edad": edad, "sexo": sexo, "tas": tas, "tad": tad, "frec_cardiaca": frec_cardiaca, "frec_respiratoria": frec_respiratoria, "saturacion": saturacion, "temperatura": temperatura, "glasgow": glasgow, "dolor": dolor, "localizacion_dolor": localizacion_dolor}) + "\n")
+
+        return jsonify({"message": "Formulario recibido", "codigo_episodio": codigo_episodio, "edad": edad, "sexo": sexo, "tas": tas, "tad": tad, "frec_cardiaca": frec_cardiaca, "frec_respiratoria": frec_respiratoria, "saturacion": saturacion, "temperatura": temperatura, "glasgow": glasgow, "dolor": dolor, "localizacion_dolor": localizacion_dolor})
+    return render_template("formulario.html")
+
+
 
 # Carpeta de subida de archivos
 app.config["UPLOAD_FOLDER"] = "docs"
@@ -22,6 +91,12 @@ document_vectors = []
 # Modelo de LLM y  Modelo de embedding    
 LLM_MODEL = "qwen2.5:0.5b"
 EMBED_MODEL = "embeddinggemma"
+
+
+# PACIENTE
+
+def get_patient_info():
+    return 
 
 
 # ------------------------------------------------
@@ -101,14 +176,6 @@ def search(question):
     scores.sort(reverse=True,key=lambda x:x[0])
     return scores[:3]
 
-
-
-# ------------------------------------------------
-# HOME
-# ------------------------------------------------
-@app.route("/")
-def index():
-    return render_template("index.html")
 
 
 # ------------------------------------------------
