@@ -92,30 +92,165 @@ _Se completará al cierre del proyecto: qué se descubrió, implicancias para el
 
 ---
 
-## Archivos del proyecto
-## Archivos del proyecto
+
+## Estructura del proyecto
 
 ```text
 HRRG---PP2/
-├── datos/                 → datos de trabajo y casos ficticios
-├── docs/                  → documentación del proyecto
-│   └── contrato_api.md    → borrador del contrato de la API
-├── evaluacion/            → pruebas y evaluación del prototipo
-├── frontend/              → pantallas, estilos, JavaScript e imágenes
-├── src/                   → módulos del backend
-│   ├── auth.py            → verificación de credenciales y cuentas activas
-│   ├── modelo.py          → componente del modelo
-│   ├── rag.py             → recuperación documental
-│   ├── registro.py        → persistencia y consulta de episodios demo
-│   ├── reglas.py          → componente de reglas
-│   ├── reporte.py         → generación de informes
-│   ├── salida.py          → tratamiento de salidas
-│   └── validacion.py      → validaciones de datos
-├── app.py                 → aplicación Flask, rutas y control de acceso
-├── requirements.txt       → dependencias del backend
-├── .gitignore             → exclusión de archivos locales y privados
-└── README.md              → presentación y guía del proyecto
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── src/
+│   │   ├── auth.py
+│   │   ├── modelo.py
+│   │   ├── rag.py
+│   │   ├── registro.py
+│   │   ├── reglas.py
+│   │   ├── reporte.py
+│   │   ├── salida.py
+│   │   └── validacion.py
+│   ├── datos/
+│   │   ├── casos_simulados.json
+│   │   ├── guias_ejemplo.json
+│   │   └── umbrales.json
+│   └── evaluacion/
+│       ├── metricas.py
+│       └── prueba_sin_guia.py
+├── frontend/
+│   ├── maquetado_extraccion_v33.html
+│   ├── formulario.html
+│   ├── estilos.css
+│   ├── formulario.js
+│   ├── validacion.js
+│   └── img/
+│       └── logo-hrrg.png
+├── docs/
+│   └── contrato_api.md
+├── .gitignore
+└── README.md
 ```
+
+| Ubicación | Propósito |
+|---|---|
+| `backend/app.py` | Aplicación Flask, rutas y conexión con servicios. |
+| `backend/src/` | Módulos de autenticación, registro, IA, reglas y salidas. |
+| `backend/datos/` | Archivos destinados a casos ficticios y configuraciones de prueba. |
+| `backend/evaluacion/` | Scripts de evaluación y métricas. |
+| `frontend/` | Pantallas, estilos, JavaScript e imágenes. |
+| `docs/` | Documentación técnica compartida. |
+
+Algunos módulos y archivos están vacíos o en desarrollo. Su presencia
+indica su ubicación prevista, no que la funcionalidad esté terminada.
+
+## Ejecución local
+
+Requisitos: Python y pip. El entorno de desarrollo utilizado es Python 3.12.7.
+
+Desde la raíz del repositorio:
+
+```powershell
+cd backend
+python -m pip install -r requirements.txt
+python app.py
+```
+
+Abrir en el navegador:
+
+http://127.0.0.1:5000/
+
+Para detener el servidor, presionar `Ctrl + C`.
+
+Flask sirve la maqueta `frontend/maquetado_extraccion_v33.html`
+como página principal. El formulario anterior se conserva.
+
+La visualización de la maqueta no implica que sus botones y pantallas
+estén conectados a las API del backend.
+
+El servidor de desarrollo de Flask se utiliza para pruebas locales.
+La integración con modelos requiere, además del cliente Python,
+el servicio Ollama y los modelos correspondientes.
+
+## Administración de profesionales
+
+Las cuentas son creadas por el ingeniero o administrador autorizado
+desde la terminal. No hay registro público de usuarios.
+
+Desde la carpeta `backend`:
+
+```powershell
+python -m flask --app app crear-profesional
+```
+
+Para cambiar una contraseña:
+
+```powershell
+python -m flask --app app cambiar-password
+```
+
+Las contraseñas se almacenan como hashes. No se pueden recuperar
+en texto original; se puede establecer una nueva contraseña.
+
+## Estado del backend
+
+Implementado:
+
+- Autenticación de profesionales con cuentas en SQLite.
+- Inicio de sesión, consulta de sesión y cierre de sesión.
+- Control de acceso en las rutas protegidas y comprobación de cuentas activas.
+- Formato común de errores para las API adaptadas.
+- Registro técnico con rotación de archivos.
+- Creación y consulta de episodios ficticios.
+- Registro del evento de apertura de cada episodio.
+- Asociación del episodio con el código interno del paciente y el profesional.
+- Rechazo de códigos de episodio duplicados.
+- Separación de carpetas de backend y frontend.
+
+### Endpoints disponibles
+
+| Método | Ruta | Función |
+|---|---|---|
+| POST | `/api/login` | Iniciar sesión. |
+| GET | `/api/sesion` | Consultar la sesión autenticada. |
+| POST | `/api/logout` | Cerrar la sesión. |
+| POST | `/api/demo/episodios` | Crear un episodio ficticio. |
+| GET | `/api/demo/episodios/<codigo_episodio>` | Consultar un episodio del profesional autenticado. |
+
+El borrador del contrato se encuentra en `docs/contrato_api.md`.
+
+## Almacenamiento local
+
+Las cuentas, los episodios de demostración, la clave de sesión y los
+registros técnicos se guardan fuera del repositorio, en:
+
+```text
+~/.hrrg_pp2/
+```
+
+Esta carpeta contiene:
+
+- `usuarios.db`: cuentas de profesionales.
+- `triage_demo.db`: episodios ficticios y sus eventos.
+- `session.key`: clave de firma de las sesiones.
+- `sistema.log`: registro técnico, con archivos rotados.
+
+Estos archivos no deben subirse a GitHub.
+
+El registro de episodios demo todavía no almacena el proceso completo
+de triage. El guardado heredado del formulario en `pacientes.jsonl`
+sigue pendiente de revisión e integración con el registro de episodios.
+
+## Próximas integraciones
+
+- Conectar la maqueta con la autenticación y las API.
+- Incorporar los esquemas y validaciones entregados por Darío.
+- Integrar la extracción con MedGemma entregada por Tomás.
+- Completar la trazabilidad del proceso de triage y sus correcciones.
+- Incorporar la descarga opcional del informe en PDF.
+- Definir e integrar el motor de reglas con fuentes y criterios aprobados.
+- Completar las pruebas automáticas y la documentación de ejecución.
+
+El prototipo se prueba con casos ficticios. Las clasificaciones
+ilustrativas de la maqueta no representan un motor Manchester validado.
 
 
 > Las bases de datos locales, claves de sesión y registros generados
