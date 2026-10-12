@@ -1,35 +1,464 @@
 
-from flask import Flask, json, render_template, request, jsonify, send_from_directory
+from flask import Flask, json, render_template, request, jsonify, send_from_directory, session
 from ollama import chat, embed
 from PyPDF2 import PdfReader
+from werkzeug.security import generate_password_hash
+from pathlib import Path
+from datetime import timedelta
+from logging.handlers import RotatingFileHandler
+from src.auth import iniciar_sesion, profesional_activo
+from src.registro import inicializar_registro, crear_episodio, obtener_episodio
 
 
 import os
 import math
 import time
+import sqlite3
+import click
+import secrets
+import logging
 
 
-app = Flask(__name__)
+
+
+app = Flask(
+    __name__,
+    static_folder="frontend",
+    static_url_path=""
+)
+
+app.config["DEMO_DOCUMENTAL_HABILITADA"] = False
+# -----------------------------------------------
+# Formato común para los errores de la API.
+# -----------------------------------------------
+
+def respuesta_error(mensaje, estado, codigo):
+    return jsonify({
+        "ok": False,
+        "mensaje": mensaje,
+        "codigo": codigo
+    }), estado
+
 
 # ------------------------------------------------
-# Usuario y Contraseña Admin // Se puede modificar para más usuarios y contraseñas // Cambiar accesos
+# Carpeta local para las cuentas, fuera del repositorio. Administrada solo por persona autorizada. 
 # ------------------------------------------------
 
-usuario = {
-    "admin": "admin123",
-    "empleado": "empleado123"
-}
 
-# ------------------------------------------------
-# Función para iniciar sesión //
-# FALTA DEFINIR LA RUTA DESDE EL FRONTEND con @app.route("/login", methods=["POST"])
-# ------------------------------------------------
+CARPETA_DATOS = Path.home() / ".hrrg_pp2"
+CARPETA_DATOS.mkdir(parents=True, exist_ok=True)
+BASE_USUARIOS = CARPETA_DATOS / "usuarios.db"
+# Base exclusiva para episodios ficticios de demostración.
+BASE_REGISTRO_DEMO = CARPETA_DATOS / "triage_demo.db"
+inicializar_registro(BASE_REGISTRO_DEMO)
 
-def iniciar_sesion(username, password):
-    if username in usuario and usuario[username] == password:
-        return True
-    else:
-        return False
+# -----------------------------------------------
+# Registro de eventos del sistema.
+# -----------------------------------------------
+
+logger_sistema = logging.getLogger("hrrg.sistema")
+logger_sistema.setLevel(logging.INFO)
+logger_sistema.propagate = False
+
+if not logger_sistema.handlers:
+    manejador = RotatingFileHandler(
+        CARPETA_DATOS / "sistema.log",
+        maxBytes=1_000_000,
+        backupCount=3,
+        encoding="utf-8"
+    )
+
+    manejador.setFormatter(logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(message)s"
+    ))
+
+    logger_sistema.addHandler(manejador)
+
+#----------------------------------------
+# Clave privada para firmar las sesiones.
+#----------------------------------------
+ARCHIVO_CLAVE = CARPETA_DATOS / "session.key"
+
+try:
+    with ARCHIVO_CLAVE.open("x", encoding="utf-8") as archivo:
+        archivo.write(secrets.token_hex(32))
+except FileExistsError:
+    pass
+
+app.config["SECRET_KEY"] = ARCHIVO_CLAVE.read_text(
+    encoding="utf-8"
+).strip()
+#--------------------------------------
+# Configuración de la cookie de sesión.
+#--------------------------------------
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
+
+def inicializar_usuarios():
+    conexion = sqlite3.connect(BASE_USUARIOS)
+
+    try:
+        conexion.execute("""
+            CREATE TABLE IF NOT EXISTS profesionales (
+                id INTEGER PRIMARY KEY,
+                usuario TEXT UNIQUE NOT NULL,
+                nombre TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                activo INTEGER NOT NULL DEFAULT 1
+            )
+        """)
+        conexion.commit()
+    finally:
+        conexion.close()
+
+
+inicializar_usuarios()
+
+
+#--------------------------------------------
+# Ruta para iniciar sesión desde el frontend.
+#--------------------------------------------
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    if not request.is_json:
+        return respuesta_error(
+            mensaje="La solicitud debe estar en formato JSON.",
+            estado=415,
+            codigo="FORMATO_NO_SOPORTADO"
+        )
+
+    datos = request.get_json(silent=True)
+
+    if not isinstance(datos, dict):
+        return respuesta_error(
+            mensaje="El JSON recibido debe ser un objeto válido.",
+            estado=400,
+            codigo="JSON_INVALIDO"
+        )
+
+    usuario = datos.get("usuario")
+    password = datos.get("password")
+
+    if not isinstance(usuario, str) or not isinstance(password, str):
+        return respuesta_error(
+            mensaje="Debés enviar usuario y contraseña como texto.",
+            estado=400,
+            codigo="TIPOS_INVALIDOS"
+        )
+
+    usuario = usuario.strip()
+
+    if not usuario or not 1 <= len(password) <= 256:
+        return respuesta_error(
+            mensaje="Revisá el usuario y la contraseña.",
+            estado=400,
+            codigo="DATOS_INVALIDOS"
+        )
+
+    if not iniciar_sesion(BASE_USUARIOS, usuario, password):
+        logger_sistema.warning("LOGIN_RECHAZADO")
+
+        return respuesta_error(
+            mensaje="Usuario o contraseña incorrectos.",
+            estado=401,
+            codigo="CREDENCIALES_INVALIDAS"
+        )
+    
+
+    # Reemplazamos la sesión anterior.
+    session.clear()
+    session.permanent = True
+    session["usuario"] = usuario
+    logger_sistema.info("LOGIN_CORRECTO")
+
+    return jsonify({
+        "ok": True,
+        "mensaje": "Sesión iniciada correctamente.",
+        "usuario": usuario
+    }), 200
+
+#------------------------------------
+# Ruta para cerrar la sesión.
+#------------------------------------
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    if not request.is_json:
+        return respuesta_error(
+            mensaje="La solicitud debe estar en formato JSON.",
+            estado=415,
+            codigo="FORMATO_NO_SOPORTADO"
+        )
+
+    session.clear()
+    logger_sistema.info("LOGOUT_PROCESADO")
+    return jsonify({
+        "ok": True,
+        "mensaje": "Sesión cerrada correctamente."
+    }), 200
+
+# -----------------------------------------------
+# Consultar el usuario de la sesión actual desde el frontend.
+# -----------------------------------------------
+
+@app.route("/api/sesion", methods=["GET"])
+def consultar_sesion():
+    respuesta = jsonify({
+        "ok": True,
+        "usuario": session["usuario"]
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+#-----------------------------------------------
+# Control de acceso antes de ejecutar las rutas.
+#-----------------------------------------------
+
+@app.before_request
+def verificar_acceso():
+    if (
+        request.endpoint in {"chat_api", "upload"}
+        and not app.config["DEMO_DOCUMENTAL_HABILITADA"]
+    ):
+        return respuesta_error(
+            mensaje="La demo documental está deshabilitada.",
+            estado=503,
+            codigo="DEMO_DESHABILITADA"
+        )
+    rutas_protegidas = {
+        "paciente_form",
+        "chat_api",
+        "upload",
+        "consultar_sesion",
+        "crear_episodio_demo"
+        "consultar_episodio_demo"
+    }
+
+    if request.endpoint not in rutas_protegidas:
+        return None
+
+    usuario = session.get("usuario")
+
+    if usuario and profesional_activo(BASE_USUARIOS, usuario):
+        return None
+
+    session.clear()
+    return respuesta_error(
+        mensaje="Debés iniciar sesión para continuar.",
+        estado=401,
+        codigo="SESION_REQUERIDA"
+    )
+#---------------------------------------
+# Alta de cuentas desde la terminal de administración.
+#---------------------------------------
+
+
+@app.cli.command("crear-profesional")
+@click.option("--usuario", prompt="Usuario")
+@click.option("--nombre", prompt="Nombre del profesional")
+@click.option(
+    "--password",
+    prompt="Contraseña",
+    hide_input=False,
+    confirmation_prompt="Repetí la contraseña"
+)
+def crear_profesional(usuario, nombre, password):
+    usuario = usuario.strip()
+    nombre = nombre.strip()
+
+    if not usuario or not nombre:
+        raise click.ClickException(
+            "El usuario y el nombre no pueden estar vacíos."
+        )
+
+    if not 12 <= len(password) <= 256:
+        raise click.ClickException(
+            "La contraseña debe tener entre 12 y 256 caracteres."
+        )
+
+    password_hash = generate_password_hash(password)
+
+    conexion = sqlite3.connect(BASE_USUARIOS)
+
+    try:
+        conexion.execute(
+            """
+            INSERT INTO profesionales (usuario, nombre, password_hash)
+            VALUES (?, ?, ?)
+            """,
+            (usuario, nombre, password_hash)
+        )
+        conexion.commit()
+
+    except sqlite3.IntegrityError:
+        conexion.rollback()
+        raise click.ClickException("Ese usuario ya existe.")
+
+    finally:
+        conexion.close()
+
+    click.echo("Cuenta creada correctamente.")
+    # Cambio de contraseña desde la terminal de administración.
+@app.cli.command("cambiar-password")
+@click.option("--usuario", prompt="Usuario a modificar")
+@click.option(
+    "--password",
+    prompt="Nueva contraseña",
+    hide_input=False,
+    confirmation_prompt="Repetí la nueva contraseña"
+)
+def cambiar_password(usuario, password):
+    usuario = usuario.strip()
+
+    if not usuario:
+        raise click.ClickException("El usuario no puede estar vacío.")
+
+    if not 12 <= len(password) <= 256:
+        raise click.ClickException(
+            "La contraseña debe tener entre 12 y 256 caracteres."
+        )
+
+    password_hash = generate_password_hash(password)
+    conexion = sqlite3.connect(BASE_USUARIOS)
+
+    try:
+        resultado = conexion.execute(
+            """
+            UPDATE profesionales
+            SET password_hash = ?
+            WHERE usuario = ? AND activo = 1
+            """,
+            (password_hash, usuario)
+        )
+
+        if resultado.rowcount == 0:
+            conexion.rollback()
+            raise click.ClickException(
+                "El usuario no existe o está desactivado."
+            )
+
+        conexion.commit()
+
+    finally:
+        conexion.close()
+
+    click.echo("Contraseña actualizada correctamente.")
+
+
+# -----------------------------------------------
+# Crear un episodio ficticio para demostraciones.
+# -----------------------------------------------
+
+@app.route("/api/demo/episodios", methods=["POST"])
+def crear_episodio_demo():
+    if not request.is_json:
+        return respuesta_error(
+            "La solicitud debe estar en formato JSON.",
+            415,
+            "FORMATO_NO_SOPORTADO"
+        )
+
+    datos = request.get_json(silent=True)
+
+    if not isinstance(datos, dict):
+        return respuesta_error(
+            "El JSON recibido debe ser un objeto válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    campos = {"codigo_paciente", "codigo_episodio"}
+
+    if set(datos) != campos:
+        return respuesta_error(
+            "Enviá únicamente codigo_paciente y codigo_episodio.",
+            400,
+            "CAMPOS_INVALIDOS"
+        )
+
+    for campo in campos:
+        valor = datos[campo]
+        if not isinstance(valor, str) or not 1 <= len(valor.strip()) <= 100:
+            return respuesta_error(
+                f"{campo} debe ser un texto de entre 1 y 100 caracteres.",
+                422,
+                "IDENTIFICADOR_INVALIDO"
+            )
+
+    try:
+        episodio = crear_episodio(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=datos["codigo_episodio"],
+            codigo_paciente=datos["codigo_paciente"],
+            profesional_usuario=session["usuario"]
+        )
+    except sqlite3.IntegrityError as error:
+        if error.sqlite_errorname == "SQLITE_CONSTRAINT_PRIMARYKEY":
+            return respuesta_error(
+                "Ya existe un episodio con ese código.",
+                409,
+                "EPISODIO_EXISTENTE"
+            )
+
+        logger_sistema.error("ERROR_INTEGRIDAD_CREAR_EPISODIO_DEMO")
+        return respuesta_error(
+            "No se pudo registrar el episodio.",
+            500,
+            "ERROR_REGISTRO"
+        )
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_BASE_CREAR_EPISODIO_DEMO")
+        return respuesta_error(
+            "No se pudo registrar el episodio.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    return jsonify({
+        "ok": True,
+        "modo": "demo",
+        "episodio": episodio
+    }), 201
+
+# -----------------------------------------------
+# Consultar un episodio ficticio y su historial.
+# -----------------------------------------------
+
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>",
+    methods=["GET"]
+)
+def consultar_episodio_demo(codigo_episodio):
+    try:
+        episodio = obtener_episodio(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            profesional_usuario=session["usuario"]
+        )
+    except (sqlite3.Error, ValueError):
+        logger_sistema.error("ERROR_CONSULTAR_EPISODIO_DEMO")
+        return respuesta_error(
+            "No se pudo consultar el episodio.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    if episodio is None:
+        return respuesta_error(
+            "El episodio no existe o no tenés permiso para consultarlo.",
+            404,
+            "EPISODIO_NO_ENCONTRADO"
+        )
+
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "episodio": episodio
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
 
 # ------------------------------------------------
 # HOME / No hay un index.html definido, falta para el inicio de sesión.
@@ -58,7 +487,7 @@ def paciente_form():
         # Datos que vienen del formulario (3)
         tas = request.form.get("tas")
         tad = request.form.get("tad")
-        frec_cardiaca = request.form.get("frec_cardiacad")
+        frec_cardiaca = request.form.get("frec_cardiaca")
         frec_respiratoria = request.form.get("frec_respiratoria")
         saturacion = request.form.get("saturacion")
         temperatura = request.form.get("temperatura")
@@ -70,12 +499,36 @@ def paciente_form():
 
         # Datos que vienen del formulario (5)
 
-        # Guardar en un json nuevo // agregar archivo
-        with open("pacientes.json", "a") as f:
-            f.write(json.dumps({"codigo_episodio": codigo_episodio, "edad": edad, "sexo": sexo, "tas": tas, "tad": tad, "frec_cardiaca": frec_cardiaca, "frec_respiratoria": frec_respiratoria, "saturacion": saturacion, "temperatura": temperatura, "glasgow": glasgow, "dolor": dolor, "localizacion_dolor": localizacion_dolor}) + "\n")
+                # Reunimos los datos recibidos en un diccionario.
+        datos_paciente = {
+            "codigo_episodio": codigo_episodio,
+            "edad": edad,
+            "sexo": sexo,
+            "motivo_consulta": motivo_consulta,
+            "tas": tas,
+            "tad": tad,
+            "frec_cardiaca": frec_cardiaca,
+            "frec_respiratoria": frec_respiratoria,
+            "saturacion": saturacion,
+            "temperatura": temperatura,
+            "glasgow": glasgow,
+            "dolor": dolor,
+            "localizacion_dolor": localizacion_dolor
+        }
 
-        return jsonify({"message": "Formulario recibido", "codigo_episodio": codigo_episodio, "edad": edad, "sexo": sexo, "tas": tas, "tad": tad, "frec_cardiaca": frec_cardiaca, "frec_respiratoria": frec_respiratoria, "saturacion": saturacion, "temperatura": temperatura, "glasgow": glasgow, "dolor": dolor, "localizacion_dolor": localizacion_dolor})
-    return render_template("formulario.html")
+        # Guardamos una consulta por línea.
+        with open("pacientes.jsonl", "a", encoding="utf-8") as archivo:
+            archivo.write(
+                json.dumps(datos_paciente, ensure_ascii=False) + "\n"
+            )
+
+        # Devolvemos una respuesta al frontend.
+        return jsonify({
+            "message": "Formulario recibido",
+            "datos": datos_paciente
+        })
+    # Mostramos el formulario cuando se abre esta dirección.
+    return send_from_directory("frontend", "formulario.html")
 
 
 
