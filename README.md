@@ -93,16 +93,33 @@ _Se completará al cierre del proyecto: qué se descubrió, implicancias para el
 ---
 
 ## Archivos del proyecto
+## Archivos del proyecto
+
+```text
+HRRG---PP2/
+├── datos/                 → datos de trabajo y casos ficticios
+├── docs/                  → documentación del proyecto
+│   └── contrato_api.md    → borrador del contrato de la API
+├── evaluacion/            → pruebas y evaluación del prototipo
+├── frontend/              → pantallas, estilos, JavaScript e imágenes
+├── src/                   → módulos del backend
+│   ├── auth.py            → verificación de credenciales y cuentas activas
+│   ├── modelo.py          → componente del modelo
+│   ├── rag.py             → recuperación documental
+│   ├── registro.py        → persistencia y consulta de episodios demo
+│   ├── reglas.py          → componente de reglas
+│   ├── reporte.py         → generación de informes
+│   ├── salida.py          → tratamiento de salidas
+│   └── validacion.py      → validaciones de datos
+├── app.py                 → aplicación Flask, rutas y control de acceso
+├── requirements.txt       → dependencias del backend
+├── .gitignore             → exclusión de archivos locales y privados
+└── README.md              → presentación y guía del proyecto
 ```
-├── data/
-│   ├── raw/          → datos originales (sintéticos/anonimizados)
-│   └── processed/    → datos trabajados
-├── analysis/         → notebooks de pruebas y evaluación del modelo
-├── src/              → código del prototipo (API, RAG, interfaz)
-├── docs/             → documentación (ámbito de desarrollo, relevamiento normativo)
-├── reports/          → entregables e informes
-└── README.md
-```
+
+
+> Las bases de datos locales, claves de sesión y registros generados
+no se incluyen en el repositorio.
 > Los archivos pesados y la documentación oficial se encuentran en Google Drive.
 
 ---
