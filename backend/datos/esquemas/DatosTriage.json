@@ -1,0 +1,504 @@
+{
+  "additionalProperties": false,
+  "description": "Todo lo que recibe la API para pedir una sugerencia.",
+  "properties": {
+    "edad": {
+      "anyOf": [
+        {
+          "maximum": 120,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Edad",
+      "origen": "HCE",
+      "title": "Edad",
+      "unidad": "años"
+    },
+    "sexo": {
+      "anyOf": [
+        {
+          "enum": [
+            "Femenino",
+            "Masculino",
+            "No informado"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Sexo",
+      "origen": "HCE",
+      "title": "Sexo"
+    },
+    "motivo_categoria": {
+      "anyOf": [
+        {
+          "enum": [
+            "Dolor torácico",
+            "Dolor abdominal",
+            "Disnea",
+            "Trauma",
+            "Fiebre",
+            "Cefalea",
+            "Síntoma neurológico",
+            "Otro"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Categoría del motivo",
+      "origen": "IA",
+      "title": "Motivo Categoria"
+    },
+    "tiempo_evolucion_valor": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Desde hace (valor)",
+      "origen": "IA",
+      "title": "Tiempo Evolucion Valor"
+    },
+    "tiempo_evolucion_unidad": {
+      "anyOf": [
+        {
+          "enum": [
+            "minutos",
+            "horas",
+            "días"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Desde hace (unidad)",
+      "origen": "IA",
+      "title": "Tiempo Evolucion Unidad"
+    },
+    "motivo_consulta": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Motivo (resumen del relato)",
+      "origen": "IA",
+      "title": "Motivo Consulta"
+    },
+    "dolor_localizacion": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Dónde le duele",
+      "origen": "IA",
+      "title": "Dolor Localizacion"
+    },
+    "sintomas_asociados": {
+      "anyOf": [
+        {
+          "maxLength": 300,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Síntomas que refiere",
+      "origen": "IA",
+      "title": "Sintomas Asociados"
+    },
+    "dolor_caracteristicas": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Cómo es el dolor",
+      "origen": "IA",
+      "title": "Dolor Caracteristicas"
+    },
+    "br_sangrado": {
+      "default": false,
+      "description": "Sangrado evidente",
+      "origen": "IA",
+      "title": "Br Sangrado",
+      "type": "boolean"
+    },
+    "br_convulsion": {
+      "default": false,
+      "description": "Convulsión activa",
+      "origen": "IA",
+      "title": "Br Convulsion",
+      "type": "boolean"
+    },
+    "br_disnea": {
+      "default": false,
+      "description": "Dificultad para respirar",
+      "origen": "IA",
+      "title": "Br Disnea",
+      "type": "boolean"
+    },
+    "br_trauma": {
+      "default": false,
+      "description": "Mecanismo de trauma",
+      "origen": "IA",
+      "title": "Br Trauma",
+      "type": "boolean"
+    },
+    "ant_diabetes": {
+      "default": false,
+      "description": "Diabetes",
+      "origen": "IA",
+      "title": "Ant Diabetes",
+      "type": "boolean"
+    },
+    "ant_cardio": {
+      "default": false,
+      "description": "Cardiovascular",
+      "origen": "IA",
+      "title": "Ant Cardio",
+      "type": "boolean"
+    },
+    "ant_resp": {
+      "default": false,
+      "description": "Respiratorio",
+      "origen": "IA",
+      "title": "Ant Resp",
+      "type": "boolean"
+    },
+    "ant_anticoag": {
+      "default": false,
+      "description": "Anticoagulación",
+      "origen": "IA",
+      "title": "Ant Anticoag",
+      "type": "boolean"
+    },
+    "ant_inmuno": {
+      "default": false,
+      "description": "Inmunosupresión",
+      "origen": "IA",
+      "title": "Ant Inmuno",
+      "type": "boolean"
+    },
+    "ant_embarazo": {
+      "default": false,
+      "description": "Embarazo",
+      "origen": "IA",
+      "title": "Ant Embarazo",
+      "type": "boolean"
+    },
+    "ant_medicacion": {
+      "default": false,
+      "description": "Medicación crítica",
+      "origen": "IA",
+      "title": "Ant Medicacion",
+      "type": "boolean"
+    },
+    "alergias": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Alergias",
+      "origen": "IA",
+      "title": "Alergias"
+    },
+    "antecedentes_otros": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Otros antecedentes",
+      "origen": "IA",
+      "title": "Antecedentes Otros"
+    },
+    "ta_sistolica": {
+      "anyOf": [
+        {
+          "maximum": 260,
+          "minimum": 50,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "TA sistólica",
+      "origen": "medición",
+      "title": "Ta Sistolica",
+      "unidad": "mmHg"
+    },
+    "ta_diastolica": {
+      "anyOf": [
+        {
+          "maximum": 160,
+          "minimum": 20,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "TA diastólica",
+      "origen": "medición",
+      "title": "Ta Diastolica",
+      "unidad": "mmHg"
+    },
+    "frecuencia_cardiaca": {
+      "anyOf": [
+        {
+          "maximum": 250,
+          "minimum": 20,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Frec. cardíaca",
+      "origen": "medición",
+      "title": "Frecuencia Cardiaca",
+      "unidad": "lpm"
+    },
+    "frecuencia_respiratoria": {
+      "anyOf": [
+        {
+          "maximum": 60,
+          "minimum": 4,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Frec. respiratoria",
+      "origen": "medición",
+      "title": "Frecuencia Respiratoria",
+      "unidad": "rpm"
+    },
+    "saturacion_o2": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 50,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "SpO₂",
+      "origen": "medición",
+      "title": "Saturacion O2",
+      "unidad": "%"
+    },
+    "temperatura": {
+      "anyOf": [
+        {
+          "maximum": 43,
+          "minimum": 30,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Temperatura",
+      "origen": "medición",
+      "title": "Temperatura",
+      "unidad": "°C"
+    },
+    "glucemia": {
+      "anyOf": [
+        {
+          "maximum": 800,
+          "minimum": 20,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Glucemia capilar",
+      "origen": "medición",
+      "title": "Glucemia",
+      "unidad": "mg/dL"
+    },
+    "estado_conciencia": {
+      "anyOf": [
+        {
+          "enum": [
+            "Alerta",
+            "Responde a la voz",
+            "Responde al dolor",
+            "No responde"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Estado de conciencia (AVDN)",
+      "origen": "medición",
+      "title": "Estado Conciencia"
+    },
+    "glasgow": {
+      "anyOf": [
+        {
+          "maximum": 15,
+          "minimum": 3,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Glasgow",
+      "origen": "medición",
+      "title": "Glasgow",
+      "unidad": "3–15"
+    },
+    "dolor_intensidad": {
+      "anyOf": [
+        {
+          "maximum": 10,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Escala de dolor",
+      "origen": "medición",
+      "title": "Dolor Intensidad",
+      "unidad": "0–10"
+    },
+    "aspecto_general": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Aspecto general",
+      "origen": "medición",
+      "title": "Aspecto General"
+    },
+    "codigo_paciente": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Z]{2,4}-[A-Z0-9-]{3,20}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Código interno del paciente (no identifica a la persona)",
+      "origen": "sistema",
+      "title": "Codigo Paciente"
+    },
+    "codigo_episodio": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Z]{2,4}-[A-Z0-9-]{3,20}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Código de una atención concreta",
+      "origen": "sistema",
+      "title": "Codigo Episodio"
+    },
+    "pam": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "PAM calculada = (sistólica + 2·diastólica) / 3, mmHg",
+      "readOnly": true,
+      "title": "Pam"
+    }
+  },
+  "required": [
+    "pam"
+  ],
+  "title": "DatosTriage",
+  "type": "object"
+}
