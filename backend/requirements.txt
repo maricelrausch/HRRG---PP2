@@ -1,0 +1,9 @@
+#Requerimientos para correr la app.
+
+Flask==3.0.3
+ollama==0.6.2
+PyPDF2==3.0.1
+Werkzeug==3.0.3
+click==8.1.7
+
+
