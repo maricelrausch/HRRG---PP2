@@ -363,6 +363,31 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .userchip b{font-weight:600}
 .linkbtn{background:none;border:0;color:var(--accent-text);text-decoration:underline;cursor:pointer;font:inherit;font-size:12px;padding:0}
 .simbar{background:#FFF4D6;color:#5A4300;border-bottom:1px solid #E9D49A;padding:8px 16px;font-size:13px}
+
+/* ---- Asistente IA (chat) ---- */
+.tc-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.robot{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px 0 6px;border-radius:999px;border:0;background:var(--panel);color:var(--ink);font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.robot svg{width:34px;height:34px}
+.robot[aria-expanded="true"]{outline:3px solid var(--accent)}
+.chat{position:fixed;right:20px;bottom:20px;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 40px));display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.25);z-index:50;overflow:hidden}
+.chat[hidden]{display:none!important}
+.chat-head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--accent);color:var(--accent-ink)}
+.chat-head svg{width:30px;height:30px;flex:none}
+.chat-head b{display:block;font-size:15px}.chat-head small{font-size:12px;opacity:.9}
+.chat-head .x{margin-left:auto;background:none;border:0;color:inherit;font-size:22px;cursor:pointer;min-width:36px;min-height:36px}
+.chat-warn{font-size:12px;padding:6px 12px;background:#FFF4D6;color:#5A4300;border-bottom:1px solid #E9D49A}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--panel-2)}
+.msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:14px;line-height:1.4;white-space:pre-line}
+.msg.ia{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+.msg.yo{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.msg.typing{opacity:.7;font-style:italic}
+.chat-sug{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-top:1px solid var(--line)}
+.chat-sug button{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.chat-in{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--line)}
+.chat-in input{flex:1;min-height:42px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:var(--panel);color:var(--ink)}
+.chat-in button{min-width:42px;min-height:42px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-weight:600}
+.chat-in .send{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);padding:0 12px}
+.chat-in .vz[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 </style>
 </head>
 <body>
@@ -453,6 +478,19 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 
       <!-- 3 · RESUMEN -->
       <div class="body" id="s-resumen" hidden>
+        <div class="chat" id="chat" role="dialog" aria-label="Consultar a la IA" hidden>
+          <div class="chat-head"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23" fill="var(--accent)"/><line x1="24" y1="8" x2="24" y2="13" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="7" r="2.5" fill="#fff"/><rect x="12" y="13" width="24" height="19" rx="6" fill="#fff"/><circle cx="19" cy="22" r="3" fill="var(--accent)"/><circle cx="29" cy="22" r="3" fill="var(--accent)"/><rect x="19" y="27" width="10" height="2.5" rx="1.2" fill="var(--accent)"/><rect x="9" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="36" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="16" y="33" width="16" height="6" rx="3" fill="#fff"/></svg><div><b>Consultar a la IA</b><small>Sobre la sugerencia de este episodio</small></div><button type="button" class="x" id="chatX" aria-label="Cerrar">×</button></div>
+          <div class="chat-warn"><b>Simulación.</b> Respuestas de ejemplo, no de MedGemma. No diagnostica ni indica tratamientos.</div>
+          <div class="chat-msgs" id="chatMsgs" aria-live="polite"></div>
+          <div class="chat-sug" id="chatSug">
+            <button type="button">¿Por qué este color?</button><button type="button">¿Qué datos faltan?</button><button type="button">¿Qué lo haría subir?</button><button type="button">¿De dónde sale?</button>
+          </div>
+          <form class="chat-in" id="chatForm" autocomplete="off">
+            <button type="button" class="vz" id="chatMic" aria-pressed="false" title="Preguntar por voz">🎤</button>
+            <input id="chatTxt" placeholder="Escribí tu pregunta…" aria-label="Pregunta">
+            <button type="submit" class="send">Enviar</button>
+          </form>
+        </div>
         <div id="triageCard" class="triage" style="--mc:var(--m-amarillo);--mi:#1A1D26">
           <div class="origin prevline" id="tcPrev" hidden></div>
           <div class="triage-head">
@@ -461,7 +499,7 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
               <h3 id="tcName">AMARILLO</h3>
               <p id="tcDesc">Urgente · 60 min [tiempo de ejemplo]</p>
             </div>
-            <span class="ia-tag">Sugerencia · requiere validación</span>
+            <div class="tc-actions"><span class="ia-tag">Sugerencia · requiere validación</span><button type="button" class="robot" id="chatBtn" aria-expanded="false" aria-controls="chat" title="Consultar a la IA sobre esta sugerencia"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23" fill="var(--accent)"/><line x1="24" y1="8" x2="24" y2="13" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="7" r="2.5" fill="#fff"/><rect x="12" y="13" width="24" height="19" rx="6" fill="#fff"/><circle cx="19" cy="22" r="3" fill="var(--accent)"/><circle cx="29" cy="22" r="3" fill="var(--accent)"/><rect x="19" y="27" width="10" height="2.5" rx="1.2" fill="var(--accent)"/><rect x="9" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="36" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="16" y="33" width="16" height="6" rx="3" fill="#fff"/></svg>Consultar a la IA</button></div>
           </div>
           <div class="origin" id="tcOrigin"></div>
           <div class="triage-body">
@@ -706,6 +744,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function go(s){
+  if(s!=='resumen'&&$('#chat'))abrirChat(false);
   st.screen=s;
   if(!st.user){location.href='index.html';return}
   if(st.user.rol==='auditor'&&s!=='espera')s='espera';
@@ -1046,6 +1085,73 @@ $('#wList').addEventListener('click',e=>{
 });
 
 /* Acceso (demo: en el sistema real, usuarios locales con contraseña cifrada) */
+
+
+/* ===== Asistente IA (chat sobre la sugerencia) =====
+   HOY: respuestas SIMULADAS armadas con los datos del caso.
+   DESPUÉS: preguntarIA() llama a la ruta que publique Maricel (a acordar en docs/contrato_api.md),
+   enviando la pregunta + episodio + datos revisados + sugerencia. El texto que vuelva se muestra igual. */
+const CHAT_API=null;            // ej.: '/api/consulta' cuando exista
+const USAR_VOZ_REAL=false;      // true = reconocimiento de voz del navegador (envía audio a Google; solo casos ficticios)
+const AVISO='\n\n(Simulación. La decisión es del profesional.)';
+function respuestaSimulada(q){
+  const t=q.toLowerCase(),c=calcSug(),L=LEVELS[SUG][0];
+  const falt=missing().map(k=>{const f=byK(k);return f?f.l:k});
+  if(/diagn|tratamiento|medicaci|remedio|dosis|qu[eé] (le )?(doy|damos|indico)/.test(t))
+    return 'No puedo diagnosticar ni indicar tratamientos. Solo explico de dónde sale la prioridad sugerida. Para eso, consultá al médico de guardia.';
+  if(/falt|sin dato|medir|complet/.test(t))
+    return falt.length?'Faltan '+falt.length+' datos: '+falt.join(', ')+'.\nSi los cargás en Medición, la sugerencia se recalcula.':'No falta ningún dato obligatorio.';
+  if(/sub|empeor|m[aá]s urgente|cambiar|naranja|rojo/.test(t)){
+    if(SUG===0)return 'Ya está en '+L+', la prioridad más alta.';
+    const up=LEVELS[SUG-1][0],it=(DISC[diag()][SUG-1]||[]).map(x=>'• '+x[0]).join('\n');
+    return 'Pasaría a '+up+' si se cumple alguno de estos (guía de ejemplo):\n'+it;}
+  if(/fuente|gu[ií]a|de d[oó]nde|p[aá]gina|manchester/.test(t))
+    return 'Sale de la guía '+GUIA_VER+', diagrama «'+diagName()+'», nivel '+L+'.\nNo es la guía del hospital: es de ejemplo para el prototipo.';
+  if(/tiempo|esper|cu[aá]nto|minutos/.test(t))
+    return 'Para '+L+' el tiempo de ejemplo es: '+DESC[SUG]+'.\nLos tiempos reales salen de la guía del hospital.';
+  if(/por ?qu[eé]|motivo|raz[oó]n|color|prioridad/.test(t)){
+    const r=[...c.R.map(x=>'• Regla: '+x.t),...c.C.map(x=>'• Confirmado: '+x.t),...c.M.why.map(x=>'• Del relato: '+x)];
+    return 'Sugiero '+L+' por:\n'+r.join('\n')+(c.rl<c.M.lv?'\nUna regla de seguridad no deja bajar el color.':'');}
+  return 'Puedo explicarte por qué se sugirió '+L+', qué datos faltan, qué lo haría subir o de qué guía sale. Probá con alguna de esas preguntas.';
+}
+async function preguntarIA(q){
+  if(!CHAT_API){await new Promise(r=>setTimeout(r,600));return respuestaSimulada(q)+AVISO}
+  const r=await fetch(CHAT_API,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
+    body:JSON.stringify({pregunta:q,episodio:st.ep,datos:st.rev,sugerencia:LEVELS[SUG][0]})});
+  if(!r.ok)throw new Error(r.status);
+  return (await r.json()).respuesta;
+}
+function addMsg(txt,who){const d=document.createElement('div');d.className='msg '+who;d.textContent=txt;$('#chatMsgs').appendChild(d);$('#chatMsgs').scrollTop=1e9;return d}
+let chatBusy=false,chatEp=null;
+async function enviarChat(q){
+  q=q.trim();if(!q||chatBusy)return;chatBusy=true;$('#chatTxt').value='';
+  addMsg(q,'yo');const w=addMsg('Pensando…','ia typing');
+  try{w.textContent=await preguntarIA(q)}catch(e){w.textContent='No pude responder ('+e.message+'). Tu pregunta no se perdió: probá de nuevo.'}
+  w.classList.remove('typing');chatBusy=false;$('#chatTxt').focus();
+}
+function abrirChat(on){
+  $('#chat').hidden=!on;$('#chatBtn').setAttribute('aria-expanded',on);
+  if(on&&chatEp!==st.ep){$('#chatMsgs').innerHTML='';chatEp=st.ep}
+  if(on){if(!$('#chatMsgs').children.length)addMsg('Hola. Puedo explicarte la sugerencia '+LEVELS[SUG][0]+' de '+st.ep+'. Preguntame lo que necesites, escribiendo o por voz.'+AVISO,'ia');$('#chatTxt').focus()}
+}
+$('#chatBtn').addEventListener('click',()=>abrirChat($('#chat').hidden));
+$('#chatX').addEventListener('click',()=>abrirChat(false));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#chat').hidden)abrirChat(false)});
+$('#chatForm').addEventListener('submit',e=>{e.preventDefault();enviarChat($('#chatTxt').value)});
+$('#chatSug').addEventListener('click',e=>{if(e.target.tagName==='BUTTON')enviarChat(e.target.textContent)});
+/* Voz: simulada por defecto (igual que el dictado del Ingreso) */
+let chatRec=null,chatMicT=null;
+$('#chatMic').addEventListener('click',()=>{
+  const b=$('#chatMic'),on=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',on);
+  if(!on){if(chatRec)chatRec.stop();clearTimeout(chatMicT);return}
+  const SRc=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(USAR_VOZ_REAL&&SRc){chatRec=new SRc();chatRec.lang='es-AR';
+    chatRec.onresult=e=>{$('#chatTxt').value=e.results[0][0].transcript};
+    chatRec.onend=()=>{b.setAttribute('aria-pressed','false');enviarChat($('#chatTxt').value)};
+    chatRec.onerror=()=>{b.setAttribute('aria-pressed','false')};chatRec.start();return}
+  $('#chatTxt').value='Escuchando… (simulado)';
+  chatMicT=setTimeout(()=>{b.setAttribute('aria-pressed','false');$('#chatTxt').value='';enviarChat('¿Qué datos faltan?')},1500);
+});
 
 /* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
 function salir(){try{sessionStorage.removeItem('hrrg_demo_user')}catch(e){}location.href='index.html'}
