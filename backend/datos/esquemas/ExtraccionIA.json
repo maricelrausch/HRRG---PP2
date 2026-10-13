@@ -1,0 +1,234 @@
+{
+  "additionalProperties": false,
+  "description": "Campos que MedGemma extrae del relato. Todo opcional: lo que no se dice queda null.",
+  "properties": {
+    "motivo_categoria": {
+      "anyOf": [
+        {
+          "enum": [
+            "Dolor torácico",
+            "Dolor abdominal",
+            "Disnea",
+            "Trauma",
+            "Fiebre",
+            "Cefalea",
+            "Síntoma neurológico",
+            "Otro"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Categoría del motivo",
+      "origen": "IA",
+      "title": "Motivo Categoria"
+    },
+    "tiempo_evolucion_valor": {
+      "anyOf": [
+        {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Desde hace (valor)",
+      "origen": "IA",
+      "title": "Tiempo Evolucion Valor"
+    },
+    "tiempo_evolucion_unidad": {
+      "anyOf": [
+        {
+          "enum": [
+            "minutos",
+            "horas",
+            "días"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Desde hace (unidad)",
+      "origen": "IA",
+      "title": "Tiempo Evolucion Unidad"
+    },
+    "motivo_consulta": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Motivo (resumen del relato)",
+      "origen": "IA",
+      "title": "Motivo Consulta"
+    },
+    "dolor_localizacion": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Dónde le duele",
+      "origen": "IA",
+      "title": "Dolor Localizacion"
+    },
+    "sintomas_asociados": {
+      "anyOf": [
+        {
+          "maxLength": 300,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Síntomas que refiere",
+      "origen": "IA",
+      "title": "Sintomas Asociados"
+    },
+    "dolor_caracteristicas": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Cómo es el dolor",
+      "origen": "IA",
+      "title": "Dolor Caracteristicas"
+    },
+    "br_sangrado": {
+      "default": false,
+      "description": "Sangrado evidente",
+      "origen": "IA",
+      "title": "Br Sangrado",
+      "type": "boolean"
+    },
+    "br_convulsion": {
+      "default": false,
+      "description": "Convulsión activa",
+      "origen": "IA",
+      "title": "Br Convulsion",
+      "type": "boolean"
+    },
+    "br_disnea": {
+      "default": false,
+      "description": "Dificultad para respirar",
+      "origen": "IA",
+      "title": "Br Disnea",
+      "type": "boolean"
+    },
+    "br_trauma": {
+      "default": false,
+      "description": "Mecanismo de trauma",
+      "origen": "IA",
+      "title": "Br Trauma",
+      "type": "boolean"
+    },
+    "ant_diabetes": {
+      "default": false,
+      "description": "Diabetes",
+      "origen": "IA",
+      "title": "Ant Diabetes",
+      "type": "boolean"
+    },
+    "ant_cardio": {
+      "default": false,
+      "description": "Cardiovascular",
+      "origen": "IA",
+      "title": "Ant Cardio",
+      "type": "boolean"
+    },
+    "ant_resp": {
+      "default": false,
+      "description": "Respiratorio",
+      "origen": "IA",
+      "title": "Ant Resp",
+      "type": "boolean"
+    },
+    "ant_anticoag": {
+      "default": false,
+      "description": "Anticoagulación",
+      "origen": "IA",
+      "title": "Ant Anticoag",
+      "type": "boolean"
+    },
+    "ant_inmuno": {
+      "default": false,
+      "description": "Inmunosupresión",
+      "origen": "IA",
+      "title": "Ant Inmuno",
+      "type": "boolean"
+    },
+    "ant_embarazo": {
+      "default": false,
+      "description": "Embarazo",
+      "origen": "IA",
+      "title": "Ant Embarazo",
+      "type": "boolean"
+    },
+    "ant_medicacion": {
+      "default": false,
+      "description": "Medicación crítica",
+      "origen": "IA",
+      "title": "Ant Medicacion",
+      "type": "boolean"
+    },
+    "alergias": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Alergias",
+      "origen": "IA",
+      "title": "Alergias"
+    },
+    "antecedentes_otros": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Otros antecedentes",
+      "origen": "IA",
+      "title": "Antecedentes Otros"
+    }
+  },
+  "title": "ExtraccionIA",
+  "type": "object"
+}

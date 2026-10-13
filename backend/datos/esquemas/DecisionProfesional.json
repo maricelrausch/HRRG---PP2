@@ -1,0 +1,60 @@
+{
+  "properties": {
+    "codigo_episodio": {
+      "title": "Codigo Episodio",
+      "type": "string"
+    },
+    "id_profesional": {
+      "minLength": 1,
+      "title": "Id Profesional",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "aceptar",
+        "modificar",
+        "descartar"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "color_final": {
+      "anyOf": [
+        {
+          "enum": [
+            "Rojo",
+            "Naranja",
+            "Amarillo",
+            "Verde",
+            "Azul"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Color Final"
+    },
+    "motivo_discrepancia": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Motivo Discrepancia"
+    }
+  },
+  "required": [
+    "codigo_episodio",
+    "id_profesional",
+    "decision"
+  ],
+  "title": "DecisionProfesional",
+  "type": "object"
+}

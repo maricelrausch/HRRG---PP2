@@ -1,0 +1,212 @@
+{
+  "additionalProperties": false,
+  "description": "Rangos de PLAUSIBILIDAD (cortan errores de tipeo), no umbrales clínicos.",
+  "properties": {
+    "ta_sistolica": {
+      "anyOf": [
+        {
+          "maximum": 260,
+          "minimum": 50,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "TA sistólica",
+      "origen": "medición",
+      "title": "Ta Sistolica",
+      "unidad": "mmHg"
+    },
+    "ta_diastolica": {
+      "anyOf": [
+        {
+          "maximum": 160,
+          "minimum": 20,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "TA diastólica",
+      "origen": "medición",
+      "title": "Ta Diastolica",
+      "unidad": "mmHg"
+    },
+    "frecuencia_cardiaca": {
+      "anyOf": [
+        {
+          "maximum": 250,
+          "minimum": 20,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Frec. cardíaca",
+      "origen": "medición",
+      "title": "Frecuencia Cardiaca",
+      "unidad": "lpm"
+    },
+    "frecuencia_respiratoria": {
+      "anyOf": [
+        {
+          "maximum": 60,
+          "minimum": 4,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Frec. respiratoria",
+      "origen": "medición",
+      "title": "Frecuencia Respiratoria",
+      "unidad": "rpm"
+    },
+    "saturacion_o2": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 50,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "SpO₂",
+      "origen": "medición",
+      "title": "Saturacion O2",
+      "unidad": "%"
+    },
+    "temperatura": {
+      "anyOf": [
+        {
+          "maximum": 43,
+          "minimum": 30,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Temperatura",
+      "origen": "medición",
+      "title": "Temperatura",
+      "unidad": "°C"
+    },
+    "glucemia": {
+      "anyOf": [
+        {
+          "maximum": 800,
+          "minimum": 20,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Glucemia capilar",
+      "origen": "medición",
+      "title": "Glucemia",
+      "unidad": "mg/dL"
+    },
+    "estado_conciencia": {
+      "anyOf": [
+        {
+          "enum": [
+            "Alerta",
+            "Responde a la voz",
+            "Responde al dolor",
+            "No responde"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Estado de conciencia (AVDN)",
+      "origen": "medición",
+      "title": "Estado Conciencia"
+    },
+    "glasgow": {
+      "anyOf": [
+        {
+          "maximum": 15,
+          "minimum": 3,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Glasgow",
+      "origen": "medición",
+      "title": "Glasgow",
+      "unidad": "3–15"
+    },
+    "dolor_intensidad": {
+      "anyOf": [
+        {
+          "maximum": 10,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Escala de dolor",
+      "origen": "medición",
+      "title": "Dolor Intensidad",
+      "unidad": "0–10"
+    },
+    "aspecto_general": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Aspecto general",
+      "origen": "medición",
+      "title": "Aspecto General"
+    },
+    "pam": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "PAM calculada = (sistólica + 2·diastólica) / 3, mmHg",
+      "readOnly": true,
+      "title": "Pam"
+    }
+  },
+  "required": [
+    "pam"
+  ],
+  "title": "Mediciones",
+  "type": "object"
+}
