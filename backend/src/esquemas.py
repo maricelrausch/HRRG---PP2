@@ -42,7 +42,8 @@ ALIAS_ANTECEDENTES = {"diabetes": "ant_diabetes", "cardiaco": "ant_cardio",
 
 # Datos personales prohibidos en textos libres (Ley 25.326)
 PATRONES_PERSONALES = {
-    "DNI": r"\bdni\b|\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,8}\b",
+    "DNI": r"\bdni\b|\bdocumento\b|\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,}\b",
+    "email": r"[\w.+-]+@[\w.-]+\.[a-z]{2,}",
     "teléfono": r"\btel[eé]fono\b|\bcel(ular)?\b|\b\d{2,4}[- ]\d{6,8}\b",
     "nombre": r"\bme llamo\b|\bse llama\b|\bnombre\b|\bapellido\b",
     "domicilio": r"\bdomicilio\b|\bvive en\b|\bcalle\b|\bbarrio\b",
@@ -130,6 +131,11 @@ class Mediciones(_Base):
     glasgow: Optional[int] = _f(desc="Glasgow", origen="medición", unidad="3–15", ge=3, le=15)
     dolor_intensidad: Optional[int] = _f(desc="Escala de dolor", origen="medición", unidad="0–10", ge=0, le=10)
     aspecto_general: Optional[str] = _f(desc="Aspecto general", origen="medición", max_length=200)
+
+    @field_validator("aspecto_general")
+    @classmethod
+    def aspecto_sin_datos_personales(cls, v):
+        return ExtraccionIA.sin_datos_personales(v)
 
     @model_validator(mode="after")
     def tension_coherente(self):
@@ -286,7 +292,7 @@ def diccionario_markdown() -> str:
         "1. Tipo y rango de cada campo numérico según la tabla.",
         "2. Opciones cerradas: solo los valores listados.",
         "3. TA diastólica menor que sistólica.",
-        "4. Sin datos personales en textos libres (DNI, teléfono, nombre, domicilio) — Ley 25.326.",
+        "4. Sin datos personales en textos libres (DNI/documento, teléfono, email, nombre, domicilio) — Ley 25.326.",
         "5. Campos desconocidos se rechazan.",
         "6. Faltantes por etapa (`ingreso`, `medicion`) se listan, no bloquean.",
         "7. `codigo_paciente` y `codigo_episodio` con formato `XXX-XXXX` (ej.: PAC-DEMO-001, EPI-DEMO-001).",
