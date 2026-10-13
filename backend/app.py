@@ -476,7 +476,7 @@ def consultar_episodio_demo(codigo_episodio):
 def inicio():
     return send_from_directory(
         str(CARPETA_FRONTEND),
-        "maquetado_extraccion_v33.html"
+        "index.html"
     )
 
 # ------------------------------------------------
