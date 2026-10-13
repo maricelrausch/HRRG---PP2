@@ -240,7 +240,7 @@ def verificar_acceso():
         "chat_api",
         "upload",
         "consultar_sesion",
-        "crear_episodio_demo"
+        "crear_episodio_demo",
         "consultar_episodio_demo"
     }
 
