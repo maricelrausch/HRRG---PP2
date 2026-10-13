@@ -30,7 +30,7 @@
 - Cada respuesta termina con "Simulación. La decisión es del profesional."
 - Al cambiar de episodio, la conversación arranca de cero.
 
-> **Importante:** el chat **no está en el V2.1 ni en Trello**. Hay que sumar la tarjeta *A11 · Asistente de consulta sobre la sugerencia · Bárbara* y acordar la ruta en el contrato de la API.
+> **Importante:** el chat **no estaba en el V2.1**. En Trello se registra como un ítem más del checklist de **A03** (la versión simulada y rotulada) y su conexión real queda dentro de **A09**. Falta acordar la ruta en el contrato de la API.
 
 ### Qué falta para conectarlo
 
