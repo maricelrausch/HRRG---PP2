@@ -1,0 +1,887 @@
+{
+  "version": "1.2",
+  "fecha": "2026-10-13",
+  "aviso": "Casos FICTICIOS, sin datos de pacientes reales. 'nivel_maqueta' es el color que muestra la demo; NO tiene validez clínica. Los resultados esperados son técnicos (validación, faltantes, PAM).",
+  "casos": [
+    {
+      "id": "D01",
+      "tipo": "demo",
+      "fuente": "maquetado v33",
+      "relato": "Me duele el pecho desde hace media hora, como una presión, y estoy sudando.",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004818",
+        "motivo_categoria": "Dolor torácico",
+        "motivo_consulta": "Dolor de pecho opresivo con sudoración",
+        "tiempo_evolucion_valor": "30",
+        "tiempo_evolucion_unidad": "minutos",
+        "dolor_localizacion": "Tórax",
+        "sintomas_asociados": "Sudoración",
+        "antecedentes_otros": "Hipertensión",
+        "ta_sistolica": "150",
+        "ta_diastolica": "95",
+        "frecuencia_cardiaca": "110",
+        "frecuencia_respiratoria": "22",
+        "saturacion_o2": "94",
+        "temperatura": "36,8",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "8",
+        "codigo_paciente": "PAC-DEMO-001"
+      },
+      "nivel_maqueta": "Naranja",
+      "esperado": {
+        "valido": true,
+        "faltantes": [],
+        "pam": 113
+      }
+    },
+    {
+      "id": "D02",
+      "tipo": "demo",
+      "fuente": "maquetado v33",
+      "relato": "Me duele mucho la panza, acá arriba, desde hace unas 6 horas. Tengo ganas de vomitar y me siento afiebrada. Soy diabética, tomo pastillas.",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-002"
+      },
+      "nivel_maqueta": "Amarillo",
+      "esperado": {
+        "valido": true,
+        "faltantes": [],
+        "pam": 97
+      }
+    },
+    {
+      "id": "D03",
+      "tipo": "demo",
+      "fuente": "maquetado v33",
+      "relato": "Me torcí el tobillo jugando al fútbol, me duele al apoyar.",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004809",
+        "motivo_categoria": "Trauma",
+        "motivo_consulta": "Dolor de tobillo tras torcedura",
+        "tiempo_evolucion_valor": "2",
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Tobillo derecho",
+        "sintomas_asociados": "Le duele al apoyar",
+        "br_trauma": true,
+        "ta_sistolica": "120",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "80",
+        "frecuencia_respiratoria": "16",
+        "saturacion_o2": "98",
+        "temperatura": "36,5",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "4",
+        "codigo_paciente": "PAC-DEMO-003"
+      },
+      "nivel_maqueta": "Verde",
+      "esperado": {
+        "valido": true,
+        "faltantes": [],
+        "pam": 93
+      }
+    },
+    {
+      "id": "D04",
+      "tipo": "demo",
+      "fuente": "maquetado v33",
+      "relato": "Vengo a que me miren la herida de la mano, me la hicieron hace tres días.",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004806",
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Control de herida en la mano",
+        "tiempo_evolucion_valor": "3",
+        "tiempo_evolucion_unidad": "días",
+        "dolor_localizacion": "Mano izquierda",
+        "ta_sistolica": "118",
+        "ta_diastolica": "76",
+        "frecuencia_cardiaca": "72",
+        "frecuencia_respiratoria": "14",
+        "saturacion_o2": "99",
+        "temperatura": "36,4",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "1",
+        "codigo_paciente": "PAC-DEMO-004"
+      },
+      "nivel_maqueta": "Azul",
+      "esperado": {
+        "valido": true,
+        "faltantes": [],
+        "pam": 90
+      }
+    },
+    {
+      "id": "D05",
+      "tipo": "demo",
+      "fuente": "maquetado v33 (botón 'Demo: empeoró')",
+      "nivel_maqueta": "Naranja",
+      "relato": "Reevaluación del caso D02: empeoró.",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "125",
+        "frecuencia_respiratoria": "26",
+        "saturacion_o2": "86",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "br_disnea": true,
+        "codigo_paciente": "PAC-DEMO-002"
+      },
+      "esperado": {
+        "valido": true,
+        "faltantes": [],
+        "pam": 97
+      }
+    },
+    {
+      "id": "E01",
+      "tipo": "error",
+      "descripcion": "Error de tipeo: SpO2 8 en vez de 98",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": 8,
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-005"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "saturacion_o2"
+        ]
+      }
+    },
+    {
+      "id": "E02",
+      "tipo": "error",
+      "descripcion": "TA invertida",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": 80,
+        "ta_diastolica": 130,
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-006"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "diastólica"
+        ]
+      }
+    },
+    {
+      "id": "E03",
+      "tipo": "error",
+      "descripcion": "Dato personal en el motivo",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Se llama Ana, dolor de panza",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-007"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "dato personal"
+        ]
+      }
+    },
+    {
+      "id": "E04",
+      "tipo": "error",
+      "descripcion": "DNI en antecedentes",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "DNI 30123456",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-008"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "dato personal"
+        ]
+      }
+    },
+    {
+      "id": "E05",
+      "tipo": "error",
+      "descripcion": "Campo con nombre desconocido",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "presion": 120,
+        "codigo_paciente": "PAC-DEMO-009"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "presion: campo no permitido"
+        ]
+      }
+    },
+    {
+      "id": "E06",
+      "tipo": "error",
+      "descripcion": "Opción fuera de catálogo",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor de muela",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-010"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "motivo_categoria"
+        ]
+      }
+    },
+    {
+      "id": "E07",
+      "tipo": "error",
+      "descripcion": "Texto en un campo numérico",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "noventa",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-011"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "frecuencia_cardiaca"
+        ]
+      }
+    },
+    {
+      "id": "E08",
+      "tipo": "error",
+      "descripcion": "Código de episodio con formato inválido",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "Juan Pérez",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7"
+      },
+      "esperado": {
+        "valido": false,
+        "errores_contienen": [
+          "codigo_episodio"
+        ]
+      }
+    },
+    {
+      "id": "F01",
+      "tipo": "faltantes",
+      "descripcion": "Solo el relato, sin mediciones (etapa ingreso completa)",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio"
+      },
+      "esperado": {
+        "valido": true,
+        "faltantes": [
+          "ta_sistolica",
+          "ta_diastolica",
+          "frecuencia_cardiaca",
+          "frecuencia_respiratoria",
+          "saturacion_o2",
+          "temperatura",
+          "dolor_intensidad"
+        ],
+        "pam": null
+      }
+    },
+    {
+      "id": "F02",
+      "tipo": "faltantes",
+      "descripcion": "Campos vacíos del formulario cuentan como faltantes",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": "7",
+        "codigo_paciente": "PAC-DEMO-012"
+      },
+      "esperado": {
+        "valido": true,
+        "faltantes": [
+          "dolor_localizacion",
+          "temperatura"
+        ]
+      }
+    },
+    {
+      "id": "F03",
+      "tipo": "faltantes",
+      "descripcion": "Cero NO es faltante: dolor 0 es un valor real",
+      "entrada": {
+        "edad": 58,
+        "sexo": "Femenino",
+        "codigo_episodio": "EPI-004815",
+        "motivo_categoria": "Dolor abdominal",
+        "tiempo_evolucion_valor": "6",
+        "tiempo_evolucion_unidad": "horas",
+        "motivo_consulta": "Dolor abdominal alto con náuseas",
+        "dolor_localizacion": "Epigastrio",
+        "sintomas_asociados": "Náuseas, se siente afiebrada",
+        "ant_diabetes": true,
+        "antecedentes_otros": "Toma pastillas para la diabetes",
+        "ta_sistolica": "130",
+        "ta_diastolica": "80",
+        "frecuencia_cardiaca": "98",
+        "frecuencia_respiratoria": "18",
+        "saturacion_o2": "97",
+        "temperatura": "37,8",
+        "glucemia": "210",
+        "estado_conciencia": "Alerta",
+        "dolor_intensidad": 0,
+        "codigo_paciente": "PAC-DEMO-013"
+      },
+      "esperado": {
+        "valido": true,
+        "faltantes": []
+      }
+    },
+    {
+      "id": "A01",
+      "tipo": "alias",
+      "descripcion": "Nombres viejos (tas, saturacion, banderas_rojas, sexo 'F') se traducen",
+      "entrada": {
+        "edad": 58,
+        "sexo": "F",
+        "motivo_categoria": "Dolor torácico",
+        "tiempo_evolucion_valor": 30,
+        "tiempo_evolucion_unidad": "minutos",
+        "motivo_consulta": "Dolor de pecho opresivo",
+        "localizacion_dolor": "Tórax",
+        "tas": 150,
+        "tad": 95,
+        "frec_cardiaca": 110,
+        "frec_respiratoria": 22,
+        "saturacion": 94,
+        "temperatura": 36.8,
+        "dolor": 8,
+        "banderas_rojas": [
+          "dificultad_respiratoria"
+        ],
+        "antecedentes": [
+          "diabetes"
+        ]
+      },
+      "esperado": {
+        "valido": true,
+        "faltantes": [],
+        "pam": 113,
+        "campos": {
+          "sexo": "Femenino",
+          "saturacion_o2": 94,
+          "br_disnea": true,
+          "ant_diabetes": true
+        }
+      }
+    }
+  ],
+  "casos_extraccion": [
+    {
+      "id": "CF-01",
+      "tipo": "completo",
+      "texto": "Varón de 62 años con dolor opresivo en el pecho de 40 minutos de evolución, dolor 9/10. FC 112 lpm, FR 24, saturación 91 %, temperatura 36,8 °C. Alerta. Sin sangrado.",
+      "esperado_extraccion": {
+        "edad": 62,
+        "motivo_consulta": "Dolor torácico",
+        "tiempo_evolucion_valor": 40,
+        "tiempo_evolucion_unidad": "minutos",
+        "temperatura": 36.8,
+        "dolor_intensidad": 9,
+        "dolor_localizacion": "Tórax",
+        "frecuencia_cardiaca": 112,
+        "frecuencia_respiratoria": 24,
+        "saturacion_o2": 91,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": false,
+        "motivo_categoria": "Dolor torácico"
+      },
+      "diagrama_esperado": "Dolor torácico",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-02",
+      "tipo": "completo",
+      "texto": "Mujer de 24 años, dolor de garganta desde hace 3 días, dolor 2/10. Temperatura 36,6 °C, FC 78, FR 14, saturación 99 %. Lúcida. Niega sangrado.",
+      "esperado_extraccion": {
+        "edad": 24,
+        "motivo_consulta": "Dolor de garganta",
+        "tiempo_evolucion_valor": 3,
+        "tiempo_evolucion_unidad": "días",
+        "temperatura": 36.6,
+        "dolor_intensidad": 2,
+        "dolor_localizacion": "Garganta",
+        "frecuencia_cardiaca": 78,
+        "frecuencia_respiratoria": 14,
+        "saturacion_o2": 99,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": false,
+        "motivo_categoria": "Otro"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": "insuficiente",
+      "color_esperado": null,
+      "pagina_guia": null,
+      "nota": "Motivo fuera de los 3 diagramas cargados: el motor debe devolver NO_CONCLUYENTE",
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-03",
+      "tipo": "completo",
+      "texto": "Mujer de 52 años con dolor abdominal en flanco derecho de 5 horas, dolor 8/10, con vómitos. Temperatura 37,4 °C, FC 102, FR 20, saturación 98 %. Orientada. No presenta sangrado.",
+      "esperado_extraccion": {
+        "edad": 52,
+        "motivo_consulta": "Dolor abdominal",
+        "tiempo_evolucion_valor": 5,
+        "tiempo_evolucion_unidad": "horas",
+        "temperatura": 37.4,
+        "dolor_intensidad": 8,
+        "dolor_localizacion": "Flanco derecho",
+        "frecuencia_cardiaca": 102,
+        "frecuencia_respiratoria": 20,
+        "saturacion_o2": 98,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": false,
+        "motivo_categoria": "Dolor abdominal"
+      },
+      "diagrama_esperado": "Dolor abdominal en adulto",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-04",
+      "tipo": "completo",
+      "texto": "Varón de 30 años con fiebre y escalofríos desde hace 2 días. Temperatura 39,2 °C, FC 118, FR 22, saturación 95 %. Alerta. Refiere malestar general, sin dolor. Sin sangrado.",
+      "esperado_extraccion": {
+        "edad": 30,
+        "motivo_consulta": "Fiebre",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "días",
+        "temperatura": 39.2,
+        "dolor_intensidad": 0,
+        "frecuencia_cardiaca": 118,
+        "frecuencia_respiratoria": 22,
+        "saturacion_o2": 95,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": false,
+        "motivo_categoria": "Fiebre"
+      },
+      "diagrama_esperado": "Malestar en adulto / fiebre",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "nota": "'sin dolor' = 0 (el texto lo afirma); a confirmar en EQ1 si se acepta 0 o null",
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-05",
+      "tipo": "faltantes",
+      "texto": "Mujer de 47 años que consulta por dolor torácico. Dolor 6/10.",
+      "esperado_extraccion": {
+        "edad": 47,
+        "motivo_consulta": "Dolor torácico",
+        "dolor_intensidad": 6,
+        "dolor_localizacion": "Tórax",
+        "motivo_categoria": "Dolor torácico"
+      },
+      "diagrama_esperado": "Dolor torácico",
+      "estado_esperado": "insuficiente",
+      "color_esperado": null,
+      "pagina_guia": null,
+      "nota": "Faltan signos vitales: no debe asignar color por defecto",
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-06",
+      "tipo": "faltantes",
+      "texto": "Consulta por dolor de panza desde ayer.",
+      "esperado_extraccion": {
+        "motivo_consulta": "Dolor abdominal",
+        "dolor_localizacion": "Abdomen",
+        "motivo_categoria": "Dolor abdominal"
+      },
+      "diagrama_esperado": "Dolor abdominal en adulto",
+      "estado_esperado": "insuficiente",
+      "color_esperado": null,
+      "pagina_guia": null,
+      "nota": "'desde ayer' no se convierte: valor y unidad en null",
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-07",
+      "tipo": "decimales_coma",
+      "texto": "Varón de 68 años, fiebre de 38,6 °C y tos con flema hace 4 días. FC 104 lpm, FR 24, saturación 92 %. Despierto. Niega sangrado.",
+      "esperado_extraccion": {
+        "edad": 68,
+        "motivo_consulta": "Fiebre y tos",
+        "tiempo_evolucion_valor": 4,
+        "tiempo_evolucion_unidad": "días",
+        "temperatura": 38.6,
+        "frecuencia_cardiaca": 104,
+        "frecuencia_respiratoria": 24,
+        "saturacion_o2": 92,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": false,
+        "motivo_categoria": "Fiebre"
+      },
+      "diagrama_esperado": "Malestar en adulto / fiebre",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Prueba la coma decimal en la temperatura (38,6). La FC se registra sin decimales."
+    },
+    {
+      "id": "CF-08",
+      "tipo": "incompatible",
+      "texto": "Paciente de sesenta años con dolor abdominal intenso hace 2 horas. Temperatura 37 grados.",
+      "esperado_extraccion": {
+        "edad": 60,
+        "motivo_consulta": "Dolor abdominal",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "horas",
+        "temperatura": 37,
+        "dolor_localizacion": "Abdomen",
+        "motivo_categoria": "Dolor abdominal"
+      },
+      "diagrama_esperado": "Dolor abdominal en adulto",
+      "estado_esperado": "insuficiente",
+      "color_esperado": null,
+      "pagina_guia": null,
+      "nota": "Edad en letras -> 60. 'Dolor intenso' sin número -> null (no inventar 8 o 9)",
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-09",
+      "tipo": "incompatible",
+      "texto": "Adulto mayor con dolor en el pecho de unos minutos, refiere que es 'muy fuerte'. Saturación normal según familiar.",
+      "esperado_extraccion": {
+        "motivo_consulta": "Dolor torácico",
+        "dolor_localizacion": "Tórax",
+        "motivo_categoria": "Dolor torácico"
+      },
+      "diagrama_esperado": "Dolor torácico",
+      "estado_esperado": "insuficiente",
+      "color_esperado": null,
+      "pagina_guia": null,
+      "nota": "Trampa: 'adulto mayor', 'unos minutos', 'muy fuerte' y 'saturación normal' no tienen número -> todo null. El modelo NO debe inventar 98 %",
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-10",
+      "tipo": "negaciones",
+      "texto": "Mujer de 35 años con dolor abdominal 5/10 de 12 horas. Niega fiebre, niega sangrado. FC 88, FR 16, saturación 98 %, temperatura 36,7 °C. Lúcida.",
+      "esperado_extraccion": {
+        "edad": 35,
+        "motivo_consulta": "Dolor abdominal",
+        "tiempo_evolucion_valor": 12,
+        "tiempo_evolucion_unidad": "horas",
+        "temperatura": 36.7,
+        "dolor_intensidad": 5,
+        "dolor_localizacion": "Abdomen",
+        "frecuencia_cardiaca": 88,
+        "frecuencia_respiratoria": 16,
+        "saturacion_o2": 98,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": false,
+        "motivo_categoria": "Dolor abdominal"
+      },
+      "diagrama_esperado": "Dolor abdominal en adulto",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-11",
+      "tipo": "conciencia_alterada",
+      "texto": "Varón de 71 años traído por familiares, malestar general desde hace 6 horas, solo responde cuando se le habla fuerte. Temperatura 38,9 °C, FC 124, FR 28, saturación 89 %.",
+      "esperado_extraccion": {
+        "edad": 71,
+        "motivo_consulta": "Malestar general",
+        "tiempo_evolucion_valor": 6,
+        "tiempo_evolucion_unidad": "horas",
+        "temperatura": 38.9,
+        "frecuencia_cardiaca": 124,
+        "frecuencia_respiratoria": 28,
+        "saturacion_o2": 89,
+        "estado_conciencia": "Responde a la voz",
+        "motivo_categoria": "Otro"
+      },
+      "diagrama_esperado": "Malestar en adulto / fiebre",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      }
+    },
+    {
+      "id": "CF-12",
+      "tipo": "hemorragia",
+      "texto": "Varón de 58 años con dolor abdominal y vómitos con sangre desde hace 1 hora. Dolor 6/10. FC 120, FR 22, saturación 95 %, temperatura 36,5 °C. Alerta, se marea al pararse.",
+      "esperado_extraccion": {
+        "edad": 58,
+        "motivo_consulta": "Dolor abdominal con vómitos con sangre",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "horas",
+        "temperatura": 36.5,
+        "dolor_intensidad": 6,
+        "dolor_localizacion": "Abdomen",
+        "frecuencia_cardiaca": 120,
+        "frecuencia_respiratoria": 22,
+        "saturacion_o2": 95,
+        "estado_conciencia": "Alerta",
+        "br_sangrado": true,
+        "motivo_categoria": "Dolor abdominal"
+      },
+      "diagrama_esperado": "Dolor abdominal en adulto",
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      }
+    }
+  ],
+  "casos_api": [
+    {
+      "id": "API-01",
+      "tipo": "texto_vacio",
+      "texto": "",
+      "esperado_http": 422
+    },
+    {
+      "id": "API-02",
+      "tipo": "solo_espacios",
+      "texto": "   ",
+      "esperado_http": 422
+    }
+  ],
+  "aviso_extraccion": "casos_extraccion: texto libre -> campos que debe extraer MedGemma (C05/C06). color_esperado lo completa C07 con la guía oficial, citando página; mientras sea null solo se evalúa la extracción. estado_esperado 'insuficiente' = NO_CONCLUYENTE."
+}
