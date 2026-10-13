@@ -1,1 +1,114 @@
+# Frontend · Qué se hizo y qué falta para conectarlo
 
+**Responsable:** Bárbara (frontend/) · **Fecha:** 12/10/2026 · **Base:** maquetado v34
+**Estado general:** todo funciona en **modo simulado**. Ninguna pantalla habla todavía con el backend ni con MedGemma.
+
+---
+
+## 1. Qué se hizo
+
+| Tarea | Archivo | Qué cambió |
+|---|---|---|
+| A01 · Montar el flujo | `frontend/formulario.html` | El v34 pasa a ser el formulario del proyecto. El formulario anterior se conserva como `frontend/formulario_original.html` (sigue usando `formulario.js` y `validacion.js`). |
+| A02 · Login simulado | `frontend/index.html` + `frontend/login.js` | El login salió del maquetado a su propia página. Usuarios de demo: `enfermeria`, `medico`, `auditor` (clave `demo`). Guarda el usuario en `sessionStorage` y pasa a `formulario.html`. Si alguien abre el formulario sin pasar por el login, lo devuelve al login. "Salir" borra la sesión. |
+| A03 · Rotular simulaciones | `frontend/formulario.html` | Cartel amarillo fijo en todas las pantallas ("Datos ficticios · Simulación"). Se sacaron las atribuciones a MedGemma y a la guía del HRRG: ahora dice "Prioridad de ejemplo · simulada", "guía de ejemplo, no oficial", "Modelo: SIMULADO", "IA: simulada". |
+| A04 · Guion de la demo | `docs/guion_demo.md` | Recorrido de 5 a 7 minutos, qué decir en cada pantalla y preguntas probables. |
+| **Nuevo** · Asistente IA | `frontend/formulario.html` | En la pantalla **Sugerencia** hay un botón con un robot ("Consultar a la IA") que abre un chat. Ver punto 2. |
+
+**Cómo probarlo:** abrir `frontend/index.html` con doble clic. No necesita servidor, ni internet, ni Ollama.
+
+---
+
+## 2. Asistente IA (chat sobre la sugerencia)
+
+**Para qué sirve:** que el profesional pueda preguntar sobre la sugerencia de ese episodio, por texto o por voz, las veces que necesite. Por ejemplo: por qué ese color, qué datos faltan, qué lo haría subir o de qué guía sale.
+
+**Qué hace hoy (simulado):**
+
+- Las respuestas se arman en el navegador con los datos del caso (función `respuestaSimulada()`): color, motivos, datos faltantes y discriminadores de la guía de ejemplo.
+- Si preguntan por diagnóstico, medicación o tratamiento, **no responde** y deriva al médico.
+- Cada respuesta termina con "Simulación. La decisión es del profesional."
+- Al cambiar de episodio, la conversación arranca de cero.
+
+> **Importante:** el chat **no está en el V2.1 ni en Trello**. Hay que sumar la tarjeta *A11 · Asistente de consulta sobre la sugerencia · Bárbara* y acordar la ruta en el contrato de la API.
+
+### Qué falta para conectarlo
+
+En `formulario.html` está todo preparado. Solo hay que cambiar **una línea**:
+
+```js
+const CHAT_API = null;              // hoy: simulado
+const CHAT_API = '/api/consulta';   // cuando exista la ruta
+```
+
+Con eso, el chat deja de usar las respuestas simuladas y llama al backend.
+
+| Quién | Qué tiene que hacer |
+|---|---|
+| **Maricel** (app.py) | Publicar `POST /api/consulta` con sesión obligatoria (401 si no hay usuario) y documentarla en `docs/contrato_api.md`. |
+| **Tomás** (src/rag.py) | Función que reciba la pregunta + el contexto del caso y devuelva una respuesta basada en la guía (RAG, tarea B06). No debe diagnosticar ni indicar tratamientos. |
+| **Darío** | Sumar al esquema los modelos de entrada y salida de la consulta, y casos de prueba (incluida una pregunta prohibida). |
+| **Bárbara** | Cambiar `CHAT_API`, mostrar los errores 401/503/504 y probar con el backend. |
+
+**Contrato propuesto** (para discutir y pasar a `docs/contrato_api.md`):
+
+```
+POST /api/consulta
+Entrada:  { "pregunta": "¿Por qué amarillo?", "episodio": "EP-004812",
+            "datos": { ...datos revisados... }, "sugerencia": "AMARILLO" }
+Salida:   { "respuesta": "texto", "fuentes": ["Guía ..., diagrama ..., pág. ..."] }
+Errores:  401 sin sesión · 422 pregunta vacía · 503 IA no disponible · 504 tiempo agotado
+```
+
+---
+
+## 3. La voz: por qué "no funciona" y cómo hacer que funcione
+
+### Por qué no funciona
+
+**No es un error del código: la voz está simulada a propósito.** Hay dos lugares con micrófono:
+
+- **Dictado del Ingreso:** al tocar "Dictar", espera 1,8 segundos y agrega una frase fija ("Esta mañana vomité una vez.").
+- **Micrófono del chat:** espera 1,5 segundos y manda la pregunta "¿Qué datos faltan?".
+
+Ninguno de los dos usa el micrófono real. Se hizo así porque la opción más fácil para tener voz real tiene problemas para este proyecto:
+
+1. **Privacidad.** El reconocimiento de voz que trae el navegador (Web Speech API) **manda el audio a servidores de Google**. Eso choca con la regla de que los datos no salen de la computadora.
+2. **Compatibilidad.** Solo anda en Chrome y Edge, y necesita internet.
+3. **Permisos.** Si el archivo se abre con doble clic (`file://`), el navegador suele bloquear el micrófono. Necesita servirse desde `http://localhost` (por ejemplo, desde Flask).
+
+### Cómo hacer que funcione
+
+**Opción A · Para una demo con casos ficticios (rápida)**
+
+- **Chat:** en `formulario.html` cambiar `const USAR_VOZ_REAL = false;` a `true`. Ya está programado.
+- **Dictado del Ingreso:** reemplazar el bloque del botón `#mic` por la versión con `webkitSpeechRecognition` (la pide Bárbara cuando se decida).
+- Abrir la app desde `http://localhost`, no con doble clic, y aceptar el permiso del micrófono.
+- Avisar en pantalla: *"El dictado usa el reconocimiento de voz del navegador (Google): solo casos ficticios."*
+
+**Opción B · Para el sistema real (voz 100 % local)**
+
+Usar **Whisper** corriendo en la misma computadora, igual que Ollama:
+
+1. **Tomás:** instalar `faster-whisper` y crear en `backend/src/voz.py` la función `transcribir(audio) -> texto`.
+2. **Maricel:** publicar `POST /api/transcribir` en `app.py`, que recibe el audio y devuelve `{ "texto": "..." }`. Las dependencias van a `requirements.txt`.
+3. **Bárbara:** grabar con `MediaRecorder` (está en el navegador, no manda nada afuera), enviar el audio a `/api/transcribir` y poner el texto en el relato o en el chat.
+
+Así el audio nunca sale de la computadora del box.
+
+---
+
+## 4. Pendientes del frontend
+
+| # | Pendiente | Depende de | Tarea |
+|---|---|---|---|
+| 1 | Login real (`/api/login`, `/api/sesion`, `/api/logout`) | D04 · Maricel | A07 |
+| 2 | Separar HTML, CSS y JS del formulario | A04 + C01 · Darío | A05 |
+| 3 | "Extraer datos" contra la API (primero con JSON simulado) | D03 · Maricel + contrato D02 | A06 |
+| 4 | Revisión y resumen con datos reales | A06 + C03/C04 + D05/D06 | A08 |
+| 5 | Conectar el chat (`CHAT_API`) | `/api/consulta` · Maricel + RAG · Tomás | A11 (nueva) |
+| 6 | Voz real (opción A o B) | Decisión del equipo; opción B: Tomás + Maricel | A11 / A06 |
+| 7 | Tarjeta de sugerencia con datos reales | Guías autorizadas por el HRRG | A09 ⏸ |
+| 8 | Espera y reevaluación persistidas | D10 | A10 ⏸ |
+
+**Reglas que se mantienen:** solo casos ficticios; nada se atribuye a MedGemma ni al HRRG mientras sea simulación; la decisión final es siempre del profesional.
