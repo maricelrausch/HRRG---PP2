@@ -43,7 +43,8 @@ Tabla de control generada desde `src/esquemas.py`. El documento del equipo es `d
 | `glasgow` | Glasgow | entero | 3–15 | 3–15 | medición | no |  |
 | `dolor_intensidad` | Escala de dolor | entero | 0–10 | 0–10 | medición | medicion | `dolor` |
 | `aspecto_general` | Aspecto general | texto |  |  | medición | no |  |
-| `codigo_episodio` | Código de episodio (no identifica al paciente) | texto |  |  | sistema | no |  |
+| `codigo_paciente` | Código interno del paciente (no identifica a la persona) | texto |  |  | sistema | no |  |
+| `codigo_episodio` | Código de una atención concreta | texto |  |  | sistema | no |  |
 | `pam` | PAM calculada (sistólica + 2·diastólica) / 3 | entero | mmHg |  | calculado | no |  |
 
 ## Controles técnicos (backend `src/validacion.py`; reflejar en `frontend/validacion.js`)
@@ -54,4 +55,4 @@ Tabla de control generada desde `src/esquemas.py`. El documento del equipo es `d
 4. Sin datos personales en textos libres (DNI, teléfono, nombre, domicilio) — Ley 25.326.
 5. Campos desconocidos se rechazan.
 6. Faltantes por etapa (`ingreso`, `medicion`) se listan, no bloquean.
-7. `codigo_episodio` con formato `EP-XXXXXX`.
+7. `codigo_paciente` y `codigo_episodio` con formato `XXX-XXXX` (ej.: PAC-DEMO-001, EPI-DEMO-001).

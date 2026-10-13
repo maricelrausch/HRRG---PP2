@@ -1,7 +1,7 @@
 """
 Esquemas Pydantic — FUENTE ÚNICA de nombres, tipos, unidades y rangos (Diccionario V2).
 Los nombres son los del maquetado v33 (frontend). Los nombres viejos se aceptan como alias.
- 
+
   Identificacion        -> edad, sexo (vienen de la HCE)
   ExtraccionIA          -> lo que MedGemma extrae del relato (Tomás)
   Mediciones            -> signos vitales y escalas (los toma enfermería)
@@ -9,23 +9,23 @@ Los nombres son los del maquetado v33 (frontend). Los nombres viejos se aceptan 
   SalidaModelo          -> sugerencia de color que devuelve MedGemma
   ResultadoHospital     -> SalidaModelo + campos que agrega Python
   DecisionProfesional   -> aceptar / modificar / descartar (revisión humana)
- 
+
 Regenerar JSON Schema + tabla de control:   python -m src.esquemas
 """
 import json
 import re
 from pathlib import Path
 from typing import Literal, Optional, get_args, get_origin
- 
+
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
- 
+
 Color = Literal["Rojo", "Naranja", "Amarillo", "Verde", "Azul"]
 Sexo = Literal["Femenino", "Masculino", "No informado"]
 Categoria = Literal["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
                     "Cefalea", "Síntoma neurológico", "Otro"]
 UnidadTiempo = Literal["minutos", "horas", "días"]
 Conciencia = Literal["Alerta", "Responde a la voz", "Responde al dolor", "No responde"]
- 
+
 # ---------- Alias: nombre viejo -> nombre V2 ----------
 ALIAS = {
     "tas": "ta_sistolica", "tad": "ta_diastolica",
@@ -39,7 +39,7 @@ ALIAS_BANDERAS = {"sangrado": "br_sangrado", "convulsion": "br_convulsion",
                   "dificultad_respiratoria": "br_disnea", "trauma": "br_trauma"}
 ALIAS_ANTECEDENTES = {"diabetes": "ant_diabetes", "cardiaco": "ant_cardio",
                       "medicacion_critica": "ant_medicacion"}
- 
+
 # Datos personales prohibidos en textos libres (Ley 25.326)
 PATRONES_PERSONALES = {
     "DNI": r"\bdni\b|\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,8}\b",
@@ -47,7 +47,7 @@ PATRONES_PERSONALES = {
     "nombre": r"\bme llamo\b|\bse llama\b|\bnombre\b|\bapellido\b",
     "domicilio": r"\bdomicilio\b|\bvive en\b|\bcalle\b|\bbarrio\b",
 }
- 
+
 # Obligatoriedad por etapa: si faltan NO se rechaza; se informan como missing_data
 OBLIGATORIOS = {
     "ingreso": ["edad", "sexo", "motivo_categoria", "tiempo_evolucion_valor",
@@ -55,19 +55,19 @@ OBLIGATORIOS = {
     "medicion": ["ta_sistolica", "ta_diastolica", "frecuencia_cardiaca",
                  "frecuencia_respiratoria", "saturacion_o2", "temperatura", "dolor_intensidad"],
 }
- 
- 
+
+
 def _f(default=None, *, desc, origen, unidad=None, **kw):
     """Field con metadatos del diccionario (unidad y origen)."""
     extra = {"origen": origen}
     if unidad:
         extra["unidad"] = unidad
     return Field(default, description=desc, json_schema_extra=extra, **kw)
- 
- 
+
+
 class _Base(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
- 
+
     @field_validator("*", mode="before")
     @classmethod
     def limpiar(cls, v):
@@ -76,13 +76,13 @@ class _Base(BaseModel):
         if isinstance(v, str) and re.fullmatch(r"-?\d+,\d+", v.strip()):
             return v.strip().replace(",", ".")            # "37,8" -> "37.8"
         return v
- 
- 
+
+
 class Identificacion(_Base):
     edad: Optional[int] = _f(desc="Edad", origen="HCE", unidad="años", ge=0, le=120)
     sexo: Optional[Sexo] = _f(desc="Sexo", origen="HCE")
- 
- 
+
+
 class ExtraccionIA(_Base):
     """Campos que MedGemma extrae del relato. Todo opcional: lo que no se dice queda null."""
     motivo_categoria: Optional[Categoria] = _f(desc="Categoría del motivo", origen="IA")
@@ -105,7 +105,7 @@ class ExtraccionIA(_Base):
     ant_medicacion: bool = _f(False, desc="Medicación crítica", origen="IA")
     alergias: Optional[str] = _f(desc="Alergias", origen="IA", max_length=200)
     antecedentes_otros: Optional[str] = _f(desc="Otros antecedentes", origen="IA", max_length=200)
- 
+
     @field_validator("motivo_consulta", "dolor_localizacion", "sintomas_asociados",
                      "dolor_caracteristicas", "alergias", "antecedentes_otros")
     @classmethod
@@ -115,8 +115,8 @@ class ExtraccionIA(_Base):
                 if re.search(patron, v.lower()):
                     raise ValueError(f"posible dato personal ({tipo}); quitarlo")
         return v
- 
- 
+
+
 class Mediciones(_Base):
     """Rangos de PLAUSIBILIDAD (cortan errores de tipeo), no umbrales clínicos."""
     ta_sistolica: Optional[int] = _f(desc="TA sistólica", origen="medición", unidad="mmHg", ge=50, le=260)
@@ -130,27 +130,29 @@ class Mediciones(_Base):
     glasgow: Optional[int] = _f(desc="Glasgow", origen="medición", unidad="3–15", ge=3, le=15)
     dolor_intensidad: Optional[int] = _f(desc="Escala de dolor", origen="medición", unidad="0–10", ge=0, le=10)
     aspecto_general: Optional[str] = _f(desc="Aspecto general", origen="medición", max_length=200)
- 
+
     @model_validator(mode="after")
     def tension_coherente(self):
         s, d = self.ta_sistolica, self.ta_diastolica
         if s is not None and d is not None and d >= s:
             raise ValueError(f"diastólica ({d}) mayor o igual a sistólica ({s})")
         return self
- 
+
     @computed_field(description="PAM calculada = (sistólica + 2·diastólica) / 3, mmHg")
     @property
     def pam(self) -> Optional[int]:
         if self.ta_sistolica is None or self.ta_diastolica is None:
             return None
         return round((self.ta_sistolica + 2 * self.ta_diastolica) / 3)
- 
- 
+
+
 class DatosTriage(Mediciones, ExtraccionIA, Identificacion):
     """Todo lo que recibe la API para pedir una sugerencia."""
-    codigo_episodio: Optional[str] = _f(desc="Código de episodio (no identifica al paciente)",
-                                        origen="sistema", pattern=r"^EP-[A-Z0-9]{4,10}$")
- 
+    codigo_paciente: Optional[str] = _f(desc="Código interno del paciente (no identifica a la persona)",
+                                        origen="sistema", pattern=r"^[A-Z]{2,4}-[A-Z0-9-]{3,20}$")
+    codigo_episodio: Optional[str] = _f(desc="Código de una atención concreta",
+                                        origen="sistema", pattern=r"^[A-Z]{2,4}-[A-Z0-9-]{3,20}$")
+
     @model_validator(mode="before")
     @classmethod
     def traducir_alias(cls, datos):
@@ -164,24 +166,24 @@ class DatosTriage(Mediciones, ExtraccionIA, Identificacion):
         if d.get("sexo") in ALIAS_SEXO:
             d["sexo"] = ALIAS_SEXO[d["sexo"]]
         return d
- 
+
     def faltantes(self, etapa: Optional[str] = None) -> list[str]:
         etapas = [etapa] if etapa else list(OBLIGATORIOS)
         return [c for e in etapas for c in OBLIGATORIOS[e] if getattr(self, c) is None]
- 
- 
+
+
 # ---------- Salidas ----------
 class SalidaModelo(BaseModel):
     """Lo que MedGemma debe devolver. Se pasa a Ollama como `format` (salida estructurada)."""
     model_config = ConfigDict(extra="ignore")
- 
+
     color: Color
     confidence: float = Field(ge=0, le=1)
     red_flags: list[str] = Field(description="signos o síntomas de alarma presentes, nunca enfermedades")
     possible_discriminators: list[str] = Field(description="discriminadores de la guía que se cumplen")
     rationale: str = Field(min_length=10, description="justificación breve citando valores del paciente")
- 
- 
+
+
 class ResultadoHospital(BaseModel):
     """Formato final del hospital. color=None significa 'Información insuficiente'."""
     color: Optional[Color]
@@ -191,15 +193,15 @@ class ResultadoHospital(BaseModel):
     missing_data: list[str]                       # lo calcula Python, no el modelo
     rationale: str
     human_validation_required: Literal[True] = True
- 
- 
+
+
 class DecisionProfesional(BaseModel):
     codigo_episodio: str
     id_profesional: str = Field(min_length=1)
     decision: Literal["aceptar", "modificar", "descartar"]
     color_final: Optional[Color] = None
     motivo_discrepancia: Optional[str] = None
- 
+
     @model_validator(mode="after")
     def motivo_si_no_acepta(self):
         if self.decision != "aceptar" and not (self.motivo_discrepancia or "").strip():
@@ -207,8 +209,8 @@ class DecisionProfesional(BaseModel):
         if self.decision != "descartar" and self.color_final is None:
             raise ValueError("falta el color final")
         return self
- 
- 
+
+
 def errores_en_espanol(e) -> list[str]:
     """Convierte los errores de Pydantic (en inglés) a mensajes cortos para el formulario."""
     salida = []
@@ -235,8 +237,8 @@ def errores_en_espanol(e) -> list[str]:
         else:
             salida.append(f"{campo}: {err['msg']}")
     return salida
- 
- 
+
+
 # ---------- Documentación generada desde el esquema ----------
 def _tipo(info) -> str:
     a = info.annotation
@@ -246,8 +248,8 @@ def _tipo(info) -> str:
     if get_origin(a) is Literal:
         return "opción: " + " / ".join(get_args(a))
     return {int: "entero", float: "decimal", str: "texto", bool: "sí/no"}.get(a, str(a))
- 
- 
+
+
 def diccionario_markdown() -> str:
     oblig = {c: e for e, campos in OBLIGATORIOS.items() for c in campos}
     inv = {}
@@ -287,11 +289,11 @@ def diccionario_markdown() -> str:
         "4. Sin datos personales en textos libres (DNI, teléfono, nombre, domicilio) — Ley 25.326.",
         "5. Campos desconocidos se rechazan.",
         "6. Faltantes por etapa (`ingreso`, `medicion`) se listan, no bloquean.",
-        "7. `codigo_episodio` con formato `EP-XXXXXX`.",
+        "7. `codigo_paciente` y `codigo_episodio` con formato `XXX-XXXX` (ej.: PAC-DEMO-001, EPI-DEMO-001).",
         "",
     ])
- 
- 
+
+
 if __name__ == "__main__":
     raiz = Path(__file__).resolve().parent.parent
     carpeta = raiz / "datos" / "esquemas"
@@ -304,4 +306,3 @@ if __name__ == "__main__":
     (raiz / "docs" / "diccionario_tabla_generada.md").write_text(diccionario_markdown(), encoding="utf-8")
     print("Generados: datos/esquemas/*.json y docs/diccionario_tabla_generada.md "
           "(control; el documento del equipo es docs/diccionario_datos_v2.md)")
- 

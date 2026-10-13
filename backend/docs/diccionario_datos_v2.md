@@ -36,7 +36,8 @@ para que **un mismo dato se llame igual en todas las capas** y se apliquen los m
 
 | Campo | Descripción | Tipo | Unidad | Rango / valores | Origen | Oblig. | Ejemplo |
 |---|---|---|---|---|---|---|---|
-| codigo_episodio | Identificador interno del episodio; reemplaza los datos personales | texto | — | `EP-` + 4 a 10 letras/números | sistema | — | EP-004815 |
+| codigo_paciente | Código interno del paciente; reemplaza los datos personales | texto | — | prefijo de 2–4 letras + guion + letras/números (ej. `PAC-…`) | sistema | — | PAC-DEMO-001 |
+| codigo_episodio | Identificador de una atención concreta (un paciente puede tener varios) | texto | — | prefijo de 2–4 letras + guion + letras/números (ej. `EPI-…`) | sistema | — | EPI-DEMO-001 |
 | edad | Edad del paciente | número entero | años | 0 – 120 | HCE | ingreso | 58 |
 | sexo | Sexo, cuando es clínicamente relevante | opción | — | Femenino, Masculino, No informado | HCE | ingreso | Femenino |
 
@@ -114,7 +115,7 @@ texto libre, la consulta se rechaza y se pide corregir.
 | 5 | Dato personal en un texto libre | Rechaza y pide quitarlo |
 | 6 | Campo con nombre desconocido | Rechaza (evita nombres distintos entre capas) |
 | 7 | Campo obligatorio vacío | No bloquea: se procesa y se informa en `missing_data` |
-| 8 | codigo_episodio con formato inválido | Rechaza |
+| 8 | codigo_paciente o codigo_episodio con formato inválido | Rechaza |
 | 9 | Relato que contradice los signos vitales | Se responde «Información insuficiente» y se pide reevaluar |
 
 ## Datos de salida
@@ -189,7 +190,7 @@ id_profesional.
 
 - ☐ Rangos de plausibilidad de cada signo vital.
 - ☐ Si la temperatura es obligatoria en todos los casos.
-- ☐ Formato del código de episodio seudonimizado.
+- ☐ Formato de los códigos de paciente y episodio, y quién los genera (ver `docs/contrato_api.md`).
 - ☐ Si la edad se carga exacta o por rango.
 - ☐ Lista completa de banderas rojas, antecedentes y categorías de motivo que usa la guardia.
 - ☐ Si se usa AVDN, Glasgow o ambos.

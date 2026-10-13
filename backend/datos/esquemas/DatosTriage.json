@@ -452,10 +452,10 @@
       "origen": "medición",
       "title": "Aspecto General"
     },
-    "codigo_episodio": {
+    "codigo_paciente": {
       "anyOf": [
         {
-          "pattern": "^EP-[A-Z0-9]{4,10}$",
+          "pattern": "^[A-Z]{2,4}-[A-Z0-9-]{3,20}$",
           "type": "string"
         },
         {
@@ -463,7 +463,22 @@
         }
       ],
       "default": null,
-      "description": "Código de episodio (no identifica al paciente)",
+      "description": "Código interno del paciente (no identifica a la persona)",
+      "origen": "sistema",
+      "title": "Codigo Paciente"
+    },
+    "codigo_episodio": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Z]{2,4}-[A-Z0-9-]{3,20}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Código de una atención concreta",
       "origen": "sistema",
       "title": "Codigo Episodio"
     },
