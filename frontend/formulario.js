@@ -587,10 +587,14 @@ $('#chatMic').addEventListener('click',()=>{
 });
 
 /* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
-function salir(){try{sessionStorage.removeItem('hrrg_demo_user')}catch(e){}location.href='index.html'}
-try{st.user=JSON.parse(sessionStorage.getItem('hrrg_demo_user')||'null')}catch(e){st.user=null}
-if(!st.user){location.href='index.html'}else{
-  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · acceso simulado <button type="button" class="linkbtn" id="logout">Salir</button>';
+/* Sesión (A07): la consulta api.js. Modo real = Flask (/api/sesion); modo demo = login simulado. */
+async function salir(){await TriageAPI.logout();location.href='index.html'}
+(async function iniciarSesion(){
+  st.user=await TriageAPI.sesion();
+  if(!st.user){location.href='index.html';return}
+  const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
+  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+' <button type="button" class="linkbtn" id="logout">Salir</button>';
   $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});
   go(st.user.rol==='auditor'?'espera':'ingreso');
-}
+})();
+

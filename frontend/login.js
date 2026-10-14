@@ -1,29 +1,35 @@
-/* A02 · Login SIMULADO para la demo.
-   No es autenticación real: no consulta al servidor y la contraseña está fija.
-   El login real (A07) va a usar /api/login, /api/sesion y /api/logout de Flask (D04). */
+/* frontend/login.js · Pantalla de ingreso (A02 + A07).
+   La validación del usuario la hace api.js: contra Flask (modo real) o simulada (modo demo). */
 (function () {
-  const USERS = {
-    enfermeria: { nom: 'Enfermería', rol: 'triage' },
-    medico: { nom: 'Médico/a de guardia', rol: 'triage' },
-    auditor: { nom: 'Calidad', rol: 'auditor' }
-  };
-  const CLAVE_DEMO = 'demo';
+  'use strict';
+  const api = window.TriageAPI;
   const form = document.getElementById('loginForm');
   const err = document.getElementById('loginErr');
+  const btn = form.querySelector('button[type="submit"]');
 
-  form.addEventListener('submit', function (e) {
+  // Carteles según el modo
+  document.querySelectorAll('[data-modo]').forEach(el => {
+    el.hidden = el.dataset.modo !== (api.MODO_REAL ? 'real' : 'demo');
+  });
+
+  // Si ya hay sesión abierta, pasa directo al formulario
+  api.sesion().then(u => { if (u) location.href = 'formulario.html'; });
+
+  form.addEventListener('submit', async function (e) {
     e.preventDefault();
-    const u = document.getElementById('lgUser').value.trim().toLowerCase();
-    const p = document.getElementById('lgPass').value;
-    if (!USERS[u] || p !== CLAVE_DEMO) {
-      err.hidden = false;
-      document.getElementById('lgPass').value = '';
-      return;
-    }
+    const usuario = document.getElementById('lgUser').value;
+    const password = document.getElementById('lgPass').value;
+    if (!usuario.trim() || !password) { mostrarError('Completá usuario y contraseña.'); return; }
+    btn.disabled = true; btn.textContent = 'Ingresando…';
+    const r = await api.login(usuario, password);
+    btn.disabled = false; btn.textContent = 'Ingresar';
+    if (!r.ok) { mostrarError(r.mensaje); document.getElementById('lgPass').value = ''; return; }
     err.hidden = true;
-    try {
-      sessionStorage.setItem('hrrg_demo_user', JSON.stringify({ u: u, nom: USERS[u].nom, rol: USERS[u].rol }));
-    } catch (e2) { /* navegador sin almacenamiento: la demo no puede seguir */ }
     location.href = 'formulario.html';
   });
+
+  function mostrarError(msg) {
+    err.querySelector('b').textContent = msg;
+    err.hidden = false;
+  }
 })();
