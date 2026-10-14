@@ -115,14 +115,14 @@ Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Aho
 
 **Pruebas:** `node frontend/tests/validacion.test.js` (14 pruebas). Además se comparó contra `validar()` del backend con los 17 casos de `casos_simulados.json`: coinciden 16. La diferencia es el caso E05 (campo desconocido), que por diseño se controla solo en el backend (control 7).
 
-**Falta:** que `formulario.html` use este archivo en vez de sus validaciones internas. Va con la separación de lógica (A05).
+**Hecho (A05, 14/10):** `formulario.html` ya usa este archivo para controlar los campos (se carga antes de `formulario.js`).
 
 ## 5. Pendientes del frontend
 
 | # | Pendiente | Depende de | Tarea |
 |---|---|---|---|
 | 1 | Login real (`/api/login`, `/api/sesion`, `/api/logout`) | D04 · Maricel | A07 |
-| 2 | Separar HTML, CSS y JS del formulario | A04 + C01 · Darío | A05 |
+| 2 | ~~Separar HTML, CSS y JS del formulario~~ ✅ Hecho 14/10: `estilos.css` + `formulario.js` + `validacion.js` | A04 + C01 · Darío | A05 |
 | 3 | "Extraer datos" contra la API (primero con JSON simulado) | D03 · Maricel + contrato D02 | A06 |
 | 4 | Revisión y resumen con datos reales | A06 + C03/C04 + D05/D06 | A08 |
 | 5 | Conectar el chat (`CHAT_API`) | `/api/consulta` · Maricel + RAG · Tomás | A11 (nueva) |
