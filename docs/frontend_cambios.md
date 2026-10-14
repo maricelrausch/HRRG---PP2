@@ -1,6 +1,6 @@
 # Frontend · Qué se hizo y qué falta para conectarlo
 
-**Responsable:** Bárbara (frontend/) · **Fecha:** 12/10/2026 · **Base:** maquetado v34
+**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 14/10/2026 · **Base:** maquetado v34
 **Estado general:** todo funciona en **modo simulado**. Ninguna pantalla habla todavía con el backend ni con MedGemma.
 
 ---
