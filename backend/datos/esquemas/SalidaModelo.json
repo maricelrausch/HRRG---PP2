@@ -1,0 +1,53 @@
+{
+  "description": "Lo que MedGemma debe devolver. Se pasa a Ollama como `format` (salida estructurada).",
+  "properties": {
+    "color": {
+      "enum": [
+        "Rojo",
+        "Naranja",
+        "Amarillo",
+        "Verde",
+        "Azul"
+      ],
+      "title": "Color",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "red_flags": {
+      "description": "signos o síntomas de alarma presentes, nunca enfermedades",
+      "items": {
+        "type": "string"
+      },
+      "title": "Red Flags",
+      "type": "array"
+    },
+    "possible_discriminators": {
+      "description": "discriminadores de la guía que se cumplen",
+      "items": {
+        "type": "string"
+      },
+      "title": "Possible Discriminators",
+      "type": "array"
+    },
+    "rationale": {
+      "description": "justificación breve citando valores del paciente",
+      "minLength": 10,
+      "title": "Rationale",
+      "type": "string"
+    }
+  },
+  "required": [
+    "color",
+    "confidence",
+    "red_flags",
+    "possible_discriminators",
+    "rationale"
+  ],
+  "title": "SalidaModelo",
+  "type": "object"
+}

@@ -1,0 +1,70 @@
+{
+  "description": "Formato final del hospital. color=None significa 'Información insuficiente'.",
+  "properties": {
+    "color": {
+      "anyOf": [
+        {
+          "enum": [
+            "Rojo",
+            "Naranja",
+            "Amarillo",
+            "Verde",
+            "Azul"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Color"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "red_flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Red Flags",
+      "type": "array"
+    },
+    "possible_discriminators": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Possible Discriminators",
+      "type": "array"
+    },
+    "missing_data": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing Data",
+      "type": "array"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "human_validation_required": {
+      "const": true,
+      "default": true,
+      "title": "Human Validation Required",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "color",
+    "confidence",
+    "red_flags",
+    "possible_discriminators",
+    "missing_data",
+    "rationale"
+  ],
+  "title": "ResultadoHospital",
+  "type": "object"
+}
