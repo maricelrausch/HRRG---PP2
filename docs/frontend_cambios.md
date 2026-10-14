@@ -9,7 +9,7 @@
 
 | Tarea | Archivo | Qué cambió |
 |---|---|---|
-| A01 · Montar el flujo | `frontend/formulario.html` | El v34 pasa a ser el formulario del proyecto. El formulario anterior se conserva como `frontend/formulario_original.html` (sigue usando `formulario.js` y `validacion.js`). |
+| A01 · Montar el flujo | `frontend/formulario.html` | El v34 pasa a ser el formulario del proyecto. (El formulario anterior y su `formulario.js` se borraron del repo; quedan en el historial de git, commit `2b07c63`.) |
 | A02 · Login simulado | `frontend/index.html` + `frontend/login.js` | El login salió del maquetado a su propia página. Usuarios de demo: `enfermeria`, `medico`, `auditor` (clave `demo`). Guarda el usuario en `sessionStorage` y pasa a `formulario.html`. Si alguien abre el formulario sin pasar por el login, lo devuelve al login. "Salir" borra la sesión. |
 | A03 · Rotular simulaciones | `frontend/formulario.html` | Cartel amarillo fijo en todas las pantallas ("Datos ficticios · Simulación"). Se sacaron las atribuciones a MedGemma y a la guía del HRRG: ahora dice "Prioridad de ejemplo · simulada", "guía de ejemplo, no oficial", "Modelo: SIMULADO", "IA: simulada". |
 | A04 · Guion de la demo | `docs/guion_demo.md` | Recorrido de 5 a 7 minutos, qué decir en cada pantalla y preguntas probables. |
@@ -98,7 +98,26 @@ Así el audio nunca sale de la computadora del box.
 
 ---
 
-## 4. Pendientes del frontend
+## 4. Validaciones del formulario (`frontend/validacion.js`) · 14/10
+
+Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Ahora usa los **nombres del diccionario V2** y los mismos controles que `backend/src/validacion.py`:
+
+- Números con coma o punto, enteros y rangos de plausibilidad (edad hasta 120; se suman `glucemia` y `tiempo_evolucion_valor`).
+- Opciones cerradas: `sexo` (Femenino / Masculino / No informado), `motivo_categoria`, `tiempo_evolucion_unidad`, `estado_conciencia`.
+- Banderas rojas `br_*` y antecedentes `ant_*` como sí/no.
+- Diastólica menor que sistólica, y PAM calculada.
+- Privacidad con los mismos patrones del backend en todos los textos libres (incluidos `sintomas_asociados`, `dolor_caracteristicas`, `aspecto_general`, `alergias`).
+- Formato de `codigo_paciente` y `codigo_episodio` (ej. `PAC-DEMO-001`).
+- Faltantes **por etapa** (`ingreso` / `medicion`): se informan, no bloquean. Glasgow y los códigos no son obligatorios.
+- Acepta nombres viejos (`tas`, `saturacion`, `sexo: 'F'`, `banderas_rojas: [...]`) y los traduce, igual que el backend.
+
+**Uso:** `TriageDatos.validate(datos, 'ingreso')` → `{ valid, errors, missing, data }`.
+
+**Pruebas:** `node frontend/tests/validacion.test.js` (14 pruebas). Además se comparó contra `validar()` del backend con los 17 casos de `casos_simulados.json`: coinciden 16. La diferencia es el caso E05 (campo desconocido), que por diseño se controla solo en el backend (control 7).
+
+**Falta:** que `formulario.html` use este archivo en vez de sus validaciones internas. Va con la separación de lógica (A05).
+
+## 5. Pendientes del frontend
 
 | # | Pendiente | Depende de | Tarea |
 |---|---|---|---|
