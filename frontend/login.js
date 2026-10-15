@@ -1,38 +1,35 @@
-const form = document.getElementById("loginForm");
-const error = document.getElementById("loginErr");
-const boton = form.querySelector('button[type="submit"]');
+/* frontend/login.js · Pantalla de ingreso (A02 + A07).
+   La validación del usuario la hace api.js: contra Flask (modo real) o simulada (modo demo). */
+(function () {
+  'use strict';
+  const api = window.TriageAPI;
+  const form = document.getElementById('loginForm');
+  const err = document.getElementById('loginErr');
+  const btn = form.querySelector('button[type="submit"]');
 
-form.addEventListener("submit", async (evento) => {
-  evento.preventDefault();
-  error.hidden = true;
-  boton.disabled = true;
+  // Carteles según el modo
+  document.querySelectorAll('[data-modo]').forEach(el => {
+    el.hidden = el.dataset.modo !== (api.MODO_REAL ? 'real' : 'demo');
+  });
 
-  try {
-    const respuesta = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({
-        usuario: document.getElementById("lgUser").value.trim(),
-        password: document.getElementById("lgPass").value
-      })
-    });
+  // Si ya hay sesión abierta, pasa directo al formulario
+  api.sesion().then(u => { if (u) location.href = 'formulario.html'; });
 
-    const datos = await respuesta.json();
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const usuario = document.getElementById('lgUser').value;
+    const password = document.getElementById('lgPass').value;
+    if (!usuario.trim() || !password) { mostrarError('Completá usuario y contraseña.'); return; }
+    btn.disabled = true; btn.textContent = 'Ingresando…';
+    const r = await api.login(usuario, password);
+    btn.disabled = false; btn.textContent = 'Ingresar';
+    if (!r.ok) { mostrarError(r.mensaje); document.getElementById('lgPass').value = ''; return; }
+    err.hidden = true;
+    location.href = 'formulario.html';
+  });
 
-    if (!respuesta.ok) {
-      throw new Error(
-        datos.mensaje || "No se pudo iniciar sesión."
-      );
-    }
-
-    window.location.replace("/formulario.html");
-  } catch (e) {
-    error.textContent =
-      e.message || "No se pudo conectar con el servidor.";
-    error.hidden = false;
-  } finally {
-    document.getElementById("lgPass").value = "";
-    boton.disabled = false;
+  function mostrarError(msg) {
+    err.querySelector('b').textContent = msg;
+    err.hidden = false;
   }
-});
+})();
