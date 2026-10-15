@@ -1,13 +1,12 @@
-from flask import Flask, json, request, jsonify, send_from_directory, session
+from flask import Flask, json, request, jsonify, send_from_directory, session, g
 from ollama import chat, embed
 from PyPDF2 import PdfReader
 from werkzeug.security import generate_password_hash
 from pathlib import Path
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
-from src.auth import iniciar_sesion, profesional_activo
+from src.auth import iniciar_sesion, profesional_activo, obtener_profesional
 from src.registro import inicializar_registro, crear_episodio, obtener_episodio
-
 
 import os
 import math
@@ -114,9 +113,24 @@ def inicializar_usuarios():
                 usuario TEXT UNIQUE NOT NULL,
                 nombre TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
-                activo INTEGER NOT NULL DEFAULT 1
+                activo INTEGER NOT NULL DEFAULT 1,
+                rol TEXT NOT NULL DEFAULT 'sin_asignar'
             )
         """)
+
+        columnas = {
+            fila[1]
+            for fila in conexion.execute(
+                "PRAGMA table_info(profesionales)"
+            ).fetchall()
+        }
+
+        if "rol" not in columnas:
+            conexion.execute("""
+                ALTER TABLE profesionales
+                ADD COLUMN rol TEXT NOT NULL DEFAULT 'sin_asignar'
+            """)
+
         conexion.commit()
     finally:
         conexion.close()
@@ -214,15 +228,21 @@ def logout():
 
 @app.route("/api/sesion", methods=["GET"])
 def consultar_sesion():
+    profesional = g.profesional
+
     respuesta = jsonify({
         "ok": True,
-        "usuario": session["usuario"]
+        "usuario": profesional["usuario"],
+        "nombre": profesional["nombre"],
+        "rol": profesional["rol"]
     })
+
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
 #-----------------------------------------------
 # Control de acceso antes de ejecutar las rutas.
 #-----------------------------------------------
+
 
 @app.before_request
 def verificar_acceso():
@@ -231,10 +251,11 @@ def verificar_acceso():
         and not app.config["DEMO_DOCUMENTAL_HABILITADA"]
     ):
         return respuesta_error(
-            mensaje="La demo documental está deshabilitada.",
-            estado=503,
-            codigo="DEMO_DESHABILITADA"
+            "La demo documental está deshabilitada.",
+            503,
+            "DEMO_DESHABILITADA"
         )
+
     rutas_protegidas = {
         "paciente_form",
         "chat_api",
@@ -248,16 +269,46 @@ def verificar_acceso():
         return None
 
     usuario = session.get("usuario")
-
-    if usuario and profesional_activo(BASE_USUARIOS, usuario):
-        return None
-
-    session.clear()
-    return respuesta_error(
-        mensaje="Debés iniciar sesión para continuar.",
-        estado=401,
-        codigo="SESION_REQUERIDA"
+    profesional = (
+        obtener_profesional(BASE_USUARIOS, usuario)
+        if usuario else None
     )
+
+    if profesional is None:
+        session.clear()
+        return respuesta_error(
+            "Debés iniciar sesión para continuar.",
+            401,
+            "SESION_REQUERIDA"
+        )
+
+    if profesional["rol"] not in {"enfermeria", "medico", "auditor"}:
+        return respuesta_error(
+            "Tu cuenta todavía no tiene un perfil asignado.",
+            403,
+            "ROL_NO_ASIGNADO"
+        )
+
+    g.profesional = profesional
+
+    # El auditor solo puede usar las consultas autorizadas.
+    if profesional["rol"] == "auditor":
+        consultas_permitidas = {
+            "consultar_sesion",
+            "consultar_episodio_demo"
+        }
+
+        if (
+            request.endpoint not in consultas_permitidas
+            or request.method not in {"GET", "HEAD"}
+        ):
+            return respuesta_error(
+                "Tu perfil tiene acceso de solo lectura.",
+                403,
+                "PERMISO_DENEGADO"
+            )
+
+    return None
 #---------------------------------------
 # Alta de cuentas desde la terminal de administración.
 #---------------------------------------
@@ -761,7 +812,39 @@ Pregunta:
     })
 
 
+@app.cli.command("asignar-rol")
+@click.option("--usuario", prompt="Usuario")
+@click.option(
+    "--rol",
+    type=click.Choice(["enfermeria", "medico", "auditor"]),
+    prompt="Rol"
+)
 
+
+#---------------------------------------
+#Función para utilizar diferentes roles de inicio de sesión
+#---------------------------------------
+def asignar_rol(usuario, rol):
+    conexion = sqlite3.connect(BASE_USUARIOS)
+
+    try:
+        resultado = conexion.execute(
+            """
+            UPDATE profesionales
+            SET rol = ?
+            WHERE usuario = ?
+            """,
+            (rol, usuario.strip())
+        )
+
+        if resultado.rowcount == 0:
+            raise click.ClickException("Ese usuario no existe.")
+
+        conexion.commit()
+    finally:
+        conexion.close()
+
+    click.echo(f"Perfil '{rol}' asignado correctamente.")
 
 if __name__ == "__main__":
 

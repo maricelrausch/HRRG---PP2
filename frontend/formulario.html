@@ -738,7 +738,7 @@ const byK=k=>F.find(f=>f.k===k);
 const ml=k=>k==='glasgow'?'Conciencia (Glasgow o estado)':byK(k).l;
 const base=f=>f.t==='chk'?f.ia:(f.ia??f.hce??'');
 const init=()=>Object.fromEntries(FI.map(f=>[f.k,base(f)]));
-const st={user:null,disc:{},fast:false,screen:'ingreso',rev:init(),insuf:false,decision:null,level:null,ollama:true,ep:'EP-004812',prev:null,manual:false,mlv:null};
+const st={user:null,disc:{},fast:false,screen:'ingreso',rev:init(),insuf:false,decision:null,level:null,ollama:true,ep:'EP-' + crypto.randomUUID(),prev:null,manual:false,mlv:null};
 let epN=4812;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1039,7 +1039,7 @@ $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderR
 function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed','false'));document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
-$('#nuevo').addEventListener('click',()=>{$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
+$('#nuevo').addEventListener('click',()=>{$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;st.ep='EP-' + crypto.randomUUID();resetDecision();go('ingreso')});
 /* Clasificación manual sin IA */
 $('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
 $('#mLevels').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;st.mlv=+b.dataset.m;$('#mLevels').querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#mReg').disabled=false});
@@ -1153,14 +1153,83 @@ $('#chatMic').addEventListener('click',()=>{
   chatMicT=setTimeout(()=>{b.setAttribute('aria-pressed','false');$('#chatTxt').value='';enviarChat('¿Qué datos faltan?')},1500);
 });
 
-/* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
-function salir(){try{sessionStorage.removeItem('hrrg_demo_user')}catch(e){}location.href='index.html'}
-try{st.user=JSON.parse(sessionStorage.getItem('hrrg_demo_user')||'null')}catch(e){st.user=null}
-if(!st.user){location.href='index.html'}else{
-  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · acceso simulado <button type="button" class="linkbtn" id="logout">Salir</button>';
-  $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});
-  go(st.user.rol==='auditor'?'espera':'ingreso');
+/* Sesión autenticada en Flask y perfil obtenido del backend. */
+async function salir() {
+  try {
+    const respuesta = await fetch("/api/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({})
+    });
+
+    if (!respuesta.ok) {
+      throw new Error("No se pudo cerrar la sesión.");
+    }
+
+    st.user = null;
+    sessionStorage.removeItem("hrrg_demo_user");
+    window.location.replace("/index.html");
+  } catch (e) {
+    alert(e.message || "No se pudo conectar con el servidor.");
+  }
 }
+
+async function verificarSesion() {
+  st.user = null;
+
+  try {
+    const respuesta = await fetch("/api/sesion", {
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+
+    if (respuesta.status === 401) {
+      window.location.replace("/index.html");
+      return;
+    }
+
+    const datos = await respuesta.json();
+
+    if (!respuesta.ok) {
+      throw new Error(
+        datos.mensaje || "No se pudo verificar la sesión."
+      );
+    }
+
+    const perfiles = ["enfermeria", "medico", "auditor"];
+
+    if (!perfiles.includes(datos.rol)) {
+      throw new Error("Tu cuenta no tiene un perfil válido asignado.");
+    }
+
+    st.user = {
+      u: datos.usuario,
+      nom: datos.nombre,
+      rol: datos.rol
+    };
+
+    const chip = $("#userChip");
+    chip.hidden = false;
+    chip.innerHTML =
+      "<b>" + esc(st.user.u) + "</b> · " +
+      esc(st.user.nom) + " · " +
+      esc(st.user.rol) +
+      ' <button type="button" class="linkbtn" id="logout">' +
+      "Salir</button>";
+
+    document.getElementById("logout")
+      .addEventListener("click", salir);
+
+    go(st.user.rol === "auditor" ? "espera" : "ingreso");
+  } catch (e) {
+    alert(e.message || "No se pudo conectar con el servidor.");
+    window.location.replace("/index.html");
+  }
+}
+
+verificarSesion();
+
 </script>
 
 </body>

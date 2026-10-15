@@ -1,29 +1,38 @@
-/* A02 · Login SIMULADO para la demo.
-   No es autenticación real: no consulta al servidor y la contraseña está fija.
-   El login real (A07) va a usar /api/login, /api/sesion y /api/logout de Flask (D04). */
-(function () {
-  const USERS = {
-    enfermeria: { nom: 'Enfermería', rol: 'triage' },
-    medico: { nom: 'Médico/a de guardia', rol: 'triage' },
-    auditor: { nom: 'Calidad', rol: 'auditor' }
-  };
-  const CLAVE_DEMO = 'demo';
-  const form = document.getElementById('loginForm');
-  const err = document.getElementById('loginErr');
+const form = document.getElementById("loginForm");
+const error = document.getElementById("loginErr");
+const boton = form.querySelector('button[type="submit"]');
 
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    const u = document.getElementById('lgUser').value.trim().toLowerCase();
-    const p = document.getElementById('lgPass').value;
-    if (!USERS[u] || p !== CLAVE_DEMO) {
-      err.hidden = false;
-      document.getElementById('lgPass').value = '';
-      return;
+form.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  error.hidden = true;
+  boton.disabled = true;
+
+  try {
+    const respuesta = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        usuario: document.getElementById("lgUser").value.trim(),
+        password: document.getElementById("lgPass").value
+      })
+    });
+
+    const datos = await respuesta.json();
+
+    if (!respuesta.ok) {
+      throw new Error(
+        datos.mensaje || "No se pudo iniciar sesión."
+      );
     }
-    err.hidden = true;
-    try {
-      sessionStorage.setItem('hrrg_demo_user', JSON.stringify({ u: u, nom: USERS[u].nom, rol: USERS[u].rol }));
-    } catch (e2) { /* navegador sin almacenamiento: la demo no puede seguir */ }
-    location.href = 'formulario.html';
-  });
-})();
+
+    window.location.replace("/formulario.html");
+  } catch (e) {
+    error.textContent =
+      e.message || "No se pudo conectar con el servidor.";
+    error.hidden = false;
+  } finally {
+    document.getElementById("lgPass").value = "";
+    boton.disabled = false;
+  }
+});
