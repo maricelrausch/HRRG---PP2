@@ -7,7 +7,9 @@ from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 from src.auth import iniciar_sesion, profesional_activo, obtener_profesional
 from src.registro import inicializar_registro, crear_episodio, obtener_episodio
-
+import re
+from pydantic import ValidationError
+from src.esquemas import ExtraccionIA, OBLIGATORIOS
 import os
 import math
 import time
@@ -34,7 +36,8 @@ app = Flask(
 )
 
 app.config["DEMO_DOCUMENTAL_HABILITADA"] = False
-
+# D03: respuesta predefinida para probar la integración.
+app.config["EXTRACCION_SIMULADA_HABILITADA"] = True
 # ------------------------------------------------
 # Formato común para los errores de la API.
 # ------------------------------------------------
@@ -262,7 +265,8 @@ def verificar_acceso():
         "upload",
         "consultar_sesion",
         "crear_episodio_demo",
-        "consultar_episodio_demo"
+        "consultar_episodio_demo",
+        "extraer"
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -845,6 +849,186 @@ def asignar_rol(usuario, rol):
         conexion.close()
 
     click.echo(f"Perfil '{rol}' asignado correctamente.")
+
+# ------------------------------------------------
+# D03: extracción simulada con casos ficticios.
+# ------------------------------------------------
+
+@app.route("/api/extraer", methods=["POST"])
+def extraer():
+    if not app.config["EXTRACCION_SIMULADA_HABILITADA"]:
+        return respuesta_error(
+            "La extracción simulada está deshabilitada.",
+            503,
+            "EXTRACCION_DESHABILITADA"
+        )
+
+    if not request.is_json:
+        return respuesta_error(
+            "La solicitud debe estar en formato JSON.",
+            415,
+            "FORMATO_NO_SOPORTADO"
+        )
+
+    entrada = request.get_json(silent=True)
+
+    if not isinstance(entrada, dict):
+        return respuesta_error(
+            "El JSON recibido debe ser un objeto válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    campos = {"codigo_paciente", "codigo_episodio", "texto"}
+
+    if set(entrada) != campos:
+        return respuesta_error(
+            "Enviá únicamente codigo_paciente, codigo_episodio y texto.",
+            422,
+            "CAMPOS_INVALIDOS"
+        )
+
+    if any(not isinstance(entrada[campo], str) for campo in campos):
+        return respuesta_error(
+            "Todos los campos deben ser texto.",
+            422,
+            "TIPOS_INVALIDOS"
+        )
+
+    entrada = {
+        campo: valor.strip()
+        for campo, valor in entrada.items()
+    }
+
+    for campo in ("codigo_paciente", "codigo_episodio"):
+        if not re.fullmatch(
+            r"[A-Z]{2,4}-[A-Z0-9-]{3,20}",
+            entrada[campo]
+        ):
+            return respuesta_error(
+                f"El formato de {campo} no es válido.",
+                422,
+                "IDENTIFICADOR_INVALIDO"
+            )
+
+    if not 1 <= len(entrada["texto"]) <= 5000:
+        return respuesta_error(
+            "El relato debe tener entre 1 y 5000 caracteres.",
+            422,
+            "TEXTO_INVALIDO"
+        )
+
+    ruta_casos = CARPETA_BACKEND / "datos" / "casos_simulados.json"
+
+    try:
+        contenido = json.loads(
+            ruta_casos.read_text(encoding="utf-8")
+        )
+
+        if not isinstance(contenido, dict):
+            raise ValueError("Estructura de casos inválida")
+
+        casos = contenido.get("casos")
+
+        if not isinstance(casos, list):
+            raise ValueError("Lista de casos inválida")
+
+        casos_demo = []
+
+        for caso in casos:
+            if not isinstance(caso, dict):
+                raise ValueError("Caso inválido")
+
+            if caso.get("tipo") != "demo":
+                continue
+
+            if (
+                not isinstance(caso.get("id"), str)
+                or not caso["id"].strip()
+                or not isinstance(caso.get("relato"), str)
+                or not caso["relato"].strip()
+                or not isinstance(caso.get("entrada"), dict)
+            ):
+                raise ValueError("Caso demo incompleto")
+
+            casos_demo.append(caso)
+
+        if not casos_demo:
+            raise ValueError("No hay casos demo disponibles")
+
+    except (OSError, UnicodeError, ValueError):
+        logger_sistema.error("ERROR_CARGAR_CASOS_EXTRACCION")
+        return respuesta_error(
+            "No se pudieron cargar los casos simulados.",
+            500,
+            "ERROR_CASOS_SIMULADOS"
+        )
+
+    texto_normalizado = " ".join(entrada["texto"].split())
+
+    coincidencias = [
+        caso
+        for caso in casos_demo
+        if " ".join(caso["relato"].split()) == texto_normalizado
+    ]
+
+    if len(coincidencias) != 1:
+        return respuesta_error(
+            "Usá el relato exacto de un único caso de demostración.",
+            422,
+            "CASO_SIMULADO_NO_IDENTIFICADO"
+        )
+
+    caso = coincidencias[0]
+
+    # Solo se toman campos del esquema de extracción.
+    # Se excluyen mediciones, identificación y prioridad clínica.
+    datos_caso = {
+        campo: valor
+        for campo, valor in caso["entrada"].items()
+        if campo in ExtraccionIA.model_fields
+    }
+
+    try:
+        datos = ExtraccionIA.model_validate(
+            datos_caso
+        ).model_dump(mode="json")
+
+    except ValidationError:
+        logger_sistema.error("ERROR_ESQUEMA_CASO_SIMULADO")
+        return respuesta_error(
+            "El caso simulado no cumple el esquema de extracción.",
+            500,
+            "CASO_SIMULADO_INVALIDO"
+        )
+
+    faltantes = [
+        campo
+        for campo in OBLIGATORIOS["ingreso"]
+        if campo in ExtraccionIA.model_fields
+        and datos[campo] is None
+    ]
+
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "simulado",
+        "caso_simulado_id": caso["id"],
+        "codigo_paciente": entrada["codigo_paciente"],
+        "codigo_episodio": entrada["codigo_episodio"],
+        "version_esquema": "ExtraccionIA-v2",
+        "modelo": None,
+        "datos": datos,
+        "campos_faltantes": faltantes,
+        "advertencias": [
+            "Respuesta simulada predefinida; no proviene de MedGemma.",
+            "El caso puede incluir datos ficticios adicionales al relato.",
+            "Los datos requieren revisión humana.",
+            "Esta respuesta no asigna prioridad Manchester."
+        ]
+    })
+
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
 
 if __name__ == "__main__":
 
