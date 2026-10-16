@@ -1,14 +1,3 @@
-from flask import Flask, json, request, jsonify, send_from_directory, session
-from ollama import chat, embed
-from PyPDF2 import PdfReader
-from werkzeug.security import generate_password_hash
-from pathlib import Path
-from datetime import timedelta
-from logging.handlers import RotatingFileHandler
-from src.auth import iniciar_sesion, profesional_activo
-from src.registro import inicializar_registro, crear_episodio, obtener_episodio
-
-
 import os
 import math
 import time
@@ -16,8 +5,31 @@ import sqlite3
 import click
 import secrets
 import logging
+import ollama
 
 
+import sys
+from pathlib import Path
+
+from flask import request, jsonify
+from flask import Flask, json, request, jsonify, send_from_directory, session, g
+from ollama import chat, embed
+from PyPDF2 import PdfReader
+from werkzeug.security import generate_password_hash
+from pathlib import Path
+from datetime import timedelta
+from logging.handlers import RotatingFileHandler
+from src.auth import iniciar_sesion, profesional_activo, obtener_profesional
+from src.registro import inicializar_registro, crear_episodio, obtener_episodio
+import re
+from pydantic import ValidationError
+from src.esquemas import ExtraccionIA, OBLIGATORIOS
+from src.modelo import responder
+from src.extraccion import extraer_datos
+from src.procesamiento_nlp import extraer_datos_planilla
+
+RUTA_SRC = Path(__file__).resolve().parent / "src"
+sys.path.insert(0, str(RUTA_SRC))
 
 
 # ------------------------------------------------
@@ -35,7 +47,8 @@ app = Flask(
 )
 
 app.config["DEMO_DOCUMENTAL_HABILITADA"] = False
-
+# D03: respuesta predefinida para probar la integración.
+app.config["EXTRACCION_SIMULADA_HABILITADA"] = True
 # ------------------------------------------------
 # Formato común para los errores de la API.
 # ------------------------------------------------
@@ -114,9 +127,24 @@ def inicializar_usuarios():
                 usuario TEXT UNIQUE NOT NULL,
                 nombre TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
-                activo INTEGER NOT NULL DEFAULT 1
+                activo INTEGER NOT NULL DEFAULT 1,
+                rol TEXT NOT NULL DEFAULT 'sin_asignar'
             )
         """)
+
+        columnas = {
+            fila[1]
+            for fila in conexion.execute(
+                "PRAGMA table_info(profesionales)"
+            ).fetchall()
+        }
+
+        if "rol" not in columnas:
+            conexion.execute("""
+                ALTER TABLE profesionales
+                ADD COLUMN rol TEXT NOT NULL DEFAULT 'sin_asignar'
+            """)
+
         conexion.commit()
     finally:
         conexion.close()
@@ -214,15 +242,21 @@ def logout():
 
 @app.route("/api/sesion", methods=["GET"])
 def consultar_sesion():
+    profesional = g.profesional
+
     respuesta = jsonify({
         "ok": True,
-        "usuario": session["usuario"]
+        "usuario": profesional["usuario"],
+        "nombre": profesional["nombre"],
+        "rol": profesional["rol"]
     })
+
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
 #-----------------------------------------------
 # Control de acceso antes de ejecutar las rutas.
 #-----------------------------------------------
+
 
 @app.before_request
 def verificar_acceso():
@@ -231,33 +265,65 @@ def verificar_acceso():
         and not app.config["DEMO_DOCUMENTAL_HABILITADA"]
     ):
         return respuesta_error(
-            mensaje="La demo documental está deshabilitada.",
-            estado=503,
-            codigo="DEMO_DESHABILITADA"
+            "La demo documental está deshabilitada.",
+            503,
+            "DEMO_DESHABILITADA"
         )
+
     rutas_protegidas = {
         "paciente_form",
         "chat_api",
         "upload",
         "consultar_sesion",
         "crear_episodio_demo",
-        "consultar_episodio_demo"
+        "consultar_episodio_demo",
+        "extraer"
     }
 
     if request.endpoint not in rutas_protegidas:
         return None
 
     usuario = session.get("usuario")
-
-    if usuario and profesional_activo(BASE_USUARIOS, usuario):
-        return None
-
-    session.clear()
-    return respuesta_error(
-        mensaje="Debés iniciar sesión para continuar.",
-        estado=401,
-        codigo="SESION_REQUERIDA"
+    profesional = (
+        obtener_profesional(BASE_USUARIOS, usuario)
+        if usuario else None
     )
+
+    if profesional is None:
+        session.clear()
+        return respuesta_error(
+            "Debés iniciar sesión para continuar.",
+            401,
+            "SESION_REQUERIDA"
+        )
+
+    if profesional["rol"] not in {"enfermeria", "medico", "auditor"}:
+        return respuesta_error(
+            "Tu cuenta todavía no tiene un perfil asignado.",
+            403,
+            "ROL_NO_ASIGNADO"
+        )
+
+    g.profesional = profesional
+
+    # El auditor solo puede usar las consultas autorizadas.
+    if profesional["rol"] == "auditor":
+        consultas_permitidas = {
+            "consultar_sesion",
+            "consultar_episodio_demo"
+        }
+
+        if (
+            request.endpoint not in consultas_permitidas
+            or request.method not in {"GET", "HEAD"}
+        ):
+            return respuesta_error(
+                "Tu perfil tiene acceso de solo lectura.",
+                403,
+                "PERMISO_DENEGADO"
+            )
+
+    return None
 #---------------------------------------
 # Alta de cuentas desde la terminal de administración.
 #---------------------------------------
@@ -476,7 +542,7 @@ def consultar_episodio_demo(codigo_episodio):
 def inicio():
     return send_from_directory(
         str(CARPETA_FRONTEND),
-        "maquetado_extraccion_v33.html"
+        "index.html"
     )
 
 # ------------------------------------------------
@@ -543,229 +609,268 @@ def paciente_form():
 
 
 
-# Carpeta de subida de archivos
-app.config["UPLOAD_FOLDER"] = "docs"
 
 
-# Memoria simple del documento
-document_chunks = []
-document_vectors = []
+# ------------------------------------------------
+# Configuración y comunicación con Ollama.
+# ------------------------------------------------
 
-
-# Modelo de LLM y  Modelo de embedding    
 LLM_MODEL = "qwen2.5:0.5b"
-EMBED_MODEL = "embeddinggemma"
 
 
-# PACIENTE
-
-def get_patient_info():
-    return 
-
-
-# ------------------------------------------------
-# EXTRAER TEXTO DEL PDF
-# ------------------------------------------------
-
-def extract_text(path):
-    reader = PdfReader(path)
-    text = ""
-    for page in reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text
-    return text
-
-
-
-
-# ------------------------------------------------
-# DIVIDIR TEXTO
-# ------------------------------------------------
-
-def split_chunks(text, size=2000):
-    text = text.replace("\n", " ")
-    chunks = []
-    for i in range(0, len(text), size):
-        chunk = text[i:i + size].strip()
-        if chunk:
-            chunks.append(chunk)
-    return chunks[:5]
-
-
-# ------------------------------------------------
-# COSINE SIMILARITY
-# ------------------------------------------------
-
-def cosine_similarity(v1, v2):
-    dot = sum(a*b for a,b in zip(v1,v2))
-
-    n1 = math.sqrt(sum(a*a for a in v1))
-    n2 = math.sqrt(sum(b*b for b in v2))
-
-    if n1 == 0 or n2 == 0:
-        return 0
-
-    return dot/(n1*n2)
-
-
-# ------------------------------------------------
-# CREAR EMBEDDINGS
-# ------------------------------------------------
-
-def create_embeddings(chunks):
-    vectors = []
-    for chunk in chunks:
-        e = embed(
-            model = EMBED_MODEL,
-            input = chunk
-        )
-        vectors.append(e["embeddings"][0])
-    return vectors
-
-
-# ------------------------------------------------
-# BUSQUEDA SEMANTICA
-# ------------------------------------------------
-
-def search(question):
-    q_vec = embed(
-        model = EMBED_MODEL,
-        input = question
-    )["embeddings"][0]
-    scores = []
-    for chunk,vec in zip(document_chunks, document_vectors):
-        s = cosine_similarity(q_vec,vec)
-        scores.append((s,chunk))
-    scores.sort(reverse=True,key=lambda x:x[0])
-    return scores[:3]
-
-
-
-# ------------------------------------------------
-# SUBIR PDF ( MODIFICAR ) = CARPETA UPLOADS SIN CREAR / HAY Q AGREGAR LOS DOCUMENTOS PDF DE EJEMPLO
-# ------------------------------------------------
-@app.route("/upload", methods=["POST"])
-def upload():
-    global document_chunks, document_vectors
-    pdf = request.files["pdf_file"]
-    os.makedirs("uploads", exist_ok=True)
-    path = os.path.join("uploads", pdf.filename)
-    pdf.save(path)
-    text = extract_text(path)
-    document_chunks = split_chunks(text)
-    document_vectors = create_embeddings(document_chunks)
-    return jsonify({
-        "chunks": len(document_chunks)
-    })
-
-
-# ------------------------------------------------
-# CHAT
-# ------------------------------------------------
-
-@app.route("/chat", methods=["POST"])
-def chat_api():
-
-
-    data = request.json
-    question = data["message"]
-
-
-    steps = []
-
-
-    # Paso 1
-    steps.append("Pregunta recibida")
-
-
-    # Paso 2: embedding de la pregunta
-    q_vec = embed(
-        model = EMBED_MODEL,
-        input = question
-    )["embeddings"][0]
-
-
-    steps.append("Embedding de la pregunta generado")
-
-
-    # Paso 3: búsqueda semántica
-    scores = []
-
-
-    for chunk,vec in zip(document_chunks, document_vectors):
-
-
-        s = cosine_similarity(q_vec,vec)
-
-
-        scores.append((s,chunk))
-
-
-    scores.sort(reverse=True,key=lambda x:x[0])
-
-
-    top_chunks = [chunk for score,chunk in scores[:3]]
-
-
-    steps.append("Búsqueda semántica en el documento")
-
-
-    context = "\n\n".join(top_chunks)
-
-
-    steps.append("Contexto construido para el modelo")
-
-
-    prompt = f"""
-Usa el siguiente contexto del documento para responder.
-
-
-Contexto:
-{context}
-
-
-Pregunta:
-{question}
-"""
-
-
-    start = time.time()
-
-
-    response = chat(
-        model = LLM_MODEL,
-        messages=[
-            {"role":"user","content":prompt}
-        ],
-        options={
-            "temperature":0.2,
-            "num_predict":120
+def consultar_ollama(mensaje, historial=None):
+    """
+    Envía un mensaje a Ollama y devuelve su respuesta.
+    El historial es opcional y contiene mensajes anteriores.
+    """
+
+    mensajes = [
+        {
+            "role": "system",
+            "content": (
+                "Sos un asistente conversacional en español. "
+                "Respondé de forma clara y ordenada. "
+                "No inventes datos que no te proporcionaron."
+            )
         }
-    )
+    ]
 
+    if historial:
+        mensajes.extend(historial)
 
-    elapsed = round(time.time() - start, 2)
-
-
-    steps.append("Respuesta generada por el modelo")
-
-
-    answer = response["message"]["content"].strip()
-
-
-    return jsonify({
-        "answer": answer,
-        "time": elapsed,
-        "steps": steps
+    mensajes.append({
+        "role": "user",
+        "content": mensaje
     })
 
+    try:
+        respuesta = ollama.chat(
+            model=LLM_MODEL,
+            messages=mensajes,
+            options={
+                "temperature": 0.2,
+                "num_predict": 300
+            }
+        )
 
+        return respuesta["message"]["content"].strip()
+
+    except ollama.ResponseError:
+        logger_sistema.exception("ERROR_RESPUESTA_OLLAMA")
+        return None
+
+    except Exception:
+        logger_sistema.exception("ERROR_CONEXION_OLLAMA")
+        return None
+
+
+
+@app.cli.command("asignar-rol")
+@click.option("--usuario", prompt="Usuario")
+@click.option(
+    "--rol",
+    type=click.Choice(["enfermeria", "medico", "auditor"]),
+    prompt="Rol"
+)
+
+
+#---------------------------------------
+#Función para utilizar diferentes roles de inicio de sesión
+#---------------------------------------
+def asignar_rol(usuario, rol):
+    conexion = sqlite3.connect(BASE_USUARIOS)
+
+    try:
+        resultado = conexion.execute(
+            """
+            UPDATE profesionales
+            SET rol = ?
+            WHERE usuario = ?
+            """,
+            (rol, usuario.strip())
+        )
+
+        if resultado.rowcount == 0:
+            raise click.ClickException("Ese usuario no existe.")
+
+        conexion.commit()
+    finally:
+        conexion.close()
+
+    click.echo(f"Perfil '{rol}' asignado correctamente.")
+
+# ------------------------------------------------
+# D03: extracción simulada con casos ficticios.
+# ------------------------------------------------
+
+@app.route("/api/extraer", methods=["POST"])
+def extraer():
+    print(">>> ENTRO EN LA RUTA DE EXTRACCION")
+    if not app.config["EXTRACCION_SIMULADA_HABILITADA"]:
+        return respuesta_error(
+            "La extracción simulada está deshabilitada.",
+            503,
+            "EXTRACCION_DESHABILITADA"
+        )
+
+    if not request.is_json:
+        return respuesta_error(
+            "La solicitud debe estar en formato JSON.",
+            415,
+            "FORMATO_NO_SOPORTADO"
+        )
+
+    entrada = request.get_json(silent=True)
+
+    if not isinstance(entrada, dict):
+        return respuesta_error(
+            "El JSON recibido debe ser un objeto válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    campos = {"codigo_paciente", "codigo_episodio", "texto"}
+
+    if set(entrada) != campos:
+        return respuesta_error(
+            "Enviá únicamente codigo_paciente, codigo_episodio y texto.",
+            422,
+            "CAMPOS_INVALIDOS"
+        )
+
+    if any(not isinstance(entrada[campo], str) for campo in campos):
+        return respuesta_error(
+            "Todos los campos deben ser texto.",
+            422,
+            "TIPOS_INVALIDOS"
+        )
+
+    entrada = {
+        campo: valor.strip()
+        for campo, valor in entrada.items()
+    }
+
+    for campo in ("codigo_paciente", "codigo_episodio"):
+        if not re.fullmatch(
+            r"[A-Z]{2,4}-[A-Z0-9-]{3,20}",
+            entrada[campo]
+        ):
+            return respuesta_error(
+                f"El formato de {campo} no es válido.",
+                422,
+                "IDENTIFICADOR_INVALIDO"
+            )
+
+    if not 1 <= len(entrada["texto"]) <= 5000:
+        return respuesta_error(
+            "El relato debe tener entre 1 y 5000 caracteres.",
+            422,
+            "TEXTO_INVALIDO"
+        )
+
+    
+    try:
+        datos = extraer_datos(entrada["texto"], ExtraccionIA)
+
+    except Exception:
+        logger_sistema.exception("ERROR_EXTRACCION_MEDGEMMA")
+        return respuesta_error(
+            "No se pudieron extraer los datos con MedGemma.",
+            500,
+            "ERROR_EXTRACCION_IA"
+        )
+
+    faltantes = [
+        campo
+        for campo in OBLIGATORIOS["ingreso"]
+        if campo in ExtraccionIA.model_fields
+        and datos.get(campo) is None
+    ]
+
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "ia",
+        "caso_simulado_id": None,
+        "codigo_paciente": entrada["codigo_paciente"],
+        "codigo_episodio": entrada["codigo_episodio"],
+        "version_esquema": "ExtraccionIA-v2",
+        "modelo": "medgemma:4b",
+        "datos": datos,
+        "campos_faltantes": faltantes,
+        "advertencias": [
+            "Datos extraídos por IA; requieren revisión profesional.",
+            "Los datos no mencionados pueden quedar sin informar.",
+            "Esta respuesta no asigna prioridad Manchester."
+        ]
+    })
+
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+
+
+
+# ---
+# MODELO MED GEMMA // CHAT
+# ----
+
+
+
+@app.route("/api/chat", methods=["POST"])
+def chat_api():
+    from flask import request, jsonify
+    import time
+
+    inicio = time.time()
+
+    data = request.get_json(silent=True) or {}
+    mensaje = data.get("message", "").strip()
+
+    if not mensaje:
+        return jsonify({
+            "error": "El mensaje está vacío."
+        }), 400
+
+    try:
+        respuesta = responder(mensaje)
+
+        return jsonify({
+            "answer": respuesta,
+            "time": round(time.time() - inicio, 2),
+            "steps": [
+                "Búsqueda de información con RAG",
+                "Generación de respuesta con MedGemma"
+            ]
+        })
+
+    except Exception:
+        app.logger.exception("Error al procesar la consulta")
+        return jsonify({
+            "error": "No se pudo procesar la consulta."
+        }), 500
+
+
+@app.route("/api/analizar", methods=["POST"])
+def analizar_paciente():
+    try:
+        datos = request.get_json()
+
+        if not datos or "texto" not in datos:
+            return jsonify({"error": "Falta el texto médico"}), 400
+
+        resultado = extraer_datos_planilla(datos["texto"])
+        print("RESULTADO NLP:", resultado)
+        return jsonify(resultado)
+
+    except Exception as e:
+        app.logger.exception("Error al extraer datos médicos")
+        return jsonify({
+            "error": "Error interno durante la extracción",
+            "detalle": str(e)
+        }), 500
 
 
 if __name__ == "__main__":
-
-
     app.run(debug=True)
 
 
