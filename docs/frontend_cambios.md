@@ -1,7 +1,7 @@
 # Frontend · Qué se hizo y qué falta para conectarlo
 
-**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 14/10/2026 · **Base:** maquetado v34
-**Estado general:** el login ya es real contra Flask (A07). El resto (extracción, sugerencia, chat) sigue en **modo simulado** y todavía no usa MedGemma.
+**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 16/10/2026 · **Base:** maquetado v34
+**Estado general:** el login (A07) y "Extraer datos" (A06) ya funcionan contra Flask. La extracción usa casos simulados (D01–D05); la sugerencia y el chat siguen en **modo simulado** y todavía no usan MedGemma.
 
 ---
 
@@ -123,7 +123,7 @@ Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Aho
 |---|---|---|---|
 | 1 | ~~Login real (`/api/login`, `/api/sesion`, `/api/logout`)~~ ✅ Hecho 14/10: `api.js` + `login.js`. Desde Flask (`http://127.0.0.1:5000/index.html`) usa el login real; con doble clic sigue el modo demo | D04 · Maricel | A07 |
 | 2 | ~~Separar HTML, CSS y JS del formulario~~ ✅ Hecho 14/10: `estilos.css` + `formulario.js` + `validacion.js` | A04 + C01 · Darío | A05 |
-| 3 | "Extraer datos" contra la API (primero con JSON simulado) | D03 · Maricel + contrato D02 | A06 |
+| 3 | ~~"Extraer datos" contra la API (primero con JSON simulado)~~ ✅ Hecho 16/10: Maricel conectó `formulario.js` a `/api/extraer`; probado por Bárbara (caso D02 completa la revisión; un texto desconocido avisa y conserva el relato) | D03 · Maricel + contrato D02 | A06 |
 | 4 | Revisión y resumen con datos reales | A06 + C03/C04 + D05/D06 | A08 |
 | 5 | Conectar el chat (`CHAT_API`) | `/api/consulta` · Maricel + RAG · Tomás | A11 (nueva) |
 | 6 | Voz real (opción A o B) | Decisión del equipo; opción B: Tomás + Maricel | A11 / A06 |
