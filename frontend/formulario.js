@@ -269,6 +269,8 @@ $('#extraer').addEventListener('click', async () => {
       st.rev[f.k] = f.ia;
     }
     st.extraccion = resultado;
+    /* A08: guarda el relato tal como se envió, aunque después se edite el Ingreso. */
+    st.relatoOriginal = texto;
     st.disc = {};
     resetDecision();
     $('#hint').classList.remove('err');
@@ -326,11 +328,16 @@ function status(f){
   if(c==='none')return isReq(f)?'none':'';
   if(f.src==='med')return 'med';
   if(f.hce!=null)return v===f.hce?'hce':'fix';
-  if(v!==(f.ia??''))return 'fix';
+  /* A08: si la extracción no trajo el dato y lo cargó el profesional, es "completado", no "corregido". */
+  const orig=f.ia??'';
+  if(orig==='')return 'add';
+  if(v!==orig)return 'fix';
   return 'ia';
 }
+/* A08: los obligatorios salen del esquema común (TriageDatos.required = OBLIGATORIOS del backend). */
+const REQ=window.TriageDatos?[...TriageDatos.required.ingreso,...TriageDatos.required.medicion]:null;
 function isReq(f){
-  if(f.req)return true;
+  if(REQ?REQ.includes(f.k):f.req)return true;
   if(f.k==='glasgow'||f.k==='estado_conciencia')return !st.rev.glasgow&&!st.rev.estado_conciencia;
   return false;
 }
@@ -341,7 +348,8 @@ function tag(f){
   const s=status(f),r=' <button type="button" class="restore" data-restore="'+f.k+'" aria-label="Restaurar valor de la IA">restaurar</button>';
   if(s==='fix')return 'corregido'+r;
   if(s==='none')return f.src==='med'?'':'falta';
-  if(s==='bad')return 'revisar'+(f.ia!=null?r:'');
+  if(s==='bad')return 'revisar'+((f.ia??'')!==''?r:'');
+  if(s==='add')return f.box==='ident'?'cargado':'completado';
   if(s==='ia')return st.extraccion?.modo==='ia'?'IA':'simulado';
   if(s==='hce')return '';
   return '';
@@ -352,7 +360,7 @@ function field(f){
   const lab='<div class="fl"><label for="'+id+'">'+(SHORT[f.k]||(f.l+(f.u?' ('+f.u+')':'')))+'</label><span class="tg" id="t-'+f.k+'">'+(f.t==='calc'?'':tag(f))+'</span></div>';
   let ctl;
   if(f.t==='calc')ctl='<input id="'+id+'" class="ro" readonly value="'+pam()+'" placeholder="—">';
-  else if(f.t==='sel')ctl='<select id="'+id+'" data-k="'+f.k+'">'+f.opts.map(o=>'<option value="'+o+'"'+(o===v?' selected':'')+'>'+(o||'Sin dato')+'</option>').join('')+'</select>';
+  else if(f.t==='sel')ctl='<select id="'+id+'" data-k="'+f.k+'">'+(f.opts.includes('')?[]:['']).concat(f.opts).map(o=>'<option value="'+o+'"'+(o===v?' selected':'')+'>'+(o||'Sin dato')+'</option>').join('')+'</select>';
   else ctl='<input id="'+id+'" data-k="'+f.k+'" value="'+esc(v)+'"'+(f.t==='num'?' inputmode="decimal"':'')+' placeholder="'+(f.ph||(f.src==='med'?'':(isReq(f)?'Completar':'Opcional')))+'"'+(s==='bad'?' aria-invalid="true"':'')+'>';
   return '<div class="f s-'+s+w+'" id="f-'+f.k+'">'+lab+ctl+'</div>';
 }
@@ -416,7 +424,7 @@ function updVital(k){
   if(!VIT[k]||VIT[k].calc)return;const e=vEval(k);$('#f-'+k).className='v s-'+e.s;if(!VIT[k].text)$('#h-'+k).textContent=e.m;
 }
 function renderForm(){
-  $('#origTxt').textContent=$('#caso').value||'(sin texto)';
+  $('#origTxt').textContent=st.relatoOriginal||$('#caso').value||'(sin texto)';
   $('#g-ident').innerHTML=F.filter(f=>f.box==='ident').map(field).join('');
   $('#g-vitales').innerHTML=['ta','frecuencia_cardiaca','frecuencia_respiratoria','saturacion_o2','temperatura','glucemia','pam'].map(vCell).join('');
   $('#g-dolor').innerHTML=['estado_conciencia','glasgow','dolor_intensidad','aspecto_general'].map(vCell).join('');
@@ -473,13 +481,13 @@ $('#subir').addEventListener('click',e=>{const b=e.target.closest('.yn button');
   st.disc[k]=st.disc[k]===b.dataset.a?undefined:b.dataset.a;if(st.disc[k]===undefined)delete st.disc[k];resetDecision();renderCard();renderReg()});
 /* Resumen */
 function summaryRows(){
-  const r=st.rev,v=k=>r[k]===''?null:r[k],fx=(...ks)=>ks.some(k=>status(byK(k))==='fix');
+  const r=st.rev,v=k=>r[k]===''?null:r[k],fx=origen;
   const list=pre=>FI.filter(f=>f.box===pre&&f.t==='chk'&&r[f.k]).map(f=>f.l);
   const ant=list('ant');if(r.alergias)ant.push('Alergias: '+r.alergias);if(r.antecedentes_otros)ant.push(r.antecedentes_otros);
   const br=list('br');
   return [
-    ['Episodio',st.ep,false],
-    ['Edad / sexo',(v('edad')?r.edad+' años':null)+' · '+r.sexo,fx('edad','sexo')],
+    ['Episodio',st.ep,''],
+    ['Edad / sexo',[v('edad')?r.edad+' años':null,v('sexo')].filter(Boolean).join(' · ')||null,fx('edad','sexo')],
     ['Motivo',(v('motivo_categoria')||'')+(v('motivo_consulta')?' · '+r.motivo_consulta:''),fx('motivo_categoria','motivo_consulta')],
     ['Síntomas referidos',v('sintomas_asociados')||'No refiere',fx('sintomas_asociados')],
     ['Evolución',v('tiempo_evolucion_valor')?r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad:null,fx('tiempo_evolucion_valor','tiempo_evolucion_unidad')],
@@ -496,6 +504,19 @@ function summaryRows(){
     ['Antecedentes',ant.length?ant.join(', '):'Ninguno',fx('ant_diabetes','ant_cardio','ant_resp','ant_anticoag','ant_inmuno','ant_embarazo','ant_medicacion','alergias','antecedentes_otros')],
   ];
 }
+/* A08: de dónde sale cada dato del resumen. Prioridad: corregido > completado/cargado > medido > extraído. */
+function origen(...ks){
+  const ss=ks.map(k=>status(byK(k)));
+  if(ss.includes('fix'))return 'corregido';
+  if(ss.includes('add'))return ks.every(k=>byK(k).box==='ident')?'cargado':'completado';
+  if(ss.includes('med'))return 'medido';
+  if(ss.includes('ia'))return 'extraído · '+(st.extraccion?.modo==='ia'?'IA':'simulado');
+  return '';
+}
+function conteo(){
+  const n=s=>FI.filter(f=>status(f)===s).length;
+  return {ia:n('ia'),fix:n('fix'),add:n('add'),med:n('med'),falta:missing().length};
+}
 function renderResumen(){
   $('#g-relato').innerHTML=F.filter(f=>f.box==='relato').map(field).join('');$('#iaDet').open=false;iaText();
   refreshSummary();renderCard();
@@ -503,17 +524,20 @@ function renderResumen(){
   renderReg();
 }
 function refreshSummary(){
-  $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>corregido</em>':'')+'</div>').join('');
+  $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>'+c+'</em>':'')+'</div>').join('');
   const m=missing();$('#sumMiss').innerHTML=m.length?m.map(k=>'<span class="st none">'+ml(k)+'</span>').join(' '):'ninguno';
-  const c=FI.filter(f=>status(f)==='fix');
-  $('#corrNote').innerHTML=c.length?'<b>Correcciones ('+c.length+').</b> '+c.map(f=>f.l+': '+(f.hce!=null?'admisión ':'IA ')+esc(fmt(f,f.ia??f.hce))+' → '+esc(fmt(f,st.rev[f.k]))).join(' · '):'Sin correcciones: se usaron los valores de la IA.';
+  const c=FI.filter(f=>status(f)==='fix'),a=FI.filter(f=>status(f)==='add'),notas=[];
+  /* A08: el valor original (admisión o extracción) se conserva y se muestra junto al confirmado. */
+  if(c.length)notas.push('<b>Correcciones ('+c.length+').</b> '+c.map(f=>f.l+': '+(f.hce!=null?'admisión ':'extracción ')+esc(fmt(f,f.ia??f.hce))+' → '+esc(fmt(f,st.rev[f.k]))).join(' · '));
+  if(a.length)notas.push('<b>Completados por el profesional ('+a.length+').</b> '+a.map(f=>f.l+': '+esc(fmt(f,st.rev[f.k]))).join(' · '));
+  $('#corrNote').innerHTML=notas.length?notas.join('<br>'):'Sin correcciones: se usaron los valores extraídos.';
   $('#triageMiss').innerHTML=m.map(k=>'<li>'+ml(k)+'</li>').join('');$('#missBox').hidden=!m.length;
 }
 function renderReg(){
   const d=st.decision,l=st.level!=null?LEVELS[st.level][0]:null;
   const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
   const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+LEVELS[SUG][0]:d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
-  $('#reg').textContent='Episodio:  '+st.ep+' (seudonimizado)\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     [DD/MM/AAAA HH:MM]\nModelo:    SIMULADO (sin IA)\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
+  $('#reg').textContent='Episodio:  '+st.ep+' (seudonimizado)\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
 }
 
 $('#levels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-l="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'" title="'+L[3]+'">'+L[0]+'</button>').join('');
@@ -548,7 +572,7 @@ function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
 $('#nuevo').addEventListener('click',()=>{
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
-  st.extraccion=null;
+  st.extraccion=null;st.relatoOriginal=null;
   F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
 /* Clasificación manual sin IA */
 $('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
@@ -675,7 +699,9 @@ async function salir() {
 }
 /* Evita presentar los ejemplos precargados como extracción del servidor. */
 if (TriageAPI.MODO_REAL) {
-  F.forEach(f=>{if ('ia' in f) f.ia=f.t==='chk'?false:null;});
+  F.forEach(f=>{if ('ia' in f) f.ia=f.t==='chk'?false:null;
+    /* A08: con servidor no hay admisión (HCE): edad y sexo los carga el profesional. */
+    if ('hce' in f) f.hce=null;});
 }
 (async function iniciarSesion(){
   st.user=await TriageAPI.sesion();

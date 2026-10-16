@@ -199,6 +199,8 @@ fieldset.grp legend{font-family:var(--f-display);font-weight:600;font-size:15px;
 .cx-h .sub{font-family:var(--f-body);font-size:12px;font-weight:400;color:var(--muted)}
 .cx-h .btn.sm{margin-left:auto;min-height:32px;padding:0 10px;font-size:12px;font-weight:500}
 .f.s-hce .tg,.f.s-med .tg{color:var(--muted)}
+/* A08: dato que no trajo la extracción y completó el profesional */
+.f.s-add>input,.f.s-add>select{border:1.5px solid var(--ink,currentColor)}.f.s-add .tg{color:var(--muted)}
 .relline{display:block;width:100%;text-align:left;border:0;background:var(--panel-2);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .relline b{color:var(--ink)}
 .relline[aria-expanded="true"]{white-space:normal}

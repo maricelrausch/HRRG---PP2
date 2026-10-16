@@ -124,7 +124,7 @@ Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Aho
 | 1 | ~~Login real (`/api/login`, `/api/sesion`, `/api/logout`)~~ ✅ Hecho 14/10: `api.js` + `login.js`. Desde Flask (`http://127.0.0.1:5000/index.html`) usa el login real; con doble clic sigue el modo demo | D04 · Maricel | A07 |
 | 2 | ~~Separar HTML, CSS y JS del formulario~~ ✅ Hecho 14/10: `estilos.css` + `formulario.js` + `validacion.js` | A04 + C01 · Darío | A05 |
 | 3 | ~~"Extraer datos" contra la API (primero con JSON simulado)~~ ✅ Hecho 16/10: Maricel conectó `formulario.js` a `/api/extraer`; probado por Bárbara (caso D02 completa la revisión; un texto desconocido avisa y conserva el relato) | D03 · Maricel + contrato D02 | A06 |
-| 4 | Revisión y resumen con datos reales | A06 + C03/C04 + D05/D06 | A08 |
+| 4 | ~~Revisión y resumen con datos reales~~ ✅ Hecho 16/10 (con la extracción simulada; con MedGemma cuando cierre D05): cada dato muestra su origen (extraído · corregido · completado · cargado · medido · falta), el relato original queda fijo, los obligatorios salen de `validacion.js` y el registro cuenta extraídos/corregidos/completados/medidos/faltantes | A06 + C03/C04 + D05/D06 | A08 |
 | 5 | Conectar el chat (`CHAT_API`) | `/api/consulta` · Maricel + RAG · Tomás | A11 (nueva) |
 | 6 | Voz real (opción A o B) | Decisión del equipo; opción B: Tomás + Maricel | A11 / A06 |
 | 7 | Tarjeta de sugerencia con datos reales | Guías autorizadas por el HRRG | A09 ⏸ |
