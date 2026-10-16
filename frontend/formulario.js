@@ -161,8 +161,12 @@ const DEMO={ta_sistolica:'130',ta_diastolica:'80',frecuencia_cardiaca:'98',frecu
 const FI=F.filter(f=>f.t!=='calc');
 const byK=k=>F.find(f=>f.k===k);
 const ml=k=>k==='glasgow'?'Conciencia (Glasgow o estado)':byK(k).l;
+/* Conserva los valores del ejemplo para la demo sin servidor. */
+const ejemploOriginal = F.map(f => ({ia: f.ia, hce: f.hce}));
 const base=f=>f.t==='chk'?f.ia:(f.ia??f.hce??'');
-const init=()=>Object.fromEntries(FI.map(f=>[f.k,base(f)]));
+/* Al iniciar un caso con servidor, deja vacíos los datos no obtenidos aún. */
+const init=()=>Object.fromEntries(FI.map(f=>[f.k,
+  TriageAPI.MODO_REAL ? (f.t==='chk'?false:'') : base(f)]));
 const st={user:null,disc:{},fast:false,screen:'ingreso',rev:init(),insuf:false,decision:null,level:null,ollama:true,ep:'EP-004812',prev:null,manual:false,mlv:null};
 let epN=4812;
 const $=s=>document.querySelector(s);
@@ -209,17 +213,88 @@ function showErr(code){
 }
 const PII=/\b(?:dni|documento|tel(?:é|e)fono|tel\.|cel(?:ular)?)\b[^\d\n]{0,6}[\d.\s-]{6,}|\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,10}\b|\b\d{2,4}[\s-]\d{6,8}\b/gi;
 $('#piiFix').addEventListener('click',()=>{$('#caso').value=$('#caso').value.replace(PII,'[dato quitado]');$('#piiBanner').hidden=true;$('#extraer').click()});
-$('#extraer').addEventListener('click',()=>{
-  $('#piiBanner').hidden=true;
-  if(!$('#caso').value.trim()){$('#hint').textContent='Escribí o dictá el relato del paciente antes de seguir.';$('#hint').classList.add('err');return}
-  PII.lastIndex=0;if(PII.test($('#caso').value)){PII.lastIndex=0;$('#piiBanner').hidden=false;return}
-  $('#hint').classList.remove('err');$('#hint').textContent='Escribí o dictá lo que cuenta el paciente, con sus palabras. La IA lo interpreta; en el paso siguiente se cargan los signos vitales.';
-  if(!st.ollama){go('revision');return}
-  const b=$('#extraer');b.disabled=true;b.textContent='Procesando…';$('#proc').hidden=false;
-  setTimeout(()=>{b.disabled=false;b.textContent='Extraer datos';$('#proc').hidden=true;go('revision')},1200);
+/* Extrae por el contrato común. El servidor informa si el origen es simulado o IA.
+   Los identificadores son ficticios; esta llamada todavía no crea un episodio. */
+$('#extraer').addEventListener('click', async () => {
+  $('#piiBanner').hidden = true;
+  const texto = $('#caso').value.trim();
+  if (!texto) {
+    $('#hint').textContent = 'Escribí el relato antes de continuar.';
+    $('#hint').classList.add('err');
+    return;
+  }
+  PII.lastIndex = 0;
+  if (PII.test(texto)) {
+    PII.lastIndex = 0;
+    $('#piiBanner').hidden = false;
+    return;
+  }
+  /* Conserva el recorrido ilustrativo al abrir el HTML sin servidor. */
+  if (!TriageAPI.MODO_REAL || !st.ollama) {
+    go('revision');
+    return;
+  }
+  const boton = $('#extraer');
+  boton.disabled = true;
+  boton.textContent = 'Procesando…';
+  $('#proc').hidden = false;
+  $('#proc').textContent = 'Consultando el backend…';
+  $('#errBanner').hidden = true;
+  try {
+    const r = await TriageAPI.pedir('/api/extraer', {
+      method: 'POST',
+      body: JSON.stringify({
+        codigo_paciente: 'PAC-DEMO-001',
+        codigo_episodio: st.ep,
+        texto: texto
+      })
+    });
+    if (!r.ok) throw new Error(r.datos.mensaje || 'No se pudo extraer el relato.');
+    const resultado = r.datos;
+    if (resultado.ok !== true || !['simulado', 'ia'].includes(resultado.modo) ||
+        !resultado.datos || typeof resultado.datos !== 'object' || Array.isArray(resultado.datos)) {
+      throw new Error('El servidor devolvió una respuesta incompatible con el contrato.');
+    }
+    /* Actualiza solo campos de extracción; conserva las mediciones profesionales.
+       Guarda el original en f.ia para que “restaurar” use la respuesta recibida. */
+    const campos = F.filter(f => ['relato', 'ant', 'br'].includes(f.box));
+    for (const f of campos) {
+      if (!Object.prototype.hasOwnProperty.call(resultado.datos, f.k)) {
+        throw new Error('La respuesta de extracción está incompleta.');
+      }
+    }
+    for (const f of campos) {
+      const valor = resultado.datos[f.k];
+      f.ia = f.t === 'chk' ? valor === true : (valor == null ? '' : String(valor));
+      st.rev[f.k] = f.ia;
+    }
+    st.extraccion = resultado;
+    st.disc = {};
+    resetDecision();
+    $('#hint').classList.remove('err');
+    $('#hint').textContent = 'Respuesta recibida. Revisá los datos antes de continuar.';
+    go('revision');
+    /* Las advertencias se muestran como texto, sin interpretar HTML. */
+    $('#errTitle').textContent = resultado.modo === 'simulado'
+      ? 'Extracción simulada: caso predefinido' : 'Extracción por IA: requiere revisión';
+    $('#errMsg').textContent = (resultado.advertencias || []).join(' ');
+    $('#errCode').textContent = resultado.modo === 'simulado' ? 'MODO SIMULADO' : 'MODO IA';
+    $('#errBanner').hidden = false;
+  } catch (error) {
+    /* Conserva el relato y los datos previos cuando falla la solicitud. */
+    $('#hint').textContent = error.message || 'No se pudo completar la extracción.';
+    $('#hint').classList.add('err');
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Extraer datos';
+    $('#proc').hidden = true;
+  }
+
 });
 function updOllama(){
-  $('#ollama').innerHTML=st.ollama?'<span class="dot"></span>IA: simulada':'<span class="dot off"></span>IA: no disponible (simulado)';
+  $('#ollama').textContent = st.ollama
+    ? (st.extraccion ? 'Extracción: '+st.extraccion.modo : (TriageAPI.MODO_REAL ? 'Extracción: backend (sin consultar)' : 'Demo sin servidor'))
+    : 'Continuar sin extracción';
   if(!st.ollama){$('#errTitle').textContent='La IA no está disponible.';$('#errMsg').textContent='Seguí con el triage habitual: no se pierde nada de lo cargado.';$('#errCode').textContent='503 · ollama_no_disponible';$('#errBanner').hidden=false;$('#extraer').textContent='Continuar sin IA'}
   else{$('#errBanner').hidden=true;$('#extraer').textContent='Extraer datos'}
   const c=$('#confirmar');c.textContent=st.ollama?'Pedir sugerencia':'IA no disponible';$('#sinIA').classList.toggle('primary',!st.ollama);
@@ -267,7 +342,7 @@ function tag(f){
   if(s==='fix')return 'corregido'+r;
   if(s==='none')return f.src==='med'?'':'falta';
   if(s==='bad')return 'revisar'+(f.ia!=null?r:'');
-  if(s==='ia')return 'IA';
+  if(s==='ia')return st.extraccion?.modo==='ia'?'IA':'simulado';
   if(s==='hce')return '';
   return '';
 }
@@ -471,7 +546,10 @@ $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderR
 function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed','false'));document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
-$('#nuevo').addEventListener('click',()=>{$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
+$('#nuevo').addEventListener('click',()=>{
+  /* Restablece los originales para evitar restaurar datos de otro episodio. */
+  st.extraccion=null;
+  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
 /* Clasificación manual sin IA */
 $('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
 $('#mLevels').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;st.mlv=+b.dataset.m;$('#mLevels').querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#mReg').disabled=false});
@@ -594,6 +672,10 @@ async function salir() {
   } catch (e) {
     alert(e.message);
   }
+}
+/* Evita presentar los ejemplos precargados como extracción del servidor. */
+if (TriageAPI.MODO_REAL) {
+  F.forEach(f=>{if ('ia' in f) f.ia=f.t==='chk'?false:null;});
 }
 (async function iniciarSesion(){
   st.user=await TriageAPI.sesion();

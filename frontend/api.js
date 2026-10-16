@@ -7,7 +7,12 @@
  */
 (function (root) {
   'use strict';
-  const MODO_REAL = location.protocol === 'http:' || location.protocol === 'https:';
+
+  /* Usa autenticación de Flask en HTTP/HTTPS y acceso simulado al abrir por file://.
+     Esta configuración controla el login, no la extracción con IA. */
+  const MODO_REAL =
+    location.protocol === 'http:' || location.protocol === 'https:';
+
   const CLAVE_DEMO = 'hrrg_demo_user';
   const USUARIOS_DEMO = {
     enfermeria: { nom: 'Enfermería', rol: 'triage' },

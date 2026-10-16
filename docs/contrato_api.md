@@ -273,6 +273,7 @@ Las pruebas usan datos ficticios y no registran secretos.
 - Darío: campos, faltantes, booleanos y versión del esquema.
 - Maricel: implementación, permisos y errores del backend.
 
+<<<<<<< HEAD
 Cualquier cambio del contrato debe comunicarse al equipo.
 
 
@@ -467,3 +468,6 @@ con EPISODIO_NO_ENCONTRADO.
 POST /api/extraer sigue devolviendo una respuesta simulada.
 Actualmente no crea episodios ni guarda automáticamente eventos
 de extracción, mediciones o correcciones.
+=======
+Cualquier cambio del contrato debe comunicarse al equipo.
+>>>>>>> origin/tomas

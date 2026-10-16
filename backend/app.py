@@ -41,6 +41,10 @@ app = Flask(
 app.config["DEMO_DOCUMENTAL_HABILITADA"] = False
 # D03: respuesta predefinida para probar la integración.
 app.config["EXTRACCION_SIMULADA_HABILITADA"] = True
+# Selecciona explícitamente la extracción; la demo funciona sin cargar modelos.
+app.config["MODO_EXTRACCION"] = os.environ.get("HRRG_MODO_EXTRACCION", "simulado")
+# BETO es experimental y se habilita por separado cuando esté instalado.
+app.config["BETO_HABILITADO"] = os.environ.get("HRRG_BETO_HABILITADO") == "1"
 # ------------------------------------------------
 # Formato común para los errores de la API.
 # ------------------------------------------------
@@ -272,7 +276,8 @@ def verificar_acceso():
         "consultar_episodio_demo",
         "extraer",
         "agregar_medicion_demo",
-        "agregar_correccion_demo"
+        "agregar_correccion_demo",
+        "analizar_paciente"
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -869,7 +874,11 @@ def asignar_rol(usuario, rol):
 
 @app.route("/api/extraer", methods=["POST"])
 def extraer():
-    if not app.config["EXTRACCION_SIMULADA_HABILITADA"]:
+    # Comprueba el modo configurado antes de procesar la solicitud.
+    modo = app.config["MODO_EXTRACCION"]
+    if modo not in {"simulado", "ia"}:
+        return respuesta_error("Modo de extracción no válido.", 503, "CONFIGURACION_INVALIDA")
+    if modo == "simulado" and not app.config["EXTRACCION_SIMULADA_HABILITADA"]:
         return respuesta_error(
             "La extracción simulada está deshabilitada.",
             503,
@@ -930,6 +939,10 @@ def extraer():
             422,
             "TEXTO_INVALIDO"
         )
+
+    # El modo real usa la función de Tomás; nunca cae silenciosamente a la demo.
+    if modo == "ia":
+        return ejecutar_extraccion_ia(entrada)
 
     ruta_casos = CARPETA_BACKEND / "datos" / "casos_simulados.json"
 
@@ -1191,10 +1204,67 @@ def agregar_correccion_demo(codigo_episodio, evento_id):
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 201
 
+
+# Ejecuta MedGemma solo cuando se solicita el modo IA.
+# Las importaciones diferidas permiten iniciar la demo sin ChromaDB ni BETO.
+def ejecutar_extraccion_ia(entrada):
+    try:
+        from src.extraccion import extraer_datos
+        from src.modelo import LLM_MODEL
+    except Exception:
+        logger_sistema.error("ERROR_INICIALIZAR_IA")
+        return respuesta_error("No se pudo inicializar el servicio de IA.", 503, "IA_NO_DISPONIBLE")
+
+    try:
+        datos = ExtraccionIA.model_validate(
+            extraer_datos(entrada["texto"], ExtraccionIA)
+        ).model_dump(mode="json")
+    except (ValueError, ValidationError):
+        return respuesta_error("La IA devolvió datos incompatibles con el esquema.", 502, "SALIDA_IA_INVALIDA")
+    except Exception:
+        # No expone relatos ni detalles internos en la respuesta o en el log.
+        logger_sistema.error("ERROR_SERVICIO_EXTRACCION_IA")
+        return respuesta_error("No se pudo completar la extracción con IA.", 503, "IA_NO_DISPONIBLE")
+
+    # Mantiene la estructura compartida, identificando el origen real.
+    respuesta = jsonify({
+        "ok": True, "modo": "ia", "caso_simulado_id": None,
+        "codigo_paciente": entrada["codigo_paciente"],
+        "codigo_episodio": entrada["codigo_episodio"],
+        "version_esquema": "ExtraccionIA-v2", "modelo": LLM_MODEL,
+        "datos": datos,
+        "campos_faltantes": [campo for campo in OBLIGATORIOS["ingreso"]
+                             if campo in ExtraccionIA.model_fields and datos.get(campo) is None],
+        "advertencias": ["Datos extraídos por IA; requieren revisión profesional.",
+                         "Esta respuesta no asigna prioridad Manchester."]
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+
+# Conserva la ruta experimental de BETO protegida por sesión y rol.
+# Su respuesta conserva el formato de Tomás; falta acordar su contrato definitivo.
+@app.route("/api/analizar", methods=["POST"])
+def analizar_paciente():
+    if not app.config["BETO_HABILITADO"]:
+        return respuesta_error("BETO está deshabilitado en esta integración.", 503, "BETO_DESHABILITADO")
+    entrada, error = leer_entrada_historial({"texto"})
+    if error is not None:
+        return error
+    texto = entrada["texto"]
+    if not isinstance(texto, str) or not 1 <= len(texto.strip()) <= 5000:
+        return respuesta_error("El relato debe tener entre 1 y 5000 caracteres.", 422, "TEXTO_INVALIDO")
+    try:
+        from src.procesamiento_nlp import extraer_datos_planilla
+        resultado = extraer_datos_planilla(texto.strip())
+    except Exception:
+        logger_sistema.error("ERROR_SERVICIO_BETO")
+        return respuesta_error("BETO no está disponible o no pudo procesar el relato.", 503, "BETO_NO_DISPONIBLE")
+    respuesta = jsonify(resultado)
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
 if __name__ == "__main__":
 
 
     app.run(debug=True)
-
-
-
