@@ -7,7 +7,10 @@ from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 from src.auth import iniciar_sesion, profesional_activo, obtener_profesional
 from src.registro import inicializar_registro, crear_episodio, obtener_episodio
-import re
+from src.registro import (
+    registrar_medicion_demo,
+    corregir_medicion_demo,
+)
 from pydantic import ValidationError
 from src.esquemas import ExtraccionIA, OBLIGATORIOS
 import os
@@ -17,7 +20,7 @@ import sqlite3
 import click
 import secrets
 import logging
-
+import re
 
 
 
@@ -259,6 +262,7 @@ def verificar_acceso():
             "DEMO_DESHABILITADA"
         )
 
+# Estas rutas requieren una cuenta activa con un rol autorizado.
     rutas_protegidas = {
         "paciente_form",
         "chat_api",
@@ -266,7 +270,9 @@ def verificar_acceso():
         "consultar_sesion",
         "crear_episodio_demo",
         "consultar_episodio_demo",
-        "extraer"
+        "extraer",
+        "agregar_medicion_demo",
+        "agregar_correccion_demo"
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -493,12 +499,19 @@ def crear_episodio_demo():
     "/api/demo/episodios/<codigo_episodio>",
     methods=["GET"]
 )
+
+# Permite a médicos y enfermeros consultar episodios
+# creados por otros profesionales, según su rol en el servidor.
 def consultar_episodio_demo(codigo_episodio):
     try:
+  
         episodio = obtener_episodio(
             ruta_base=BASE_REGISTRO_DEMO,
             codigo_episodio=codigo_episodio,
-            profesional_usuario=session["usuario"]
+            profesional_usuario=g.profesional["usuario"],
+            permitir_lectura_compartida=(
+                g.profesional["rol"] in {"medico", "enfermeria", "auditor"}
+            )
         )
     except (sqlite3.Error, ValueError):
         logger_sistema.error("ERROR_CONSULTAR_EPISODIO_DEMO")
@@ -1029,6 +1042,154 @@ def extraer():
 
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
+
+# ------------------------------------------------
+# Validar el formato y los campos de las solicitudes
+# de mediciones y correcciones.
+# ------------------------------------------------
+def leer_entrada_historial(campos):
+    if not request.is_json:
+        return None, respuesta_error(
+            "La solicitud debe estar en formato JSON.",
+            415,
+            "FORMATO_NO_SOPORTADO"
+        )
+
+    entrada = request.get_json(silent=True)
+
+    if not isinstance(entrada, dict):
+        return None, respuesta_error(
+            "El JSON recibido debe ser un objeto válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    # Rechaza campos adicionales, incluido un autor enviado por el cliente.
+    if set(entrada) != set(campos):
+        return None, respuesta_error(
+            "Los campos enviados no coinciden con los requeridos.",
+            422,
+            "CAMPOS_INVALIDOS"
+        )
+
+    return entrada, None
+
+
+# ------------------------------------------------
+# Registrar una nueva medición en un episodio.
+# El profesional responsable se obtiene de la sesión.
+# ------------------------------------------------
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>/mediciones",
+    methods=["POST"]
+)
+
+# Recibe el episodio de la URL y agrega un evento al historial.
+def agregar_medicion_demo(codigo_episodio):
+    entrada, error = leer_entrada_historial({"medido_en", "valores"})
+
+    if error is not None:
+        return error
+
+    try:
+        evento = registrar_medicion_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            profesional_usuario=g.profesional["usuario"],
+            medido_en=entrada["medido_en"],
+            valores=entrada["valores"]
+        )
+
+    # No devuelve los valores recibidos ni detalles internos de Pydantic.
+    except ValidationError:
+        return respuesta_error(
+            "Revisá los campos, rangos y coherencia de las mediciones.",
+            422,
+            "MEDICION_INVALIDA"
+        )
+
+    except ValueError:
+        return respuesta_error(
+            "Revisá la fecha, las mediciones y que el episodio exista.",
+            422,
+            "REGISTRO_INVALIDO"
+        )
+
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_GUARDAR_MEDICION_DEMO")
+        return respuesta_error(
+            "No se pudo guardar la medición.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Confirma el guardado e incluye el ID para futuras correcciones.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "evento": evento
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 201
+
+# ------------------------------------------------
+# Corregir una medición mediante un nuevo evento.
+# Conserva el original, el motivo y el autor de la corrección.
+# ------------------------------------------------
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>"
+    "/mediciones/<int:evento_id>/correcciones",
+    methods=["POST"]
+)
+def agregar_correccion_demo(codigo_episodio, evento_id):
+    entrada, error = leer_entrada_historial({"cambios", "motivo"})
+
+    if error is not None:
+        return error
+
+    try:
+        evento = corregir_medicion_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            evento_id=evento_id,
+            profesional_usuario=g.profesional["usuario"],
+            cambios=entrada["cambios"],
+            motivo=entrada["motivo"]
+        )
+
+    # Rechaza valores que no cumplen el esquema de Darío.
+    except ValidationError:
+        return respuesta_error(
+            "Los valores corregidos no cumplen el esquema de mediciones.",
+            422,
+            "MEDICION_INVALIDA"
+        )
+
+    # Incluye intentos sobre una versión que ya fue corregida.
+    except ValueError:
+        return respuesta_error(
+            "Revisá los cambios, el motivo y que el registro "
+            "sea la última versión de esa medición.",
+            422,
+            "CORRECCION_INVALIDA"
+        )
+
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_GUARDAR_CORRECCION_DEMO")
+        return respuesta_error(
+            "No se pudo guardar la corrección.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Devuelve la nueva versión con su identificador y autor.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "evento": evento
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 201
 
 if __name__ == "__main__":
 

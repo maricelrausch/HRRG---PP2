@@ -274,3 +274,196 @@ Las pruebas usan datos ficticios y no registran secretos.
 - Maricel: implementación, permisos y errores del backend.
 
 Cualquier cambio del contrato debe comunicarse al equipo.
+
+
+## Historial de episodios — modo demostración
+
+Estado: implementado en backend; pendiente de revisión del equipo
+e integración con el frontend.
+
+Solo se utilizan pacientes, episodios y mediciones ficticios.
+Estas rutas requieren una sesión válida.
+
+### Permisos
+
+| Acción | Enfermería / Médico | Auditor |
+|---|---|---|
+| Crear episodio | Sí | No |
+| Consultar episodio e historial | Sí | Sí |
+| Registrar mediciones | Sí | No |
+| Corregir mediciones | Sí | No |
+
+La consulta y la escritura autorizadas no dependen de quién creó
+el episodio. Cada evento conserva su propio autor.
+
+Flask obtiene el usuario y el rol desde la sesión.
+El cliente no debe enviar la identidad del profesional.
+
+### Crear un episodio
+
+POST /api/demo/episodios
+
+Entrada:
+
+```json
+{
+  "codigo_paciente": "PAC-DEMO-001",
+  "codigo_episodio": "EPI-DEMO-001"
+}
+```
+
+Respuesta correcta: HTTP 201, con ok, modo y episodio.
+
+Se registra automáticamente el evento EPISODIO_CREADO.
+Un código de episodio duplicado devuelve HTTP 409.
+
+Actualmente esta ruta acepta identificadores de texto de entre
+1 y 100 caracteres, luego de quitar espacios exteriores.
+La unificación con el patrón de /api/extraer está pendiente.
+
+### Registrar una medición
+
+POST /api/demo/episodios/{codigo_episodio}/mediciones
+
+Entrada:
+
+```json
+{
+  "medido_en": "2026-10-15T10:45:00-03:00",
+  "valores": {
+    "ta_sistolica": 150,
+    "ta_diastolica": 80
+  }
+}
+```
+
+El episodio debe existir previamente.
+
+medido_en debe incluir fecha, hora y zona horaria.
+No se admiten fechas futuras.
+
+valores utiliza los nombres y validaciones de Mediciones,
+definidos en backend/src/esquemas.py.
+
+Se admite una medición parcial con al menos un valor válido.
+Los campos omitidos no se copian de mediciones anteriores.
+La PAM se calcula en el backend; no debe enviarse.
+
+Respuesta correcta: HTTP 201.
+
+```json
+{
+  "ok": true,
+  "modo": "demo",
+  "evento": {
+    "id": 3,
+    "codigo_episodio": "EPI-DEMO-001",
+    "tipo": "MEDICION_REGISTRADA",
+    "ocurrido_en": "2026-10-15T13:46:00+00:00",
+    "profesional_usuario": "prueba_enfermeria",
+    "datos": {
+      "version_evento": 1,
+      "modo": "demo",
+      "origen": "medicion_profesional",
+      "medido_en": "2026-10-15T13:45:00+00:00",
+      "valores": {
+        "ta_sistolica": 150,
+        "ta_diastolica": 80,
+        "pam": 103
+      }
+    }
+  }
+}
+```
+
+Los identificadores y fechas de las respuestas son ilustrativos.
+
+### Corregir una medición
+
+POST /api/demo/episodios/{codigo_episodio}/mediciones/{evento_id}/correcciones
+
+Entrada:
+
+```json
+{
+  "cambios": {
+    "ta_sistolica": 140
+  },
+  "motivo": "Error de transcripcion en caso ficticio"
+}
+```
+
+Respuesta correcta: HTTP 201, con ok, modo y evento.
+
+El nuevo evento tiene tipo MEDICION_CORREGIDA y contiene:
+
+- evento_corregido_id: ID de la versión corregida.
+- medido_en: hora de medición original.
+- motivo: explicación obligatoria, de 1 a 200 caracteres.
+- valores_anteriores: valores de la versión anterior.
+- valores: resultado validado después de aplicar los cambios.
+- profesional_usuario: autor de la corrección, en el evento.
+- ocurrido_en: fecha de registro generada por el servidor.
+
+Los campos no incluidos en cambios conservan su valor anterior.
+Un null explícito permite retirar un valor, siempre que quede
+al menos una medición válida. La PAM se recalcula.
+
+El evento original no se modifica ni se elimina.
+Para corregir nuevamente debe utilizarse el ID de la última
+corrección. Una versión ya corregida no admite otra rama de cambios.
+
+Esta operación corrige valores; no cambia la hora de medición.
+Una nueva toma de signos vitales debe registrarse como nueva medición.
+
+### Consultar historial
+
+GET /api/demo/episodios/{codigo_episodio}
+
+Respuesta correcta: HTTP 200, con ok, modo y episodio.
+episodio contiene sus identificadores, creador, fecha y eventos.
+
+Los eventos se devuelven ordenados por ID de registro.
+Ese orden no necesariamente coincide con la hora de medición,
+porque puede haber cargas retrospectivas.
+
+El frontend debe conservar la distinción entre mediciones y
+correcciones. Una corrección de una medición antigua no debe
+presentarse como una nueva toma de signos vitales.
+
+No existe todavía una ruta para listar todos los episodios
+de un paciente por codigo_paciente.
+
+### Errores de las nuevas rutas de escritura
+
+Formato:
+
+```json
+{
+  "ok": false,
+  "mensaje": "Descripción del problema.",
+  "codigo": "IDENTIFICADOR_DEL_ERROR"
+}
+```
+
+| HTTP | Código | Situación |
+|---|---|---|
+| 400 | JSON_INVALIDO | JSON mal formado o contenido que no es objeto. |
+| 401 | SESION_REQUERIDA | Sesión ausente, inválida o cuenta inactiva. |
+| 403 | ROL_NO_ASIGNADO | Cuenta sin un rol admitido. |
+| 403 | PERMISO_DENEGADO | El auditor intenta escribir. |
+| 415 | FORMATO_NO_SOPORTADO | Contenido no JSON. |
+| 422 | CAMPOS_INVALIDOS | Campos requeridos ausentes o adicionales. |
+| 422 | MEDICION_INVALIDA | Valores que incumplen el esquema. |
+| 422 | REGISTRO_INVALIDO | Fecha o medición inválida, o episodio inexistente. |
+| 422 | CORRECCION_INVALIDA | Corrección inválida o versión ya corregida. |
+| 500 | ERROR_REGISTRO | Falla de almacenamiento. |
+
+La consulta de un episodio inexistente devuelve HTTP 404
+con EPISODIO_NO_ENCONTRADO.
+
+### Relación con la extracción
+
+POST /api/extraer sigue devolviendo una respuesta simulada.
+Actualmente no crea episodios ni guarda automáticamente eventos
+de extracción, mediciones o correcciones.
