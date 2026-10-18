@@ -383,3 +383,6 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .chat-in button{min-width:42px;min-height:42px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-weight:600}
 .chat-in .send{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);padding:0 12px}
 .chat-in .vz[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+/* Historial guardado en el servidor */
+.note.hist ul{margin:6px 0 0 18px;padding:0}.note.hist li{margin:4px 0}.note.hist .old{color:var(--muted);font-size:13px}.note.hist .w{color:var(--err)}

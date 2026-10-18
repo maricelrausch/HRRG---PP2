@@ -229,6 +229,8 @@ $('#extraer').addEventListener('click', async () => {
     $('#piiBanner').hidden = false;
     return;
   }
+  /* Con servidor: el episodio se crea una sola vez, antes de la primera extracción. */
+  if (TriageAPI.MODO_REAL && !(await asegurarEpisodio())) return;
   /* Conserva el recorrido ilustrativo al abrir el HTML sin servidor. */
   if (!TriageAPI.MODO_REAL || !st.ollama) {
     go('revision');
@@ -244,7 +246,7 @@ $('#extraer').addEventListener('click', async () => {
     const r = await TriageAPI.pedir('/api/extraer', {
       method: 'POST',
       body: JSON.stringify({
-        codigo_paciente: 'PAC-DEMO-001',
+        codigo_paciente: st.srv.pac,
         codigo_episodio: st.ep,
         texto: texto
       })
@@ -466,8 +468,64 @@ $('#rvForm').addEventListener('input',e=>{
   updField(f);updControl();
 });
 $('#rvForm').addEventListener('click',e=>{const k=e.target.dataset.restore;if(!k)return;e.preventDefault();const f=byK(k);st.rev[k]=base(f);renderForm()});
-$('#confirmar').addEventListener('click',()=>{st.manual=false;st.insuf=CORE.filter(k=>!st.rev[k]).length>=3;go('resumen')});
-$('#sinIA').addEventListener('click',()=>{st.manual=true;st.insuf=false;go('resumen')});
+$('#confirmar').addEventListener('click',async()=>{await guardarMediciones();st.manual=false;st.insuf=CORE.filter(k=>!st.rev[k]).length>=3;go('resumen')});
+$('#sinIA').addEventListener('click',async()=>{await guardarMediciones();st.manual=true;st.insuf=false;go('resumen')});
+
+/* ===== Guardado en el servidor (episodio, mediciones, correcciones, historial) =====
+   Solo con servidor. Sin servidor (doble clic) no se guarda nada, como antes.
+   - El episodio lo crea el servidor y genera el código (EPI-…).
+   - La primera vez que se piden sugerencias se registra una MEDICIÓN.
+   - Si después se cambian valores, se registra una CORRECCIÓN (no se pisa la original).
+   - Una reevaluación desde En espera es una toma nueva: se registra otra MEDICIÓN. */
+const VALORES_MEDICION=['ta_sistolica','ta_diastolica','frecuencia_cardiaca','frecuencia_respiratoria','saturacion_o2','temperatura','glucemia','estado_conciencia','glasgow','dolor_intensidad','aspecto_general'];
+const nuevoSrv=()=>({ep:null,pac:null,medicion:null,nuevaToma:false,aviso:null});
+st.srv=nuevoSrv();
+async function asegurarEpisodio(){
+  if(st.srv.ep)return true;
+  const pac='PAC-'+Math.random().toString(36).slice(2,8).toUpperCase().padEnd(6,'0');
+  const r=await TriageAPI.crearEpisodio(pac);
+  if(r.estado===401){location.href='index.html';return false}
+  if(!r.ok){$('#hint').textContent='No se pudo crear el episodio: '+(r.datos.mensaje||'error del servidor')+' Tu texto se conservó.';$('#hint').classList.add('err');return false}
+  st.srv.ep=r.datos.episodio.codigo_episodio;st.srv.pac=r.datos.episodio.codigo_paciente||pac;st.ep=st.srv.ep;
+  return true;
+}
+function valoresMedidos(){
+  const d=window.TriageDatos?TriageDatos.validate(st.rev).data:{},v={};
+  VALORES_MEDICION.forEach(k=>{if(d[k]!=null&&d[k]!=='')v[k]=d[k]});
+  return v;
+}
+async function guardarMediciones(){
+  st.srv.aviso=null;
+  if(!TriageAPI.MODO_REAL||!st.srv.ep)return;
+  const v=valoresMedidos();
+  if(!Object.keys(v).length)return;
+  let r;
+  if(!st.srv.medicion||st.srv.nuevaToma){
+    r=await TriageAPI.registrarMedicion(st.srv.ep,new Date().toISOString(),v);
+  }else{
+    const prev=st.srv.medicion.valores,cambios={};
+    VALORES_MEDICION.forEach(k=>{const a=prev[k]??null,b=v[k]??null;if(a!==b)cambios[k]=b});
+    if(!Object.keys(cambios).length)return;
+    r=await TriageAPI.corregirMedicion(st.srv.ep,st.srv.medicion.id,cambios,'Corregido en la revisión, antes de la decisión.');
+  }
+  if(r.estado===401){location.href='index.html';return}
+  if(!r.ok){st.srv.aviso='No se pudo guardar la medición: '+(r.datos.mensaje||'error del servidor')+' El triage sigue; los datos quedan en pantalla.';return}
+  st.srv.medicion={id:r.datos.evento.id,valores:v};st.srv.nuevaToma=false;
+}
+const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida'};
+async function renderHistorial(){
+  const box=$('#histBox');
+  if(!TriageAPI.MODO_REAL||!st.srv.ep){box.hidden=true;return}
+  box.hidden=false;box.innerHTML='<b>Historial guardado en el servidor</b> · cargando…';
+  const r=await TriageAPI.consultarEpisodio(st.srv.ep);
+  if(!r.ok){box.innerHTML='<b>Historial guardado en el servidor.</b> No se pudo consultar: '+esc(r.datos.mensaje||'error');return}
+  const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
+  const fila=e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+x).join(' · '):'';
+    return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(hora(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
+      (d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'};
+  box.innerHTML='<b>Historial guardado en el servidor</b> · '+esc(st.srv.ep)+(st.srv.aviso?'<br><span class="w">'+esc(st.srv.aviso)+'</span>':'')+
+    '<ul>'+(r.datos.episodio.eventos||[]).map(fila).join('')+'</ul>';
+}
 $('#demoWorse').addEventListener('click',()=>{Object.assign(st.rev,{saturacion_o2:'86',frecuencia_cardiaca:'125',frecuencia_respiratoria:'26',br_disnea:true});renderForm()});
 $('#demoVitals').addEventListener('click',()=>{Object.assign(st.rev,DEMO);renderForm()});
 $('#relline').addEventListener('click',e=>{const b=e.currentTarget;b.setAttribute('aria-expanded',b.getAttribute('aria-expanded')!=='true')});
@@ -522,7 +580,7 @@ function conteo(){
 function renderResumen(){
   $('#g-relato').innerHTML=F.filter(f=>f.box==='relato').map(field).join('');$('#iaDet').open=false;iaText();
   refreshSummary();renderCard();
-  renderInsuf();
+  renderInsuf();renderHistorial();
   $('#triageCard').hidden=st.insuf||st.manual;$('#insufCard').hidden=!st.insuf||st.manual;$('#manualCard').hidden=!st.manual;
   renderReg();
 }
@@ -591,7 +649,7 @@ function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
 $('#nuevo').addEventListener('click',()=>{
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
-  st.extraccion=null;st.relatoOriginal=null;renderSimbar();
+  st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
   F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
 /* Clasificación manual sin IA */
 $('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
@@ -612,8 +670,8 @@ let escPending=null;
 function commit(lv){
   if(lv==null)return;
   let w=WAIT.find(x=>x.ep===st.ep);
-  if(w){w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false}
-  else WAIT.push({ep:st.ep,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev))});
+  if(w){w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
+  else WAIT.push({ep:st.ep,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
 }
 function clock(w){
   if(w.lv===0)return '<span class="clock over"><span class="ct">ROJO · atención inmediata</span><span class="bar"><i></i></span></span>';
@@ -633,7 +691,7 @@ $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
 setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>w.min++);if(st.screen==='espera')renderWait()},1000);
 $('#wList').addEventListener('click',e=>{
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]');
-  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.prev={lv:w.lv,min:w.min};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();go('revision');return}
+  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev={lv:w.lv,min:w.min};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();go('revision');return}
   if(es){const ep=es.dataset.esc;if(escPending===ep){const w=WAIT.find(x=>x.ep===ep);w.lv=0;w.esc=true;w.min=0;escPending=null}else escPending=ep;renderWait()}
 });
 
@@ -725,6 +783,7 @@ if (TriageAPI.MODO_REAL) {
 (async function iniciarSesion(){
   st.user=await TriageAPI.sesion();
   if(!st.user){location.href='index.html';return}
+  if(st.user.modoExtraccion){st.modoServidor=st.user.modoExtraccion;renderSimbar()}
   const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
   $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+' <button type="button" class="linkbtn" id="logout">Salir</button>';
   $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});

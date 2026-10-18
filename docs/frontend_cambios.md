@@ -1,7 +1,7 @@
 # Frontend · Qué se hizo y qué falta para conectarlo
 
-**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 16/10/2026 · **Base:** maquetado v34
-**Estado general:** el login (A07) y "Extraer datos" (A06) ya funcionan contra Flask. La extracción usa casos simulados (D01–D05); la sugerencia y el chat siguen en **modo simulado** y todavía no usan MedGemma.
+**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 18/10/2026 · **Base:** maquetado v34
+**Estado general:** el login (A07), "Extraer datos" (A06) y el **guardado del caso** (episodio, mediciones, correcciones e historial) ya funcionan contra Flask. La extracción usa casos simulados (D01–D05) o MedGemma (`HRRG_MODO_EXTRACCION=ia`); la sugerencia de color, el chat y el dictado siguen **simulados**.
 
 ---
 
@@ -129,5 +129,8 @@ Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Aho
 | 6 | Voz real (opción A o B) | Decisión del equipo; opción B: Tomás + Maricel | A11 / A06 |
 | 7 | Tarjeta de sugerencia con datos reales | Guías autorizadas por el HRRG | A09 ⏸ |
 | 8 | Espera y reevaluación persistidas | D10 | A10 ⏸ |
+| 9 | ~~Guardar el caso en el servidor~~ ✅ Hecho 18/10: al extraer se crea el episodio (código `EPI-…` del servidor); al pedir sugerencia se registra la **medición**; si después se cambian valores se registra una **corrección** (la original no se pisa); reevaluar desde En espera registra una **medición nueva**. El historial se ve en "Ver datos del caso". Sin servidor (doble clic) no se guarda nada | Rutas de episodios · Maricel | A10 |
+| 10 | ~~Cartel según el modo~~ ✅ Hecho 18/10: el cartel amarillo usa `modo_extraccion` de `/api/sesion` desde el inicio ("Simulación" o "Extracción con IA local") | `/api/sesion` · Maricel | A03 |
+| 11 | Que un error de IA **no vuelva solo a la simulación** (revisar `frontend/js/medgemma.js` y `dictado.js` de Darío antes de activarlos: hoy no están cargados) | Acordar con Darío | A08 |
 
 **Reglas que se mantienen:** solo casos ficticios; nada se atribuye a MedGemma ni al HRRG mientras sea simulación; la decisión final es siempre del profesional.
