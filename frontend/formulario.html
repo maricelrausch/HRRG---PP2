@@ -35,11 +35,11 @@
         </div>
         <div class="chips">
           <span class="chip userchip" id="userChip" hidden></span>
-          <span class="chip sim"><span class="n">S</span>MODO SIMULADO</span>
+          <span class="chip sim" id="simChip"><span class="n">S</span>MODO SIMULADO</span>
           <button type="button" class="chip" id="ollama" title="Demo: tocá para simular que la IA no está disponible"><span class="dot"></span>IA: simulada</button>
         </div>
       </div>
-      <div class="simbar" role="note"><b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.</div>
+      <div class="simbar" role="note" id="simbar"><b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.</div>
       <div class="stepper" id="stepper">
         <span data-s="ingreso">1 Ingreso</span>›<span data-s="revision">2 Medición</span>›<span data-s="resumen">3 Sugerencia</span>
       </div>
@@ -154,7 +154,7 @@
 
         <div id="insufCard" class="insuf" hidden>
           <div class="triage-head"><div><div class="eyebrow">Sugerencia IA</div><h3 style="font-size:28px">Información insuficiente</h3><p>No se emite prioridad para este episodio.</p></div></div>
-          <div class="triage-body"><div style="grid-column:1/-1"><h4>Reevaluar y completar</h4><ul><li>Frecuencia cardíaca</li><li>Nivel de conciencia (Glasgow)</li><li>El relato dice “no puede respirar” pero la SpO₂ es 99 %: datos contradictorios</li></ul></div></div>
+          <div class="triage-body"><div style="grid-column:1/-1"><h4>Reevaluar y completar</h4><ul id="insufList"></ul></div></div>
           <div class="decision"><div class="row"><button type="button" class="btn dark" data-go="revision">Revisar datos</button><button type="button" class="btn" id="manual">Clasificar manualmente</button></div></div>
         </div>
 

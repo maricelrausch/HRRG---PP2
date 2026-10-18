@@ -271,6 +271,7 @@ $('#extraer').addEventListener('click', async () => {
     st.extraccion = resultado;
     /* A08: guarda el relato tal como se envió, aunque después se edite el Ingreso. */
     st.relatoOriginal = texto;
+    renderSimbar();
     st.disc = {};
     resetDecision();
     $('#hint').classList.remove('err');
@@ -520,8 +521,24 @@ function conteo(){
 function renderResumen(){
   $('#g-relato').innerHTML=F.filter(f=>f.box==='relato').map(field).join('');$('#iaDet').open=false;iaText();
   refreshSummary();renderCard();
+  renderInsuf();
   $('#triageCard').hidden=st.insuf||st.manual;$('#insufCard').hidden=!st.insuf||st.manual;$('#manualCard').hidden=!st.manual;
   renderReg();
+}
+/* Información insuficiente: lista lo que falta de verdad (antes era un texto fijo del maquetado). */
+function renderInsuf(){
+  const esMed=k=>byK(k).src==='med'||k==='glasgow',m=missing();
+  const sinMedir=m.filter(esMed).map(k=>ml(k)),otros=m.filter(k=>!esMed(k)).map(k=>ml(k));
+  const items=sinMedir.map(t=>'Medir: '+t).concat(otros.map(t=>'Completar: '+t));
+  $('#insufList').innerHTML=(items.length?items:['Revisá los datos cargados']).map(t=>'<li>'+esc(t)+'</li>').join('');
+}
+/* Cartel de arriba: dice la verdad según de dónde vino la extracción. */
+function renderSimbar(){
+  const ia=st.extraccion&&st.extraccion.modo==='ia';
+  $('#simbar').innerHTML=ia
+    ?'<b>Datos ficticios · Extracción con IA local.</b> Los datos del relato los extrajo MedGemma en esta computadora y requieren revisión. La sugerencia de color, el dictado, los tiempos y los registros siguen siendo de demostración (no son guías del hospital).'
+    :'<b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.';
+  $('#simChip').lastChild.textContent=ia?'IA LOCAL · RESTO SIMULADO':'MODO SIMULADO';
 }
 function refreshSummary(){
   $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>'+c+'</em>':'')+'</div>').join('');
@@ -572,7 +589,7 @@ function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
 $('#nuevo').addEventListener('click',()=>{
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
-  st.extraccion=null;st.relatoOriginal=null;
+  st.extraccion=null;st.relatoOriginal=null;renderSimbar();
   F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
 /* Clasificación manual sin IA */
 $('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
