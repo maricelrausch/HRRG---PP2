@@ -271,6 +271,7 @@ $('#extraer').addEventListener('click', async () => {
     st.extraccion = resultado;
     /* A08: guarda el relato tal como se envió, aunque después se edite el Ingreso. */
     st.relatoOriginal = texto;
+    st.modoServidor = resultado.modo;
     renderSimbar();
     st.disc = {};
     resetDecision();
@@ -534,7 +535,8 @@ function renderInsuf(){
 }
 /* Cartel de arriba: dice la verdad según de dónde vino la extracción. */
 function renderSimbar(){
-  const ia=st.extraccion&&st.extraccion.modo==='ia';
+  /* Se recuerda el último modo que informó el servidor, aunque se empiece un caso nuevo. */
+  const ia=st.modoServidor==='ia';
   $('#simbar').innerHTML=ia
     ?'<b>Datos ficticios · Extracción con IA local.</b> Los datos del relato los extrajo MedGemma en esta computadora y requieren revisión. La sugerencia de color, el dictado, los tiempos y los registros siguen siendo de demostración (no son guías del hospital).'
     :'<b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.';
