@@ -1,12 +1,15 @@
 # Contrato de API — HRRG
 
+
 Estado: propuesta para revisión de Bárbara, Tomás, Darío y Maricel.
-Versión propuesta del contrato: 0.2.
+Versión propuesta del contrato: 0.3 — integración en revisión.
 
 La autenticación y las rutas de episodios están implementadas.
-POST /api/extraer está pendiente de implementación en D03.
+POST /api/extraer tiene modo simulado implementado y una conexión experimental con MedGemma.
+La ejecución real de IA y la integración web todavía requieren pruebas.
 
 ## 1. Convenciones generales
+
 
 - Solicitudes y respuestas en JSON.
 - Content-Type: application/json.
@@ -18,7 +21,9 @@ POST /api/extraer está pendiente de implementación en D03.
 
 ## 2. Autenticación disponible
 
+
 ### POST /api/login
+
 
 Entrada:
 
@@ -28,6 +33,7 @@ Entrada:
   "password": "<contraseña de la cuenta local>"
 }
 ```
+
 
 Respuesta correcta: HTTP 200.
 
@@ -39,7 +45,39 @@ Respuesta correcta: HTTP 200.
 }
 ```
 
+### Modo de extracción informado en la sesión
+
+GET /api/sesion requiere una sesión válida y devuelve los datos del
+profesional junto con el modo de extracción configurado en el servidor.
+
+Ejemplo de respuesta HTTP 200:
+
+```json
+{
+  "ok": true,
+  "usuario": "prueba_enfermeria",
+  "nombre": "Enfermeria de prueba",
+  "rol": "enfermeria",
+  "modo_extraccion": "ia"
+}
+```
+
+Valores de modo_extraccion:
+
+- "simulado": utiliza respuestas predefinidas de demostración.
+- "ia": está configurado para realizar extracción mediante el modelo local.
+
+Este campo informa la configuración; no comprueba que Ollama o el modelo
+estén disponibles ni confirma que una extracción haya terminado correctamente.
+
+El frontend debe conservar este campo al procesar la respuesta de sesión
+y utilizarlo para mostrar el modo configurado desde el inicio.
+El origen de cada extracción se obtiene del campo "modo" de /api/extraer.
+
+La respuesta de sesión mantiene la cabecera Cache-Control: no-store.
+
 ### GET /api/sesion
+
 
 Respuesta correcta: HTTP 200.
 
@@ -48,14 +86,18 @@ Respuesta correcta: HTTP 200.
   "ok": true,
   "usuario": "prueba_enfermeria",
   "nombre": "Enfermería de prueba",
-  "rol": "enfermeria"
+  "rol": "enfermeria",
+  "modo_extraccion": "ia"
+}
 }
 ```
+
 
 Perfiles admitidos: enfermeria, medico y auditor.
 Las cuentas sin perfil asignado no acceden a las rutas protegidas.
 
 ### POST /api/logout
+
 
 Recibe un objeto JSON vacío: {}.
 Elimina la sesión del cliente y devuelve HTTP 200.
@@ -65,20 +107,40 @@ No existe registro público de profesionales.
 
 ## 3. Identificación y episodios
 
+
 - codigo_paciente identifica al paciente ficticio.
 - codigo_episodio identifica una atención concreta.
 - Un paciente puede tener varios episodios.
 - Los códigos no deben contener nombres, DNI ni otros datos personales.
 - El profesional responsable se obtiene de la sesión.
 
-Para la extracción se propone usar el formato de DatosTriage:
+Para la extracción se valida el siguiente formato:
 
 ^[A-Z]{2,4}-[A-Z0-9-]{3,20}$
 
 Ejemplos: PAC-DEMO-001 y EPI-DEMO-001.
 
-En las pruebas los códigos se suministran explícitamente.
-La generación automática definitiva queda pendiente de acuerdo.
+El servidor genera codigo_episodio cuando se omite en la creación.
+Por compatibilidad, también se admite un código explícito.
+
+Rutas disponibles:
+
+- POST /api/demo/episodios: recibe codigo_paciente y, opcionalmente,
+  codigo_episodio. Guarda el episodio y su evento de creación.
+- GET /api/demo/episodios: lista episodios con filtros opcionales
+  por codigo_paciente y codigo_episodio, y admite paginación.
+- GET /api/demo/episodios/<codigo_episodio>: consulta el episodio
+  y su historial completo.
+
+Médicos y enfermería pueden crear y consultar episodios.
+El auditor puede consultar el listado y los historiales, pero no crear.
+
+Los identificadores recibidos en estas rutas admiten textos de
+1 a 100 caracteres. Su unificación con el patrón de /api/extraer
+sigue pendiente. El código generado por el servidor cumple ese patrón.
+
+La generación automática y la búsqueda se incorporaron al código;
+sus pruebas e integración con el frontend están pendientes.
 
 Rutas disponibles:
 
@@ -86,15 +148,17 @@ Rutas disponibles:
   recibe codigo_paciente y codigo_episodio;
   crea un episodio asociado al profesional de la sesión.
 - GET /api/demo/episodios/<codigo_episodio>:
-  consulta un episodio del propio profesional y su historial.
+  consulta un episodio y su historial según el rol, aunque lo haya creado otro profesional.
 
 La validación actual de estas rutas admite textos de 1 a 100
 caracteres; su unificación con el patrón de DatosTriage está pendiente.
 
 El auditor no puede crear episodios.
-La consulta global para auditoría todavía no está implementada.
+El auditor puede consultar un episodio por código, aunque lo haya creado otro profesional.
+No hay una ruta de listado global de episodios.
 
-## 4. Extracción propuesta — D03
+## 4. Extracción — modos simulado e IA
+
 
 POST /api/extraer
 
@@ -111,7 +175,8 @@ Entrada:
 }
 ```
 
-Reglas de entrada propuestas:
+
+Reglas de entrada implementadas:
 
 - Los tres campos son obligatorios y deben ser textos.
 - No se aceptan campos adicionales.
@@ -124,10 +189,11 @@ Esta ruta no crea episodios ni guarda decisiones en D03.
 Devuelve los códigos recibidos para vincular la respuesta.
 No comprueba todavía que esos códigos existan en el registro.
 
-La futura integración con el modelo recibirá únicamente el relato,
+La función de extracción recibe únicamente el relato y el esquema,
 sin credenciales ni códigos de identificación.
 
 ## 5. Funcionamiento de la simulación
+
 
 El modo simulado se configura explícitamente en el servidor.
 No se utiliza como reemplazo silencioso cuando falla el modelo real.
@@ -155,7 +221,8 @@ No se devuelven:
 - nivel_maqueta.
 - Colores, prioridades o discriminadores clínicos.
 
-## 6. Respuesta de extracción propuesta
+## 6. Respuesta de extracción simulada
+
 
 Respuesta correcta: HTTP 200.
 
@@ -200,6 +267,7 @@ advertencias debe informar que:
 
 ## 7. Errores
 
+
 Formato común:
 
 ```json
@@ -209,6 +277,7 @@ Formato común:
   "codigo": "IDENTIFICADOR_DEL_ERROR"
 }
 ```
+
 
 Estados previstos para D03:
 
@@ -229,9 +298,10 @@ Ejemplo:
 {
   "ok": false,
   "mensaje": "El texto no corresponde a un caso de demostración disponible.",
-  "codigo": "CASO_SIMULADO_NO_ENCONTRADO"
+  "codigo": "CASO_SIMULADO_NO_IDENTIFICADO"
 }
 ```
+
 
 Para D05, al integrar la IA:
 
@@ -243,6 +313,7 @@ Los errores no deben incluir contraseñas, trazas internas ni
 copias del relato recibido.
 
 ## 8. Persistencia y auditoría
+
 
 D03 valida la solicitud y devuelve una respuesta simulada.
 No persiste el relato, la extracción ni las correcciones.
@@ -256,6 +327,7 @@ Las pruebas usan datos ficticios y no registran secretos.
 
 ## 9. Criterios de prueba de D03
 
+
 - Solicitud válida: HTTP 200 y modo "simulado".
 - Respuesta compatible con ExtraccionIA.
 - No incluye signos vitales ni prioridad clínica.
@@ -268,16 +340,18 @@ Las pruebas usan datos ficticios y no registran secretos.
 
 ## 10. Acuerdos pendientes para cerrar D02
 
+
 - Bárbara: estructura consumible desde el frontend.
 - Tomás: compatibilidad con la futura función de extracción.
 - Darío: campos, faltantes, booleanos y versión del esquema.
 - Maricel: implementación, permisos y errores del backend.
 
-<<<<<<< HEAD
+
 Cualquier cambio del contrato debe comunicarse al equipo.
 
 
 ## Historial de episodios — modo demostración
+
 
 Estado: implementado en backend; pendiente de revisión del equipo
 e integración con el frontend.
@@ -286,6 +360,7 @@ Solo se utilizan pacientes, episodios y mediciones ficticios.
 Estas rutas requieren una sesión válida.
 
 ### Permisos
+
 
 | Acción | Enfermería / Médico | Auditor |
 |---|---|---|
@@ -300,29 +375,122 @@ el episodio. Cada evento conserva su propio autor.
 Flask obtiene el usuario y el rol desde la sesión.
 El cliente no debe enviar la identidad del profesional.
 
+## Creación y consulta de episodios de demostración
+
 ### Crear un episodio
 
 POST /api/demo/episodios
+Content-Type: application/json
 
-Entrada:
+Requiere sesión activa con rol medico o enfermeria.
+El auditor no puede crear episodios.
+
+Entrada recomendada:
 
 ```json
 {
-  "codigo_paciente": "PAC-DEMO-001",
-  "codigo_episodio": "EPI-DEMO-001"
+  "codigo_paciente": "PAC-DEMO-001"
 }
 ```
 
-Respuesta correcta: HTTP 201, con ok, modo y episodio.
+El servidor genera codigo_episodio y guarda en SQLite el episodio
+y el evento EPISODIO_CREADO, con fecha y profesional responsable.
 
-Se registra automáticamente el evento EPISODIO_CREADO.
-Un código de episodio duplicado devuelve HTTP 409.
+Por compatibilidad, también se admite codigo_episodio en la entrada.
+Si el código ya existe, se devuelve HTTP 409.
 
-Actualmente esta ruta acepta identificadores de texto de entre
-1 y 100 caracteres, luego de quitar espacios exteriores.
-La unificación con el patrón de /api/extraer está pendiente.
+Ejemplo de respuesta HTTP 201:
+
+```json
+{
+  "ok": true,
+  "modo": "demo",
+  "episodio": {
+    "codigo_episodio": "EPI-A1B2C3D4E5F607182930",
+    "codigo_paciente": "PAC-DEMO-001",
+    "creado_en": "2026-10-18T21:00:00+00:00"
+  }
+}
+```
+
+El frontend debe conservar episodio.codigo_episodio y reutilizarlo
+para las mediciones, correcciones y consultas de esa atención.
+
+Una reevaluación mantiene el episodio.
+Una nueva atención genera otro episodio.
+
+No repetir automáticamente el POST si se pierde la respuesta:
+la creación todavía no tiene un mecanismo de idempotencia que
+impida duplicados por reintentos.
+
+### Buscar episodios
+
+GET /api/demo/episodios
+
+Requiere sesión activa con rol medico, enfermeria o auditor.
+Permite consultar episodios creados por otros profesionales.
+
+Parámetros opcionales:
+
+- codigo_paciente: coincidencia exacta.
+- codigo_episodio: coincidencia exacta.
+- limite: entero entre 1 y 100; por defecto 50.
+- desplazamiento: entero mayor o igual a 0; por defecto 0.
+
+Si se envían ambos códigos, deben coincidir ambos.
+No se aceptan parámetros desconocidos ni repetidos.
+
+Ejemplo:
+
+GET /api/demo/episodios?codigo_paciente=PAC-DEMO-001&limite=50
+
+Respuesta HTTP 200:
+
+```json
+{
+  "ok": true,
+  "modo": "demo",
+  "episodios": [
+    {
+      "codigo_episodio": "EPI-A1B2C3D4E5F607182930",
+      "codigo_paciente": "PAC-DEMO-001",
+      "creado_en": "2026-10-18T21:00:00+00:00",
+      "profesional_usuario": "prueba_enfermeria"
+    }
+  ],
+  "total": 1,
+  "limite": 50,
+  "desplazamiento": 0
+}
+```
+
+Los resultados se ordenan por fecha de creación descendente.
+Sin coincidencias se devuelve HTTP 200, episodios: [] y total: 0.
+
+profesional_usuario identifica al creador del episodio.
+Cada evento del historial conserva por separado a su propio autor.
+
+### Consultar el historial completo
+
+GET /api/demo/episodios/<codigo_episodio>
+
+Devuelve el episodio y sus eventos mediante la ruta existente.
+Médicos, enfermería y auditores pueden consultarlo.
+
+El listado de episodios no equivale al tablero de espera:
+todavía falta implementar la persistencia del estado de atención.
+
+### Integración pendiente en el frontend
+
+1. Crear el episodio una sola vez al iniciar la atención.
+2. Conservar el código que devuelve el servidor.
+3. Registrar nuevas mediciones sobre ese mismo episodio.
+4. Diferenciar una nueva medición de una corrección por error.
+5. Buscar episodios y consultar su historial.
+6. Mostrar "Guardado" únicamente después de una respuesta exitosa.
 
 ### Registrar una medición
+
 
 POST /api/demo/episodios/{codigo_episodio}/mediciones
 
@@ -337,6 +505,7 @@ Entrada:
   }
 }
 ```
+
 
 El episodio debe existir previamente.
 
@@ -377,9 +546,11 @@ Respuesta correcta: HTTP 201.
 }
 ```
 
+
 Los identificadores y fechas de las respuestas son ilustrativos.
 
 ### Corregir una medición
+
 
 POST /api/demo/episodios/{codigo_episodio}/mediciones/{evento_id}/correcciones
 
@@ -393,6 +564,7 @@ Entrada:
   "motivo": "Error de transcripcion en caso ficticio"
 }
 ```
+
 
 Respuesta correcta: HTTP 201, con ok, modo y evento.
 
@@ -419,6 +591,7 @@ Una nueva toma de signos vitales debe registrarse como nueva medición.
 
 ### Consultar historial
 
+
 GET /api/demo/episodios/{codigo_episodio}
 
 Respuesta correcta: HTTP 200, con ok, modo y episodio.
@@ -432,10 +605,9 @@ El frontend debe conservar la distinción entre mediciones y
 correcciones. Una corrección de una medición antigua no debe
 presentarse como una nueva toma de signos vitales.
 
-No existe todavía una ruta para listar todos los episodios
-de un paciente por codigo_paciente.
 
 ### Errores de las nuevas rutas de escritura
+
 
 Formato:
 
@@ -446,6 +618,7 @@ Formato:
   "codigo": "IDENTIFICADOR_DEL_ERROR"
 }
 ```
+
 
 | HTTP | Código | Situación |
 |---|---|---|
@@ -465,9 +638,67 @@ con EPISODIO_NO_ENCONTRADO.
 
 ### Relación con la extracción
 
-POST /api/extraer sigue devolviendo una respuesta simulada.
+
+POST /api/extraer devuelve una respuesta simulada o de IA según la configuración explícita del servidor.
 Actualmente no crea episodios ni guarda automáticamente eventos
 de extracción, mediciones o correcciones.
-=======
-Cualquier cambio del contrato debe comunicarse al equipo.
->>>>>>> origin/tomas
+
+
+## 11. Configuración de extracción en la integración
+
+
+Estado: código preparado; pendiente de ensayo con modelos instalados y revisión conjunta.
+La configuración se lee al iniciar Flask. Cambiarla requiere reiniciar el servidor.
+
+| Configuración | Comportamiento |
+|---|---|
+| `HRRG_MODO_EXTRACCION` ausente o `simulado` | Usa los casos ficticios; no carga MedGemma, BETO ni ChromaDB para extraer. |
+| `HRRG_MODO_EXTRACCION=ia` | Llama a `src.extraccion.extraer_datos(relato, ExtraccionIA)`. |
+| Otro valor | HTTP 503, `CONFIGURACION_INVALIDA`. |
+| `EXTRACCION_SIMULADA_HABILITADA=False` en Flask | Bloquea el modo simulado con HTTP 503, `EXTRACCION_DESHABILITADA`. No controla el modo IA. |
+
+En modo IA, la respuesta conserva las claves de la sección 6 con estas diferencias:
+
+- `modo`: `"ia"`.
+- `caso_simulado_id`: `null`.
+- `modelo`: valor de `LLM_MODEL` en `src/modelo.py` (actualmente `medgemma:4b`).
+- `datos`: resultado del modelo validado con `ExtraccionIA`.
+- `advertencias`: informa origen IA, revisión profesional y ausencia de clasificación Manchester.
+
+La función actual de Tomás consulta RAG antes de MedGemma. Requiere las dependencias y modelos correspondientes; su instalación reproducible está pendiente.
+Si falla la IA, no se devuelve un caso simulado como sustituto.
+
+| HTTP | Código | Situación |
+|---|---|---|
+| 502 | SALIDA_IA_INVALIDA | La función devuelve datos incompatibles o lanza un error de valor/validación. |
+| 503 | IA_NO_DISPONIBLE | Falla al importar, inicializar o ejecutar el servicio. |
+
+Limitaciones: falta distinguir errores de conexión, modelo ausente y tiempo agotado; definir un timeout explícito; validar la extracción con casos de referencia. Los booleanos con `false` por defecto siguen sin distinguir ausencia de información y negación. La validación estructural no garantiza exactitud clínica.
+
+## 12. Ruta experimental BETO — pendiente de contrato definitivo
+
+
+`POST /api/analizar` se conserva para revisar el aporte de Tomás. No es equivalente a `/api/extraer` ni utiliza MedGemma.
+
+- Requiere sesión activa y perfil `enfermeria` o `medico`; auditor recibe HTTP 403.
+- Está deshabilitada por defecto: devuelve HTTP 503 con `BETO_DESHABILITADO` a un profesional autorizado.
+- Solo se habilita con `HRRG_BETO_HABILITADO=1` al iniciar Flask.
+- Recibe exclusivamente `{"texto": "Relato ficticio"}`; texto de 1 a 5000 caracteres tras quitar espacios exteriores.
+- Sin JSON: 415; JSON no objeto: 400; claves incorrectas o texto inválido: 422.
+- Un error de carga o procesamiento devuelve 503 con `BETO_NO_DISPONIBLE`.
+- Si funciona, devuelve HTTP 200 con el diccionario de `extraer_datos_planilla`, sin la envoltura `ok`, `modo`, `datos` de `/api/extraer`.
+
+El diccionario experimental usa claves como `tas`, `tad`, `frec_cardiaca`, `saturacion` y `dolor`. Todavía no se valida con `ExtraccionIA` ni con `Mediciones` en esta ruta. Debe acordarse su normalización y la separación entre datos relatados, datos medidos y revisión humana antes de integrarlo al flujo común.
+
+El modelo local `modelo_medico_entrenado` y sus dependencias deben estar disponibles para habilitar BETO. La ruta no guarda episodios ni eventos.
+
+## 13. Pendientes de la fusión y coordinación
+
+
+- Resolver y revisar `frontend/api.js` y `frontend/formulario.js` con Bárbara. El botón de la rama de Tomás llama a `/api/analizar`, aunque su mensaje menciona MedGemma; corregir esa correspondencia.
+- Conectar el historial del backend al frontend y probar permisos por HTTP.
+- Revisar dependencias, modelos y preparación reproducible con Tomás.
+- Acordar esquemas, valores desconocidos y ejemplos JSON con Darío.
+- La integración del chat `/api/chat` de Tomás sigue pendiente. El `app.py` entregado conserva las rutas documentales anteriores (`/chat`, `/upload`), deshabilitadas por defecto; no deben presentarse como chat MedGemma integrado.
+- La espera y las decisiones profesionales todavía no tienen persistencia completa en estas rutas.
+- Este documento describe una propuesta de integración, no una aprobación del equipo ni validación institucional.

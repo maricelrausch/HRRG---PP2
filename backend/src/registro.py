@@ -9,11 +9,14 @@ def conectar_registro(ruta_base):
     return conexion
 
 
+# Prepara las tablas del registro de demostración.
+# Conserva las tablas y los datos que ya existen.
 def inicializar_registro(ruta_base):
     conexion = conectar_registro(ruta_base)
 
     try:
         with conexion:
+            # Guarda la identificación de cada atención y su creador.
             conexion.execute("""
                 CREATE TABLE IF NOT EXISTS episodios (
                     codigo_episodio TEXT PRIMARY KEY,
@@ -23,6 +26,7 @@ def inicializar_registro(ruta_base):
                 )
             """)
 
+            # Conserva los eventos del historial con fecha y autor.
             conexion.execute("""
                 CREATE TABLE IF NOT EXISTS eventos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,11 +40,43 @@ def inicializar_registro(ruta_base):
                 )
             """)
 
+            # Facilita la consulta del historial de cada episodio.
             conexion.execute("""
                 CREATE INDEX IF NOT EXISTS idx_eventos_episodio
                 ON eventos (codigo_episodio, id)
             """)
+
+            # Guarda el estado operativo actual de cada episodio.
+            # La versión permitirá detectar cambios simultáneos.
+            # Estos estados no representan una prioridad clínica.
+            conexion.execute("""
+                CREATE TABLE IF NOT EXISTS estados_episodio (
+                    codigo_episodio TEXT PRIMARY KEY,
+                    estado TEXT NOT NULL
+                        CHECK (
+                            estado IN (
+                                'en_ingreso',
+                                'en_espera',
+                                'finalizado'
+                            )
+                        ),
+                    actualizado_en TEXT NOT NULL,
+                    profesional_usuario TEXT NOT NULL,
+                    version INTEGER NOT NULL
+                        CHECK (version >= 1),
+                    FOREIGN KEY (codigo_episodio)
+                        REFERENCES episodios (codigo_episodio)
+                )
+            """)
+
+            # Facilita la búsqueda de episodios según su estado.
+            conexion.execute("""
+                CREATE INDEX IF NOT EXISTS idx_estados_episodio
+                ON estados_episodio (estado, actualizado_en)
+            """)
+
     finally:
+        # Libera la conexión incluso si ocurre un error.
         conexion.close()
 
 def crear_episodio(
@@ -548,3 +584,59 @@ def corregir_medicion_demo(
         "profesional_usuario": profesional_usuario,
         "datos": contenido
     }
+
+# Busca episodios por código exacto de paciente o de episodio.
+# Devuelve una página de resultados; no modifica los registros.
+def buscar_episodios(
+    ruta_base,
+    codigo_paciente=None,
+    codigo_episodio=None,
+    limite=50,
+    desplazamiento=0
+):
+    condiciones = []
+    parametros = []
+
+    # Los valores se pasan como parámetros para evitar inyección SQL.
+    if codigo_paciente:
+        condiciones.append("codigo_paciente = ?")
+        parametros.append(codigo_paciente)
+
+    if codigo_episodio:
+        condiciones.append("codigo_episodio = ?")
+        parametros.append(codigo_episodio)
+
+    filtro = (
+        " WHERE " + " AND ".join(condiciones)
+        if condiciones else ""
+    )
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        # Consulta primero la cantidad total que coincide con los filtros.
+        total = conexion.execute(
+            "SELECT COUNT(*) FROM episodios" + filtro,
+            parametros
+        ).fetchone()[0]
+
+        # Ordena de más reciente a más antiguo y limita la respuesta.
+        filas = conexion.execute(
+            """
+            SELECT codigo_episodio, codigo_paciente,
+                   creado_en, profesional_usuario
+            FROM episodios
+            """ + filtro + """
+            ORDER BY creado_en DESC, codigo_episodio DESC
+            LIMIT ? OFFSET ?
+            """,
+            parametros + [limite, desplazamiento]
+        ).fetchall()
+
+        return {
+            "episodios": [dict(fila) for fila in filas],
+            "total": total
+        }
+    finally:
+        conexion.close()

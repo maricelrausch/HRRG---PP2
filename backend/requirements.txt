@@ -7,7 +7,8 @@ Werkzeug==3.0.3
 click==8.1.7
 pydantic==2.13.5
 pytest==9.1.1
-
+chromadb==1.5.9
 #Instalación:
 # python -m pip install -r requirements.txt
+
 

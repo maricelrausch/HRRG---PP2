@@ -13,6 +13,7 @@ from src.registro import (
 )
 from pydantic import ValidationError
 from src.esquemas import ExtraccionIA, OBLIGATORIOS
+from src.registro import buscar_episodios
 import os
 import math
 import time
@@ -21,6 +22,7 @@ import click
 import secrets
 import logging
 import re
+import secrets
 
 
 
@@ -233,7 +235,7 @@ def logout():
     }), 200
 
 # -----------------------------------------------
-# Consultar el usuario de la sesión actual desde el frontend.
+# Devuelve el profesional autenticado y el modo de extracción configurado.
 # -----------------------------------------------
 
 @app.route("/api/sesion", methods=["GET"])
@@ -244,11 +246,14 @@ def consultar_sesion():
         "ok": True,
         "usuario": profesional["usuario"],
         "nombre": profesional["nombre"],
-        "rol": profesional["rol"]
+        "rol": profesional["rol"],
+        "modo_extraccion": app.config["MODO_EXTRACCION"]
     })
 
+    # Evita reutilizar información de sesión almacenada en caché.
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
+
 #-----------------------------------------------
 # Control de acceso antes de ejecutar las rutas.
 #-----------------------------------------------
@@ -277,7 +282,8 @@ def verificar_acceso():
         "extraer",
         "agregar_medicion_demo",
         "agregar_correccion_demo",
-        "analizar_paciente"
+        "analizar_paciente",
+        "listar_episodios_demo",
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -310,7 +316,8 @@ def verificar_acceso():
     if profesional["rol"] == "auditor":
         consultas_permitidas = {
             "consultar_sesion",
-            "consultar_episodio_demo"
+            "consultar_episodio_demo",
+            "listar_episodios_demo",
         }
 
         if (
@@ -443,16 +450,22 @@ def crear_episodio_demo():
             "JSON_INVALIDO"
         )
 
-    campos = {"codigo_paciente", "codigo_episodio"}
+        # El paciente es obligatorio. El código de episodio puede omitirse
+    # para que el servidor lo genere.
+    campos_permitidos = {"codigo_paciente", "codigo_episodio"}
 
-    if set(datos) != campos:
+    if (
+        "codigo_paciente" not in datos
+        or set(datos) - campos_permitidos
+    ):
         return respuesta_error(
-            "Enviá únicamente codigo_paciente y codigo_episodio.",
+            "Enviá codigo_paciente y, opcionalmente, codigo_episodio.",
             400,
             "CAMPOS_INVALIDOS"
         )
 
-    for campo in campos:
+    # Valida los identificadores recibidos antes de crear el episodio.
+    for campo in datos:
         valor = datos[campo]
         if not isinstance(valor, str) or not 1 <= len(valor.strip()) <= 100:
             return respuesta_error(
@@ -460,11 +473,19 @@ def crear_episodio_demo():
                 422,
                 "IDENTIFICADOR_INVALIDO"
             )
-
+    # Genera el código una sola vez al crear una atención.
+    # SQLite impide guardar dos episodios con el mismo código.
+    # El formato también es compatible con la ruta /api/extraer.
+    
+    codigo_episodio = (
+        datos["codigo_episodio"].strip()
+        if "codigo_episodio" in datos
+        else "EPI-" + secrets.token_hex(10).upper()
+    )
     try:
         episodio = crear_episodio(
             ruta_base=BASE_REGISTRO_DEMO,
-            codigo_episodio=datos["codigo_episodio"],
+            codigo_episodio=codigo_episodio,
             codigo_paciente=datos["codigo_paciente"],
             profesional_usuario=session["usuario"]
         )
@@ -1261,6 +1282,91 @@ def analizar_paciente():
         logger_sistema.error("ERROR_SERVICIO_BETO")
         return respuesta_error("BETO no está disponible o no pudo procesar el relato.", 503, "BETO_NO_DISPONIBLE")
     respuesta = jsonify(resultado)
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+# Lista episodios ficticios para buscar casos y abrir su historial.
+# La sesión y el rol se verifican en verificar_acceso().
+@app.route("/api/demo/episodios", methods=["GET"])
+def listar_episodios_demo():
+    permitidos = {
+        "codigo_paciente",
+        "codigo_episodio",
+        "limite",
+        "desplazamiento"
+    }
+
+    # Rechaza parámetros desconocidos o repetidos.
+    if (
+        set(request.args) - permitidos
+        or any(len(request.args.getlist(k)) != 1 for k in request.args)
+    ):
+        return respuesta_error(
+            "Los parámetros de búsqueda no son válidos.",
+            400,
+            "PARAMETROS_INVALIDOS"
+        )
+
+    # Valida los códigos opcionales sin convertirlos a números.
+    filtros = {}
+    for campo in ("codigo_paciente", "codigo_episodio"):
+        valor = request.args.get(campo)
+
+        if valor is not None:
+            valor = valor.strip()
+            if not 1 <= len(valor) <= 100:
+                return respuesta_error(
+                    f"{campo} debe tener entre 1 y 100 caracteres.",
+                    422,
+                    "IDENTIFICADOR_INVALIDO"
+                )
+
+        filtros[campo] = valor
+
+    # Limita la cantidad de episodios devueltos por solicitud.
+    try:
+        limite = int(request.args.get("limite", "50"))
+        desplazamiento = int(request.args.get("desplazamiento", "0"))
+    except ValueError:
+        return respuesta_error(
+            "El límite y el desplazamiento deben ser números enteros.",
+            422,
+            "PAGINACION_INVALIDA"
+        )
+
+    if not 1 <= limite <= 100 or desplazamiento < 0:
+        return respuesta_error(
+            "El límite debe estar entre 1 y 100 y el desplazamiento no puede ser negativo.",
+            422,
+            "PAGINACION_INVALIDA"
+        )
+
+    # Consulta la base compartida; no filtra por el creador del episodio.
+    try:
+        resultado = buscar_episodios(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_paciente=filtros["codigo_paciente"],
+            codigo_episodio=filtros["codigo_episodio"],
+            limite=limite,
+            desplazamiento=desplazamiento
+        )
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_LISTAR_EPISODIOS_DEMO")
+        return respuesta_error(
+            "No se pudieron consultar los episodios.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Devuelve los resultados sin permitir su almacenamiento en caché.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "episodios": resultado["episodios"],
+        "total": resultado["total"],
+        "limite": limite,
+        "desplazamiento": desplazamiento
+    })
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
 
