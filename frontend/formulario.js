@@ -121,7 +121,7 @@ function renderSubir(){
     return '<li><span class="q">'+esc(t)+'</span>'+(kind==='q'?'<span class="yn" data-key="'+esc(key)+'"><button type="button" data-a="si" aria-pressed="'+(a==='si')+'">Sí</button><button type="button" data-a="no" aria-pressed="'+(a==='no')+'">No</button></span>':'<span class="meas">se evalúa con lo medido</span>')+'</li>'}).join('')+'</ul><div class="hint">Tocar <b>Sí</b> recalcula el color al instante y queda registrado. Es el recorrido de la guía: se pregunta solo lo que podría subir la prioridad.</div>';
 }
 const F=[
-  {k:'edad',l:'Edad',u:'años',t:'num',hce:'58',min:0,max:120,req:1,box:'ident'},
+  {k:'edad',l:'Edad',u:'años',t:'num',hce:'58',min:0,max:120,req:1,box:'ident',ph:'años'},
   {k:'sexo',l:'Sexo',t:'sel',hce:'Femenino',opts:['Femenino','Masculino','No informado'],req:1,box:'ident'},
   {k:'motivo_categoria',l:'Categoría',t:'sel',ia:'Dolor abdominal',opts:['Dolor torácico','Dolor abdominal','Disnea','Trauma','Fiebre','Cefalea','Síntoma neurológico','Otro'],req:1,box:'relato',w:'half'},
   {k:'tiempo_evolucion_valor',l:'Desde hace',t:'num',ia:'6',min:0,max:10000,req:1,box:'relato'},
