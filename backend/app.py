@@ -1231,7 +1231,7 @@ def agregar_correccion_demo(codigo_episodio, evento_id):
 def ejecutar_extraccion_ia(entrada):
     try:
         from src.extraccion import extraer_datos
-        from src.modelo import LLM_MODEL
+        from src.extraccion import LLM_MODEL
     except Exception:
         logger_sistema.error("ERROR_INICIALIZAR_IA")
         return respuesta_error("No se pudo inicializar el servicio de IA.", 503, "IA_NO_DISPONIBLE")
