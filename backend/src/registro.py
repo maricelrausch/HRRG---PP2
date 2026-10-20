@@ -640,3 +640,299 @@ def buscar_episodios(
         }
     finally:
         conexion.close()
+
+# Identifica un episodio inexistente para que Flask pueda responder 404.
+class EpisodioNoEncontradoError(ValueError):
+    pass
+
+
+# Identifica una modificación basada en una versión desactualizada.
+# Flask podrá responder 409 y pedir que se vuelva a consultar el episodio.
+class ConflictoEstadoError(ValueError):
+    pass
+
+
+# Guarda el estado operativo y agrega su evento al historial.
+# El profesional debe obtenerse de la sesión autenticada en Flask.
+# Esta función no determina prioridades clínicas ni colores.
+def cambiar_estado_demo(
+    ruta_base,
+    codigo_episodio,
+    profesional_usuario,
+    nuevo_estado,
+    version_esperada
+):
+    # Comprueba los identificadores antes de acceder a SQLite.
+    for valor in (codigo_episodio, profesional_usuario):
+        if not isinstance(valor, str) or not valor.strip():
+            raise ValueError(
+                "El episodio y el profesional son obligatorios."
+            )
+
+    codigo_episodio = codigo_episodio.strip()
+    profesional_usuario = profesional_usuario.strip()
+
+    # Acepta solamente los estados operativos del prototipo.
+    estados_permitidos = {"en_ingreso", "en_espera", "finalizado"}
+    if (
+        not isinstance(nuevo_estado, str)
+        or nuevo_estado not in estados_permitidos
+    ):
+        raise ValueError("El estado solicitado no es válido.")
+
+    # La versión 0 representa un episodio sin estado registrado.
+    # Rechaza también booleanos, aunque Python los considere enteros.
+    if type(version_esperada) is not int or version_esperada < 0:
+        raise ValueError(
+            "La versión esperada debe ser un entero no negativo."
+        )
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        with conexion:
+            # Evita que otra escritura se intercale entre la consulta
+            # del estado y el guardado del cambio.
+            conexion.execute("BEGIN IMMEDIATE")
+
+            # Comprueba que exista la atención.
+            episodio = conexion.execute(
+                "SELECT codigo_episodio FROM episodios "
+                "WHERE codigo_episodio = ?",
+                (codigo_episodio,)
+            ).fetchone()
+
+            if episodio is None:
+                raise EpisodioNoEncontradoError(
+                    "El episodio no existe."
+                )
+
+            # Recupera el último estado operativo guardado.
+            anterior = conexion.execute(
+                """
+                SELECT estado, version
+                FROM estados_episodio
+                WHERE codigo_episodio = ?
+                """,
+                (codigo_episodio,)
+            ).fetchone()
+
+            estado_anterior = anterior["estado"] if anterior else None
+            version_actual = anterior["version"] if anterior else 0
+
+            # Impide sobrescribir un cambio que otro profesional
+            # haya realizado desde la última consulta.
+            if version_esperada != version_actual:
+                raise ConflictoEstadoError(
+                    "El estado cambió. Actualizá el episodio "
+                    "antes de volver a guardar."
+                )
+
+            # Evita crear eventos que no representan ningún cambio.
+            if nuevo_estado == estado_anterior:
+                raise ValueError(
+                    "El episodio ya tiene ese estado."
+                )
+
+            # Genera la fecha en el servidor y aumenta la versión.
+            fecha = datetime.now(timezone.utc).isoformat()
+            nueva_version = version_actual + 1
+
+            # Crea el estado inicial o actualiza el existente.
+            # No modifica el profesional que creó el episodio.
+            conexion.execute(
+                """
+                INSERT INTO estados_episodio (
+                    codigo_episodio, estado, actualizado_en,
+                    profesional_usuario, version
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(codigo_episodio) DO UPDATE SET
+                    estado = excluded.estado,
+                    actualizado_en = excluded.actualizado_en,
+                    profesional_usuario = excluded.profesional_usuario,
+                    version = excluded.version
+                """,
+                (
+                    codigo_episodio,
+                    nuevo_estado,
+                    fecha,
+                    profesional_usuario,
+                    nueva_version
+                )
+            )
+
+            # Conserva el estado anterior y el nuevo en el historial.
+            contenido = {
+                "version_evento": 1,
+                "modo": "demo",
+                "origen": "cambio_estado_profesional",
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": nuevo_estado,
+                "version_anterior": version_actual,
+                "version": nueva_version
+            }
+
+            cursor = conexion.execute(
+                """
+                INSERT INTO eventos (
+                    codigo_episodio, tipo, ocurrido_en,
+                    profesional_usuario, datos_json
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    codigo_episodio,
+                    "ESTADO_CAMBIADO",
+                    fecha,
+                    profesional_usuario,
+                    json.dumps(
+                        contenido,
+                        ensure_ascii=False,
+                        allow_nan=False
+                    )
+                )
+            )
+
+            evento_id = cursor.lastrowid
+
+        # Devuelve el resultado solamente después de confirmar
+        # el guardado del estado y su evento.
+        return {
+            "estado": {
+                "codigo_episodio": codigo_episodio,
+                "estado": nuevo_estado,
+                "actualizado_en": fecha,
+                "profesional_usuario": profesional_usuario,
+                "version": nueva_version
+            },
+            "evento": {
+                "id": evento_id,
+                "codigo_episodio": codigo_episodio,
+                "tipo": "ESTADO_CAMBIADO",
+                "ocurrido_en": fecha,
+                "profesional_usuario": profesional_usuario,
+                "datos": contenido
+            }
+        }
+
+    finally:
+        # Libera la conexión incluso cuando ocurre un error.
+        conexion.close()
+
+# Consulta el estado operativo sin modificar el episodio.
+# Flask deberá autorizar el acceso antes de llamar a esta función.
+def obtener_estado_demo(ruta_base, codigo_episodio):
+    # Comprueba que el código recibido sea un texto válido.
+    if (
+        not isinstance(codigo_episodio, str)
+        or not codigo_episodio.strip()
+    ):
+        raise ValueError("El código de episodio es obligatorio.")
+
+    codigo_episodio = codigo_episodio.strip()
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        # Consulta el episodio y su estado en una misma operación.
+        # LEFT JOIN permite reconocer episodios que aún no tienen estado.
+        fila = conexion.execute(
+            """
+            SELECT
+                e.codigo_episodio,
+                s.estado,
+                s.actualizado_en,
+                s.profesional_usuario,
+                s.version
+            FROM episodios AS e
+            LEFT JOIN estados_episodio AS s
+                ON s.codigo_episodio = e.codigo_episodio
+            WHERE e.codigo_episodio = ?
+            """,
+            (codigo_episodio,)
+        ).fetchone()
+
+        # Distingue un episodio inexistente de uno sin estado asignado.
+        if fila is None:
+            raise EpisodioNoEncontradoError(
+                "El episodio no existe."
+            )
+
+        # La versión 0 indica que todavía no se registró ningún estado.
+        # No supone que el episodio esté en ingreso o en espera.
+        resultado = dict(fila)
+        if resultado["version"] is None:
+            resultado["version"] = 0
+
+        return resultado
+
+    finally:
+        # Cierra la conexión tanto si la consulta funciona como si falla.
+        conexion.close()
+
+        # Consulta una página de episodios cuyo estado actual es en_espera.
+# No modifica registros ni asigna prioridades clínicas.
+def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
+    # Valida la paginación también en la función de almacenamiento.
+    if type(limite) is not int or not 1 <= limite <= 100:
+        raise ValueError("El límite debe estar entre 1 y 100.")
+
+    if type(desplazamiento) is not int or desplazamiento < 0:
+        raise ValueError(
+            "El desplazamiento debe ser un entero no negativo."
+        )
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        # Mantiene el total y los resultados dentro de la misma lectura.
+        with conexion:
+            conexion.execute("BEGIN")
+
+            # Cuenta únicamente los episodios actualmente en espera.
+            total = conexion.execute(
+                """
+                SELECT COUNT(*)
+                FROM estados_episodio
+                WHERE estado = 'en_espera'
+                """
+            ).fetchone()[0]
+
+            # Ordena por la entrada al estado de espera actual.
+            # Distingue al creador del episodio del autor del cambio.
+            filas = conexion.execute(
+                """
+                SELECT
+                    e.codigo_episodio,
+                    e.codigo_paciente,
+                    e.creado_en,
+                    e.profesional_usuario AS profesional_creador,
+                    s.estado,
+                    s.actualizado_en AS en_espera_desde,
+                    s.profesional_usuario AS profesional_estado,
+                    s.version
+                FROM estados_episodio AS s
+                JOIN episodios AS e
+                    ON e.codigo_episodio = s.codigo_episodio
+                WHERE s.estado = 'en_espera'
+                ORDER BY s.actualizado_en ASC, e.codigo_episodio ASC
+                LIMIT ? OFFSET ?
+                """,
+                (limite, desplazamiento)
+            ).fetchall()
+
+        return {
+            "episodios": [dict(fila) for fila in filas],
+            "total": total,
+            "limite": limite,
+            "desplazamiento": desplazamiento
+        }
+
+    finally:
+        # Libera la conexión incluso si falla la consulta.
+        conexion.close()
+
+        

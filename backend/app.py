@@ -11,9 +11,17 @@ from src.registro import (
     registrar_medicion_demo,
     corregir_medicion_demo,
 )
+from src.registro import listar_espera_demo
 from pydantic import ValidationError
 from src.esquemas import ExtraccionIA, OBLIGATORIOS
 from src.registro import buscar_episodios
+from src.registro import (
+    cambiar_estado_demo,
+    obtener_estado_demo,
+    EpisodioNoEncontradoError,
+    ConflictoEstadoError,
+)
+from werkzeug.exceptions import BadRequest
 import os
 import math
 import time
@@ -284,6 +292,9 @@ def verificar_acceso():
         "agregar_correccion_demo",
         "analizar_paciente",
         "listar_episodios_demo",
+        "consultar_estado_episodio_demo",
+        "actualizar_estado_episodio_demo",
+        "consultar_espera_demo",
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -318,6 +329,8 @@ def verificar_acceso():
             "consultar_sesion",
             "consultar_episodio_demo",
             "listar_episodios_demo",
+            "consultar_estado_episodio_demo",
+            "consultar_espera_demo",
         }
 
         if (
@@ -1366,6 +1379,195 @@ def listar_episodios_demo():
         "total": resultado["total"],
         "limite": limite,
         "desplazamiento": desplazamiento
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+# Consulta el estado actual y su versión.
+# El control de acceso permite médicos, enfermería y auditor.
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>/estado",
+    methods=["GET"]
+)
+def consultar_estado_episodio_demo(codigo_episodio):
+    try:
+        estado = obtener_estado_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio
+        )
+    except EpisodioNoEncontradoError:
+        return respuesta_error(
+            "El episodio no existe.",
+            404,
+            "EPISODIO_NO_ENCONTRADO"
+        )
+    except ValueError as error:
+        return respuesta_error(
+            str(error),
+            422,
+            "IDENTIFICADOR_INVALIDO"
+        )
+    except sqlite3.Error:
+        # Registra el fallo técnico sin exponer detalles al navegador.
+        logger_sistema.error("ERROR_CONSULTAR_ESTADO_DEMO")
+        return respuesta_error(
+            "No se pudo consultar el estado.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Evita que el navegador reutilice un estado desactualizado.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "estado": estado
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+
+# Cambia el estado y registra el evento con el profesional autenticado.
+# El control de acceso bloquea esta operación para el auditor.
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>/estado",
+    methods=["POST"]
+)
+def actualizar_estado_episodio_demo(codigo_episodio):
+    # Exige que la solicitud declare contenido JSON.
+    if not request.is_json:
+        return respuesta_error(
+            "Enviá el contenido como application/json.",
+            415,
+            "FORMATO_NO_ADMITIDO"
+        )
+
+    # Distingue un JSON mal formado de un objeto con campos incorrectos.
+    try:
+        datos = request.get_json()
+    except BadRequest:
+        return respuesta_error(
+            "El JSON enviado no es válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    # El cliente envía solo el estado deseado y la versión que consultó.
+    # El nombre del profesional nunca se recibe desde el formulario.
+    if (
+        not isinstance(datos, dict)
+        or set(datos) != {"estado", "version_esperada"}
+    ):
+        return respuesta_error(
+            "Enviá únicamente estado y version_esperada.",
+            400,
+            "CAMPOS_INVALIDOS"
+        )
+
+    try:
+        resultado = cambiar_estado_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            profesional_usuario=g.profesional["usuario"],
+            nuevo_estado=datos["estado"],
+            version_esperada=datos["version_esperada"]
+        )
+    except EpisodioNoEncontradoError:
+        return respuesta_error(
+            "El episodio no existe.",
+            404,
+            "EPISODIO_NO_ENCONTRADO"
+        )
+    except ConflictoEstadoError:
+        # No sobrescribe cambios realizados desde otra sesión.
+        return respuesta_error(
+            "El estado cambió. Consultá la versión actual "
+            "antes de volver a guardar.",
+            409,
+            "VERSION_DESACTUALIZADA"
+        )
+    except ValueError as error:
+        return respuesta_error(
+            str(error),
+            422,
+            "ESTADO_INVALIDO"
+        )
+    except sqlite3.Error:
+        # La función de registro revierte la transacción si falla.
+        logger_sistema.error("ERROR_CAMBIAR_ESTADO_DEMO")
+        return respuesta_error(
+            "No se pudo guardar el estado.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Confirma el estado guardado y el evento agregado al historial.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "estado": resultado["estado"],
+        "evento": resultado["evento"]
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+# Devuelve el listado persistido de episodios en espera.
+# Médicos, enfermería y auditor pueden consultar esta ruta.
+@app.route("/api/demo/espera", methods=["GET"])
+def consultar_espera_demo():
+    # Rechaza parámetros desconocidos y parámetros repetidos.
+    permitidos = {"limite", "desplazamiento"}
+    if (
+        set(request.args) - permitidos
+        or any(
+            len(request.args.getlist(nombre)) != 1
+            for nombre in request.args
+        )
+    ):
+        return respuesta_error(
+            "Los parámetros de consulta no son válidos.",
+            400,
+            "PARAMETROS_INVALIDOS"
+        )
+
+    # Convierte la paginación recibida en números enteros.
+    try:
+        limite = int(request.args.get("limite", "50"))
+        desplazamiento = int(
+            request.args.get("desplazamiento", "0")
+        )
+    except ValueError:
+        return respuesta_error(
+            "El límite y el desplazamiento deben ser enteros.",
+            422,
+            "PAGINACION_INVALIDA"
+        )
+
+    # Consulta SQLite; la función valida los límites permitidos.
+    try:
+        resultado = listar_espera_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            limite=limite,
+            desplazamiento=desplazamiento
+        )
+    except ValueError as error:
+        return respuesta_error(
+            str(error),
+            422,
+            "PAGINACION_INVALIDA"
+        )
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_CONSULTAR_ESPERA_DEMO")
+        return respuesta_error(
+            "No se pudo consultar la lista de espera.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Evita mostrar una lista antigua almacenada en caché.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        **resultado
     })
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
