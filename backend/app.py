@@ -26,6 +26,10 @@ from src.registro import (
     ConflictoEstadoError,
 )
 from werkzeug.exceptions import BadRequest
+from src.identificacion import (
+    inicializar_identificacion,
+    identificar_paciente_demo,
+)
 import os
 import math
 import time
@@ -87,6 +91,7 @@ BASE_USUARIOS = CARPETA_DATOS / "usuarios.db"
 BASE_REGISTRO_DEMO = CARPETA_DATOS / "triage_demo.db"
 
 inicializar_registro(BASE_REGISTRO_DEMO)
+inicializar_identificacion(BASE_REGISTRO_DEMO)
 
 
 # -----------------------------------------------
@@ -309,6 +314,7 @@ def verificar_acceso():
         "iachat.consulta",
         "voz.transcribir",
         "guardar_decision_demo",
+        "identificar_paciente",
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -1674,6 +1680,70 @@ def guardar_decision_demo(codigo_episodio):
     })
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 201
+
+# Vincula el DNI con un código interno de paciente.
+# Si el DNI ya existe, devuelve el mismo código.
+# No crea episodios ni envía información a la IA.
+@app.route("/api/demo/pacientes/identificar", methods=["POST"])
+def identificar_paciente():
+    # Exige una solicitud JSON.
+    if not request.is_json:
+        return respuesta_error(
+            "Enviá el contenido como application/json.",
+            415,
+            "FORMATO_NO_ADMITIDO"
+        )
+
+    # Distingue un JSON mal formado de campos incorrectos.
+    try:
+        datos = request.get_json()
+    except BadRequest:
+        return respuesta_error(
+            "El JSON enviado no es válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    # Recibe únicamente el DNI.
+    # El profesional se obtiene de la sesión del servidor.
+    if not isinstance(datos, dict) or set(datos) != {"dni"}:
+        return respuesta_error(
+            "Enviá únicamente el campo dni.",
+            400,
+            "CAMPOS_INVALIDOS"
+        )
+
+    # Recupera la identificación existente o crea una nueva.
+    try:
+        paciente = identificar_paciente_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            dni=datos["dni"],
+            profesional_usuario=g.profesional["usuario"]
+        )
+    except ValueError as error:
+        return respuesta_error(
+            str(error),
+            422,
+            "IDENTIFICACION_INVALIDA"
+        )
+    except sqlite3.Error:
+        # Registra el fallo sin incluir el DNI.
+        logger_sistema.error("ERROR_IDENTIFICAR_PACIENTE_DEMO")
+        return respuesta_error(
+            "No se pudo identificar al paciente.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Devuelve el código interno, sin repetir el DNI.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "paciente": paciente
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+
+    return respuesta, 201 if paciente["creado"] else 200
 
 if __name__ == "__main__":
 
