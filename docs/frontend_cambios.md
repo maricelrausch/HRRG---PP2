@@ -1,6 +1,6 @@
 # Frontend · Qué se hizo y qué falta para conectarlo
 
-**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 20/10/2026 · **Base:** maquetado v34
+**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 20/10/2026 (DNI) · **Base:** maquetado v34
 **Estado general:** el login (A07), "Extraer datos" (A06) y el **guardado del caso** (episodio, mediciones, correcciones e historial) ya funcionan contra Flask. La extracción usa casos simulados (D01–D05) o MedGemma (`HRRG_MODO_EXTRACCION=ia`); la sugerencia de color, el chat y el dictado siguen **simulados**.
 
 ---
@@ -133,6 +133,7 @@ Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Aho
 | 10 | ~~Cartel según el modo~~ ✅ Hecho 18/10: el cartel amarillo usa `modo_extraccion` de `/api/sesion` desde el inicio ("Simulación" o "Extracción con IA local") | `/api/sesion` · Maricel | A03 |
 | 12 | ~~Botón imprimir~~ ✅ Hecho 20/10: "Imprimir / PDF" en la pantalla de resultado; imprime solo el resumen (datos, correcciones, historial y registro) con encabezado de datos ficticios. Desde el diálogo se elige "Guardar como PDF". Si Tomi arma un PDF desde el servidor, el botón se puede apuntar a esa ruta | Pedido de Tomi | — |
 | 13 | Guardar la **decisión** (color aceptado/modificado/rechazado, motivo) y los datos del ingreso (edad, sexo, extracción) en el servidor | Ruta nueva · Maricel | A10 |
+| 14 | ~~DNI del paciente (pedido del HRRG en la visita)~~ ✅ Frontend hecho 20/10: campo opcional en Ingreso, valida 7 u 8 dígitos, se muestra en Medición, resumen, registro, En espera e impresión. **Nunca se envía a la IA** (no va en el relato ni en `/api/extraer`). **Falta backend:** una ruta que vincule DNI → `codigo_paciente` (guardado aparte, a futuro desde admisión/HCE); hasta entonces el DNI no se guarda | Ruta · Maricel; reglas de privacidad · Darío | A10 |
 | 11 | Que un error de IA **no vuelva solo a la simulación** (revisar `frontend/js/medgemma.js` y `dictado.js` de Darío antes de activarlos: hoy no están cargados) | Acordar con Darío | A08 |
 
 **Reglas que se mantienen:** solo casos ficticios; nada se atribuye a MedGemma ni al HRRG mientras sea simulación; la decisión final es siempre del profesional.

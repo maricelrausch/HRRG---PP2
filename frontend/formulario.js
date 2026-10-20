@@ -184,7 +184,7 @@ function go(s){
   $('#stepper').hidden=s==='espera';
   const sp=SPECS[s];
   $('#specs').innerHTML='<div class="eyebrow">Especificaciones</div><h2>'+sp.t+'</h2><ol>'+sp.items.map(i=>'<li><span class="n">'+i[0]+'</span><span>'+i[1]+'</span></li>').join('')+'</ol><div class="src">Fuente: '+sp.src+'</div>';
-  if(s==='revision'){$('#epCode').textContent=st.ep;$('#reBadge').hidden=!st.prev;if(st.prev)$('#reBadge').textContent='Reevaluación · antes '+LEVELS[st.prev.lv][0]+', hace '+fmtMin(st.prev.min);$('#demoWorse').hidden=!st.prev;$('#demoVitals').hidden=!!st.prev;renderForm();updOllama();setTimeout(()=>{const i=$('#r-ta_sistolica');i&&!i.value&&i.focus()},0)}
+  if(s==='revision'){$('#epCode').textContent=st.ep;$('#dniTag').textContent=st.dni?'DNI '+fmtDni(st.dni):'Sin DNI';$('#reBadge').hidden=!st.prev;if(st.prev)$('#reBadge').textContent='Reevaluación · antes '+LEVELS[st.prev.lv][0]+', hace '+fmtMin(st.prev.min);$('#demoWorse').hidden=!st.prev;$('#demoVitals').hidden=!!st.prev;renderForm();updOllama();setTimeout(()=>{const i=$('#r-ta_sistolica');i&&!i.value&&i.focus()},0)}
   if(s==='resumen')renderResumen();
   if(s==='espera'){renderWait();if(TriageAPI.MODO_REAL)cargarEspera().then(renderWait)}
   window.scrollTo({top:0});
@@ -218,6 +218,7 @@ $('#piiFix').addEventListener('click',()=>{$('#caso').value=$('#caso').value.rep
 $('#extraer').addEventListener('click', async () => {
   $('#piiBanner').hidden = true;
   const texto = $('#caso').value.trim();
+  if (!leerDni()) return;
   if (!texto) {
     $('#hint').textContent = 'Escribí el relato antes de continuar.';
     $('#hint').classList.add('err');
@@ -548,6 +549,7 @@ function summaryRows(){
   const br=list('br');
   return [
     ['Episodio',st.ep,''],
+    ['Paciente (DNI)',st.dni?fmtDni(st.dni):'Sin identificar',''],
     ['Edad / sexo',[v('edad')?r.edad+' años':null,v('sexo')].filter(Boolean).join(' · ')||null,fx('edad','sexo')],
     ['Motivo',(v('motivo_categoria')||'')+(v('motivo_consulta')?' · '+r.motivo_consulta:''),fx('motivo_categoria','motivo_consulta')],
     ['Síntomas referidos',v('sintomas_asociados')||'No refiere',fx('sintomas_asociados')],
@@ -615,7 +617,7 @@ function renderReg(){
   const d=st.decision,l=st.level!=null?LEVELS[st.level][0]:null;
   const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
   const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+LEVELS[SUG][0]:d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
-  $('#reg').textContent='Episodio:  '+st.ep+' (seudonimizado)\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
+  $('#reg').textContent='Episodio:  '+st.ep+'\nPaciente:  '+(st.dni?'DNI '+fmtDni(st.dni):'sin identificar')+'\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
 }
 
 $('#levels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-l="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'" title="'+L[3]+'">'+L[0]+'</button>').join('');
@@ -651,6 +653,7 @@ function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
 $('#nuevo').addEventListener('click',()=>{
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
+  st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');
   F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
 /* Clasificación manual sin IA */
 $('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
@@ -673,8 +676,8 @@ if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
   if(lv==null)return;
   let w=WAIT.find(x=>x.ep===st.ep);
-  if(w){w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
-  else WAIT.push({ep:st.ep,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
+  if(w){w.dni=st.dni;w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
+  else WAIT.push({ep:st.ep,dni:st.dni,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
   w=WAIT.find(x=>x.ep===st.ep);w.base=Date.now();w.extra=0;
   recordarColor(w);ponerEnEspera(w);
 }
@@ -761,7 +764,7 @@ function renderWait(){
   const ro=st.user&&st.user.rol==='auditor';
   $('#wList').innerHTML=rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||'<div class="hint">No hay episodios con ese código.</div>';
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||'<div class="hint">No hay episodios con ese código.</div>';
 }
 $('#epSearch').addEventListener('input',renderWait);
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
@@ -769,7 +772,7 @@ setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(
 $('#wList').addEventListener('click',e=>{
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]'),fi=e.target.closest('[data-fin]');
   if(fi){const ep=fi.dataset.fin;if(finPending===ep){finPending=null;const w=WAIT.find(x=>x.ep===ep);if(w)finalizar(w)}else{finPending=ep;renderWait()}return}
-  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
+  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
   if(es){const ep=es.dataset.esc;if(escPending===ep){const w=WAIT.find(x=>x.ep===ep);w.lv=0;w.esc=true;w.min=0;if(w.base){w.base=Date.now();w.extra=0}recordarColor(w);escPending=null}else escPending=ep;renderWait()}
@@ -875,9 +878,30 @@ if (TriageAPI.MODO_REAL) {
 $('#imprimir').addEventListener('click',()=>{
   const det=$('#s-resumen details.more'),abierto=det&&det.open;
   if(det)det.open=true;
-  $('#printHead').innerHTML='<b>Triage asistido · HRRG · Equipo 1 PP2</b><br>Episodio '+esc(st.ep)+' · '+esc(new Date().toLocaleString('es-AR'))+' · Usuario '+esc(st.user?st.user.u:'—')+
+  $('#printHead').innerHTML='<b>Triage asistido · HRRG · Equipo 1 PP2</b><br>Episodio '+esc(st.ep)+' · '+(st.dni?'DNI '+esc(fmtDni(st.dni))+' · ':'')+esc(new Date().toLocaleString('es-AR'))+' · Usuario '+esc(st.user?st.user.u:'—')+
     '<br><i>Datos ficticios. La sugerencia de color usa reglas de ejemplo (no es la guía del hospital). La decisión es del profesional.</i>';
   const volver=()=>{if(det)det.open=abierto;window.removeEventListener('afterprint',volver)};
   window.addEventListener('afterprint',volver);
   window.print();
 });
+
+/* ===== DNI del paciente =====
+   Pedido del HRRG: identificar al paciente para vincular el triage con la historia clínica.
+   - Es opcional (puede llegar alguien sin documento) y se valida el formato: 7 u 8 dígitos.
+   - NUNCA se manda a la IA: no está en st.rev ni en el relato; /api/extraer recibe solo el texto y los códigos.
+   - Por ahora no se guarda en el servidor ni en el navegador: falta la ruta de Maricel que lo vincule con codigo_paciente.
+   - A futuro puede venir "por defecto" desde admisión / HCE. */
+st.dni=null;
+const fmtDni=d=>String(d).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+function leerDni(){
+  const el=$('#dni'),crudo=el.value.trim();
+  if(!crudo){st.dni=null;el.classList.remove('bad');return true}
+  const d=crudo.replace(/[.\s-]/g,'');
+  if(!/^\d{7,8}$/.test(d)||/^0+$/.test(d)){
+    el.classList.add('bad');
+    $('#hint').textContent='El DNI tiene que tener 7 u 8 números (con o sin puntos). Corregilo o dejalo vacío si el paciente no tiene documento.';
+    $('#hint').classList.add('err');el.focus();return false;
+  }
+  el.classList.remove('bad');st.dni=d;el.value=fmtDni(d);return true;
+}
+$('#dni').addEventListener('blur',()=>{if($('#dni').value.trim())leerDni()});

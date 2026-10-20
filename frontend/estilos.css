@@ -401,3 +401,10 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
   .print-only{display:block!important;border-bottom:1px solid #000;padding-bottom:8px;margin-bottom:12px;font-size:13px}
   .summary div,.wrow{break-inside:avoid}
 }
+
+/* DNI del paciente (ingreso) */
+.ident-pac{margin-bottom:12px}
+.ident-pac .opt{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.ident-pac input{width:200px;max-width:100%;font-family:var(--f-mono);font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.ident-pac input.bad{border:2px solid var(--err)}
+.dnitag{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:2px}

@@ -48,7 +48,12 @@
       <div class="body" id="s-ingreso">
         <div class="banner" id="errBanner" hidden><b id="errTitle"></b><span id="errMsg"></span><span class="code" id="errCode"></span></div>
         <div class="banner" id="piiBanner" hidden><b>El relato parece tener un dato personal (DNI o teléfono).</b><span>La IA no puede recibir datos identificatorios. Quitalo antes de seguir.</span><div class="row" style="margin-top:6px"><button type="button" class="btn" id="piiFix">Quitar dato y continuar</button></div></div>
-        <div class="note"><b>Caso ficticio.</b> No escribir ni dictar nombre, DNI, domicilio, teléfono ni datos de pacientes reales.</div>
+        <div class="ident-pac">
+          <label class="label" for="dni">DNI del paciente <span class="opt">opcional · para vincular con la historia clínica</span></label>
+          <input id="dni" inputmode="numeric" autocomplete="off" placeholder="Ej. 30.123.456" maxlength="11">
+          <div class="hint" id="dniHint">El DNI <b>no se envía a la IA</b>: queda aparte del relato. Por ahora es solo de pantalla (todavía no se guarda en el servidor). En pruebas, usar un DNI ficticio.</div>
+        </div>
+        <div class="note"><b>Caso ficticio.</b> En el relato no escribas ni dictes nombre, DNI, domicilio ni teléfono: el DNI va solo en su campo, arriba.</div>
         <label class="label" for="caso">Descripción del evento. <span class="n">1</span></label>
         <div class="field-wrap">
           <textarea id="caso">Me duele mucho la panza, acá arriba, desde hace unas 6 horas. Tengo ganas de vomitar y me siento afiebrada. Soy diabética, tomo pastillas.</textarea>
@@ -71,7 +76,7 @@
         <div id="rvForm" class="rv">
           <div class="rv-main">
             <div class="strip">
-              <span class="ep"><span class="eyebrow">Episodio</span><b id="epCode">EP-004812</b></span><span class="rebadge" id="reBadge" hidden></span>
+              <span class="ep"><span class="eyebrow">Episodio</span><b id="epCode">EP-004812</b><span class="dnitag" id="dniTag"></span></span><span class="rebadge" id="reBadge" hidden></span>
               <div class="strip-f" id="g-ident"></div>
               <button type="button" class="relline" id="relline" aria-expanded="false"><b>Relato:</b> <span id="origTxt"></span></button>
             </div>
