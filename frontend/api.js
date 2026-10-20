@@ -98,9 +98,27 @@ function aUsuario(datos) {
     u: datos.usuario,
     nom: datos.nombre,
     rol: datos.rol,
-    modo: 'real'
+    modo: 'real',
+    modoExtraccion: datos.modo_extraccion || null
   };
 }
 
-  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir };
+  /* Episodios e historial (rutas de Maricel, modo demostración). Devuelven { ok, estado, datos }. */
+  function crearEpisodio(codigoPaciente) {
+    return pedir('/api/demo/episodios', { method: 'POST', body: JSON.stringify({ codigo_paciente: codigoPaciente }) });
+  }
+  function registrarMedicion(episodio, medidoEn, valores) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/mediciones',
+      { method: 'POST', body: JSON.stringify({ medido_en: medidoEn, valores: valores }) });
+  }
+  function corregirMedicion(episodio, eventoId, cambios, motivo) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/mediciones/' + eventoId + '/correcciones',
+      { method: 'POST', body: JSON.stringify({ cambios: cambios, motivo: motivo }) });
+  }
+  function consultarEpisodio(episodio) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio), { method: 'GET', cache: 'no-store' });
+  }
+
+  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir,
+    crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
