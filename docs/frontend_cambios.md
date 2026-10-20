@@ -1,6 +1,6 @@
 # Frontend · Qué se hizo y qué falta para conectarlo
 
-**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 18/10/2026 · **Base:** maquetado v34
+**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 20/10/2026 (DNI) · **Base:** maquetado v34
 **Estado general:** el login (A07), "Extraer datos" (A06) y el **guardado del caso** (episodio, mediciones, correcciones e historial) ya funcionan contra Flask. La extracción usa casos simulados (D01–D05) o MedGemma (`HRRG_MODO_EXTRACCION=ia`); la sugerencia de color, el chat y el dictado siguen **simulados**.
 
 ---
@@ -128,9 +128,12 @@ Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Aho
 | 5 | Conectar el chat (`CHAT_API`) | `/api/consulta` · Maricel + RAG · Tomás | A11 (nueva) |
 | 6 | Voz real (opción A o B) | Decisión del equipo; opción B: Tomás + Maricel | A11 / A06 |
 | 7 | Tarjeta de sugerencia con datos reales | Guías autorizadas por el HRRG | A09 ⏸ |
-| 8 | Espera y reevaluación persistidas | D10 | A10 ⏸ |
+| 8 | ~~Espera y reevaluación persistidas~~ ✅ Hecho 20/10: al registrar la decisión el episodio pasa a **en espera** en el servidor; la lista "En espera" se lee de `/api/demo/espera` (no se pierde al recargar y la ven todos los usuarios); botón **Finalizar (atendido)** con confirmación; el auditor solo mira. Al reevaluar un episodio de otra sesión se recuperan sus últimos signos vitales. **Falta:** el servidor no guarda la decisión (color), así que en otra compu se ve "Sin color" | Rutas de estado y espera · Maricel | A10 |
 | 9 | ~~Guardar el caso en el servidor~~ ✅ Hecho 18/10: al extraer se crea el episodio (código `EPI-…` del servidor); al pedir sugerencia se registra la **medición**; si después se cambian valores se registra una **corrección** (la original no se pisa); reevaluar desde En espera registra una **medición nueva**. El historial se ve en "Ver datos del caso". Sin servidor (doble clic) no se guarda nada | Rutas de episodios · Maricel | A10 |
 | 10 | ~~Cartel según el modo~~ ✅ Hecho 18/10: el cartel amarillo usa `modo_extraccion` de `/api/sesion` desde el inicio ("Simulación" o "Extracción con IA local") | `/api/sesion` · Maricel | A03 |
+| 12 | ~~Botón imprimir~~ ✅ Hecho 20/10: "Imprimir / PDF" en la pantalla de resultado; imprime solo el resumen (datos, correcciones, historial y registro) con encabezado de datos ficticios. Desde el diálogo se elige "Guardar como PDF". Si Tomi arma un PDF desde el servidor, el botón se puede apuntar a esa ruta | Pedido de Tomi | — |
+| 13 | Guardar la **decisión** (color aceptado/modificado/rechazado, motivo) y los datos del ingreso (edad, sexo, extracción) en el servidor | Ruta nueva · Maricel | A10 |
+| 14 | ~~DNI del paciente (pedido del HRRG en la visita)~~ ✅ Frontend hecho 20/10: campo opcional en Ingreso, valida 7 u 8 dígitos, se muestra en Medición, resumen, registro, En espera e impresión. **Nunca se envía a la IA** (no va en el relato ni en `/api/extraer`). **Falta backend:** una ruta que vincule DNI → `codigo_paciente` (guardado aparte, a futuro desde admisión/HCE); hasta entonces el DNI no se guarda | Ruta · Maricel; reglas de privacidad · Darío | A10 |
 | 11 | Que un error de IA **no vuelva solo a la simulación** (revisar `frontend/js/medgemma.js` y `dictado.js` de Darío antes de activarlos: hoy no están cargados) | Acordar con Darío | A08 |
 
 **Reglas que se mantienen:** solo casos ficticios; nada se atribuye a MedGemma ni al HRRG mientras sea simulación; la decisión final es siempre del profesional.

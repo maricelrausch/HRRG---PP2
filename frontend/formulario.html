@@ -48,7 +48,12 @@
       <div class="body" id="s-ingreso">
         <div class="banner" id="errBanner" hidden><b id="errTitle"></b><span id="errMsg"></span><span class="code" id="errCode"></span></div>
         <div class="banner" id="piiBanner" hidden><b>El relato parece tener un dato personal (DNI o teléfono).</b><span>La IA no puede recibir datos identificatorios. Quitalo antes de seguir.</span><div class="row" style="margin-top:6px"><button type="button" class="btn" id="piiFix">Quitar dato y continuar</button></div></div>
-        <div class="note"><b>Caso ficticio.</b> No escribir ni dictar nombre, DNI, domicilio, teléfono ni datos de pacientes reales.</div>
+        <div class="ident-pac">
+          <label class="label" for="dni">DNI del paciente <span class="opt">opcional · para vincular con la historia clínica</span></label>
+          <input id="dni" inputmode="numeric" autocomplete="off" placeholder="Ej. 30.123.456" maxlength="11">
+          <div class="hint" id="dniHint">El DNI <b>no se envía a la IA</b>: queda aparte del relato. Por ahora es solo de pantalla (todavía no se guarda en el servidor). En pruebas, usar un DNI ficticio.</div>
+        </div>
+        <div class="note"><b>Caso ficticio.</b> En el relato no escribas ni dictes nombre, DNI, domicilio ni teléfono: el DNI va solo en su campo, arriba.</div>
         <label class="label" for="caso">Descripción del evento. <span class="n">1</span></label>
         <div class="field-wrap">
           <textarea id="caso">Me duele mucho la panza, acá arriba, desde hace unas 6 horas. Tengo ganas de vomitar y me siento afiebrada. Soy diabética, tomo pastillas.</textarea>
@@ -71,7 +76,7 @@
         <div id="rvForm" class="rv">
           <div class="rv-main">
             <div class="strip">
-              <span class="ep"><span class="eyebrow">Episodio</span><b id="epCode">EP-004812</b></span><span class="rebadge" id="reBadge" hidden></span>
+              <span class="ep"><span class="eyebrow">Episodio</span><b id="epCode">EP-004812</b><span class="dnitag" id="dniTag"></span></span><span class="rebadge" id="reBadge" hidden></span>
               <div class="strip-f" id="g-ident"></div>
               <button type="button" class="relline" id="relline" aria-expanded="false"><b>Relato:</b> <span id="origTxt"></span></button>
             </div>
@@ -96,6 +101,7 @@
 
       <!-- 3 · RESUMEN -->
       <div class="body" id="s-resumen" hidden>
+        <div class="print-only" id="printHead"></div>
         <div class="chat" id="chat" role="dialog" aria-label="Consultar a la IA" hidden>
           <div class="chat-head"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23" fill="var(--accent)"/><line x1="24" y1="8" x2="24" y2="13" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="7" r="2.5" fill="#fff"/><rect x="12" y="13" width="24" height="19" rx="6" fill="#fff"/><circle cx="19" cy="22" r="3" fill="var(--accent)"/><circle cx="29" cy="22" r="3" fill="var(--accent)"/><rect x="19" y="27" width="10" height="2.5" rx="1.2" fill="var(--accent)"/><rect x="9" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="36" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="16" y="33" width="16" height="6" rx="3" fill="#fff"/></svg><div><b>Consultar a la IA</b><small>Sobre la sugerencia de este episodio</small></div><button type="button" class="x" id="chatX" aria-label="Cerrar">×</button></div>
           <div class="chat-warn"><b>Simulación.</b> Respuestas de ejemplo, no de MedGemma. No diagnostica ni indica tratamientos.</div>
@@ -174,6 +180,7 @@
         <div class="row">
           <button type="button" class="btn" data-go="revision">Volver a medición</button>
           <button type="button" class="btn" data-go="espera">Ver en espera</button>
+          <button type="button" class="btn" id="imprimir" title="Imprimir o guardar como PDF el resumen del episodio">Imprimir / PDF</button>
           <button type="button" class="btn primary" id="nuevo">Nuevo caso</button>
         </div>
       </div>
@@ -184,6 +191,7 @@
           <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span></div>
           <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio</span><input id="epSearch" placeholder="EP-0048…" autocomplete="off"></label>
         </div>
+        <div class="werr" id="wErr" hidden></div>
         <div class="wlist" id="wList"></div>
         <div class="row" style="justify-content:space-between"><div class="hint">Reloj de reevaluación: cada color tiene su tiempo objetivo (tiempos de ejemplo, no oficiales). Al vencerse, el paciente se marca para reevaluar.</div><label class="fast"><input type="checkbox" id="fastT"> Demo: tiempo acelerado (1 s = 1 min)</label></div>
       </div>

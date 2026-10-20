@@ -115,10 +115,21 @@ function aUsuario(datos) {
     return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/mediciones/' + eventoId + '/correcciones',
       { method: 'POST', body: JSON.stringify({ cambios: cambios, motivo: motivo }) });
   }
+  function consultarEstado(episodio) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/estado', { method: 'GET', cache: 'no-store' });
+  }
+  function cambiarEstado(episodio, estado, versionEsperada) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/estado',
+      { method: 'POST', body: JSON.stringify({ estado: estado, version_esperada: versionEsperada }) });
+  }
+  function listarEspera() {
+    return pedir('/api/demo/espera?limite=100', { method: 'GET', cache: 'no-store' });
+  }
   function consultarEpisodio(episodio) {
     return pedir('/api/demo/episodios/' + encodeURIComponent(episodio), { method: 'GET', cache: 'no-store' });
   }
 
   root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir,
-    crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio };
+    crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
+    consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
