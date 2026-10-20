@@ -872,10 +872,10 @@ def obtener_estado_demo(ruta_base, codigo_episodio):
         # Cierra la conexión tanto si la consulta funciona como si falla.
         conexion.close()
 
-        # Consulta una página de episodios cuyo estado actual es en_espera.
-# No modifica registros ni asigna prioridades clínicas.
+        # Consulta los episodios en espera y su última decisión profesional.
+# Conserva la paginación y no modifica el historial.
 def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
-    # Valida la paginación también en la función de almacenamiento.
+    # Valida los límites de la consulta.
     if type(limite) is not int or not 1 <= limite <= 100:
         raise ValueError("El límite debe estar entre 1 y 100.")
 
@@ -888,11 +888,11 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
     conexion.row_factory = sqlite3.Row
 
     try:
-        # Mantiene el total y los resultados dentro de la misma lectura.
+        # Lee el total, los episodios y sus decisiones
+        # dentro de una misma transacción.
         with conexion:
             conexion.execute("BEGIN")
 
-            # Cuenta únicamente los episodios actualmente en espera.
             total = conexion.execute(
                 """
                 SELECT COUNT(*)
@@ -901,8 +901,8 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
                 """
             ).fetchone()[0]
 
-            # Ordena por la entrada al estado de espera actual.
-            # Distingue al creador del episodio del autor del cambio.
+            # Mantiene los campos existentes de la lista de espera.
+            # Busca el último evento de decisión de cada episodio.
             filas = conexion.execute(
                 """
                 SELECT
@@ -913,10 +913,23 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
                     s.estado,
                     s.actualizado_en AS en_espera_desde,
                     s.profesional_usuario AS profesional_estado,
-                    s.version
+                    s.version,
+                    d.id AS decision_evento_id,
+                    d.ocurrido_en AS decision_fecha,
+                    d.profesional_usuario AS decision_profesional,
+                    d.datos_json AS decision_json
                 FROM estados_episodio AS s
                 JOIN episodios AS e
                     ON e.codigo_episodio = s.codigo_episodio
+                LEFT JOIN eventos AS d
+                    ON d.id = (
+                        SELECT ev.id
+                        FROM eventos AS ev
+                        WHERE ev.codigo_episodio = e.codigo_episodio
+                          AND ev.tipo = 'DECISION_REGISTRADA'
+                        ORDER BY ev.id DESC
+                        LIMIT 1
+                    )
                 WHERE s.estado = 'en_espera'
                 ORDER BY s.actualizado_en ASC, e.codigo_episodio ASC
                 LIMIT ? OFFSET ?
@@ -924,15 +937,195 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
                 (limite, desplazamiento)
             ).fetchall()
 
+            # Convierte la decisión guardada en un objeto JSON.
+            episodios = []
+
+            for fila in filas:
+                episodio = dict(fila)
+                contenido = episodio.pop("decision_json")
+                evento_id = episodio.pop("decision_evento_id")
+                fecha = episodio.pop("decision_fecha")
+                profesional = episodio.pop("decision_profesional")
+
+                # Sin decisión previa, informa ausencia de color.
+                # No inventa una clasificación ni reutiliza otra atención.
+                episodio["decision_actual"] = None
+                episodio["color_final"] = None
+                episodio["version_decision"] = 0
+
+                if evento_id is not None:
+                    datos = json.loads(contenido)
+
+                    episodio["decision_actual"] = {
+                        "evento_id": evento_id,
+                        "decision": datos["decision"],
+                        "color_final": datos["color_final"],
+                        "motivo": datos["motivo"],
+                        "version": datos["version"],
+                        "ocurrido_en": fecha,
+                        "profesional_usuario": profesional
+                    }
+                    episodio["color_final"] = datos["color_final"]
+                    episodio["version_decision"] = datos["version"]
+
+                episodios.append(episodio)
+
+        # Devuelve la página solicitada junto con el total.
         return {
-            "episodios": [dict(fila) for fila in filas],
+            "episodios": episodios,
             "total": total,
             "limite": limite,
             "desplazamiento": desplazamiento
         }
 
     finally:
-        # Libera la conexión incluso si falla la consulta.
+        # Libera la conexión incluso cuando falla la consulta.
         conexion.close()
 
+# Identifica un intento de guardar sobre una decisión desactualizada.
+# La ruta lo convierte en una respuesta HTTP 409.
+class ConflictoDecisionError(ValueError):
+    pass
+# Guarda una decisión del prototipo como un nuevo evento.
+# Conserva las decisiones anteriores y no calcula prioridad clínica.
+def registrar_decision_demo(
+    ruta_base,
+    codigo_episodio,
+    profesional_usuario,
+    decision,
+    color_final,
+    motivo,
+    version_esperada
+):
+    # Valida el episodio y el profesional recibido desde Flask.
+    for valor in (codigo_episodio, profesional_usuario):
+        if not isinstance(valor, str) or not valor.strip():
+            raise ValueError("El episodio y el profesional son obligatorios.")
+
+    codigo_episodio = codigo_episodio.strip()
+    profesional_usuario = profesional_usuario.strip()
+
+    # Acepta únicamente las acciones acordadas para la decisión.
+    if (
+        not isinstance(decision, str)
+        or decision not in {"aceptada", "modificada", "rechazada"}
+    ):
+        raise ValueError("La decisión no es válida.")
+
+    # Una decisión rechazada no deja un color vigente.
+    # Si el profesional elige otro color, corresponde 'modificada'.
+    colores = {"ROJO", "NARANJA", "AMARILLO", "VERDE", "AZUL"}
+
+    if decision == "rechazada":
+        if color_final is not None:
+            raise ValueError("Una decisión rechazada debe tener color_final null.")
+    elif not isinstance(color_final, str) or color_final not in colores:
+        raise ValueError("El color final no es válido.")
+
+    # Exige una explicación al modificar o rechazar la sugerencia.
+    if not isinstance(motivo, str):
+        raise ValueError("El motivo debe ser un texto.")
+
+    motivo = motivo.strip()
+
+    if len(motivo) > 1000:
+        raise ValueError("El motivo no puede superar 1000 caracteres.")
+
+    if decision in {"modificada", "rechazada"} and not motivo:
+        raise ValueError("Indicá el motivo de la modificación o el rechazo.")
+
+    # Esta versión corresponde a la decisión, no al estado de espera.
+    # El valor 0 indica que todavía no existe una decisión guardada.
+    if type(version_esperada) is not int or version_esperada < 0:
+        raise ValueError("La versión esperada debe ser un entero no negativo.")
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        with conexion:
+            # Evita que dos profesionales guarden sobre la misma versión.
+            conexion.execute("BEGIN IMMEDIATE")
+
+            episodio = conexion.execute(
+                "SELECT codigo_episodio FROM episodios "
+                "WHERE codigo_episodio = ?",
+                (codigo_episodio,)
+            ).fetchone()
+
+            if episodio is None:
+                raise EpisodioNoEncontradoError("El episodio no existe.")
+
+            # Recupera la última decisión sin alterar su contenido.
+            anterior = conexion.execute(
+                """
+                SELECT id, datos_json
+                FROM eventos
+                WHERE codigo_episodio = ?
+                  AND tipo = 'DECISION_REGISTRADA'
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (codigo_episodio,)
+            ).fetchone()
+
+            version_actual = (
+                json.loads(anterior["datos_json"])["version"]
+                if anterior else 0
+            )
+
+            if version_esperada != version_actual:
+                raise ConflictoDecisionError(
+                    "La decisión cambió. Consultá la versión actual."
+                )
+
+            # Genera la fecha en el servidor y vincula la decisión anterior.
+            fecha = datetime.now(timezone.utc).isoformat()
+            contenido = {
+                "version_evento": 1,
+                "modo": "demo",
+                "origen": "decision_profesional",
+                "decision": decision,
+                "color_final": color_final,
+                "motivo": motivo,
+                "version": version_actual + 1,
+                "evento_anterior_id": anterior["id"] if anterior else None
+            }
+
+            # Agrega un evento: nunca reemplaza ni elimina el historial.
+            cursor = conexion.execute(
+                """
+                INSERT INTO eventos (
+                    codigo_episodio, tipo, ocurrido_en,
+                    profesional_usuario, datos_json
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    codigo_episodio,
+                    "DECISION_REGISTRADA",
+                    fecha,
+                    profesional_usuario,
+                    json.dumps(
+                        contenido,
+                        ensure_ascii=False,
+                        allow_nan=False
+                    )
+                )
+            )
+            evento_id = cursor.lastrowid
+
+        # Devuelve el evento únicamente después de confirmar el guardado.
+        return {
+            "id": evento_id,
+            "codigo_episodio": codigo_episodio,
+            "tipo": "DECISION_REGISTRADA",
+            "ocurrido_en": fecha,
+            "profesional_usuario": profesional_usuario,
+            "datos": contenido
+        }
+
+    finally:
+        # Libera la conexión también si se rechaza o falla el guardado.
+        conexion.close()
         

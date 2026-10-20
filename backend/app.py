@@ -11,6 +11,10 @@ from src.registro import (
     registrar_medicion_demo,
     corregir_medicion_demo,
 )
+from src.registro import (
+    registrar_decision_demo,
+    ConflictoDecisionError,
+)
 from src.registro import listar_espera_demo
 from pydantic import ValidationError
 from src.esquemas import ExtraccionIA, OBLIGATORIOS
@@ -47,6 +51,12 @@ app = Flask(
     static_folder=str(CARPETA_FRONTEND),
     static_url_path=""
 )
+
+# IA local (Darío): chat con MedGemma y dictado con Whisper. No sale nada a internet.
+from ia.chat import bp as chat_ia_bp
+from ia.transcripcion import bp as voz_bp
+app.register_blueprint(chat_ia_bp)   # /api/ia/estado, /api/ia/consulta
+app.register_blueprint(voz_bp)       # /api/transcribir
 
 app.config["DEMO_DOCUMENTAL_HABILITADA"] = False
 # D03: respuesta predefinida para probar la integración.
@@ -295,6 +305,10 @@ def verificar_acceso():
         "consultar_estado_episodio_demo",
         "actualizar_estado_episodio_demo",
         "consultar_espera_demo",
+        "iachat.estado",
+        "iachat.consulta",
+        "voz.transcribir",
+        "guardar_decision_demo",
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -1571,6 +1585,95 @@ def consultar_espera_demo():
     })
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
+
+# Recibe la decisión profesional y la guarda en el historial del episodio.
+# El control de acceso permite escribir a médicos y enfermería.
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>/decision",
+    methods=["POST"]
+)
+def guardar_decision_demo(codigo_episodio):
+    # Exige contenido JSON.
+    if not request.is_json:
+        return respuesta_error(
+            "Enviá el contenido como application/json.",
+            415,
+            "FORMATO_NO_ADMITIDO"
+        )
+
+    # Rechaza un JSON mal formado.
+    try:
+        datos = request.get_json()
+    except BadRequest:
+        return respuesta_error(
+            "El JSON enviado no es válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    # Acepta únicamente los campos del contrato de decisión.
+    # El profesional y la fecha se obtienen en el servidor.
+    campos = {
+        "decision",
+        "color_final",
+        "motivo",
+        "version_esperada"
+    }
+
+    if not isinstance(datos, dict) or set(datos) != campos:
+        return respuesta_error(
+            "Enviá únicamente decision, color_final, motivo "
+            "y version_esperada.",
+            400,
+            "CAMPOS_INVALIDOS"
+        )
+
+    # Guarda un nuevo evento sin reemplazar decisiones anteriores.
+    try:
+        evento = registrar_decision_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            profesional_usuario=g.profesional["usuario"],
+            decision=datos["decision"],
+            color_final=datos["color_final"],
+            motivo=datos["motivo"],
+            version_esperada=datos["version_esperada"]
+        )
+    except EpisodioNoEncontradoError:
+        return respuesta_error(
+            "El episodio no existe.",
+            404,
+            "EPISODIO_NO_ENCONTRADO"
+        )
+    except ConflictoDecisionError:
+        return respuesta_error(
+            "La decisión cambió. Consultá la versión actual "
+            "antes de volver a guardar.",
+            409,
+            "VERSION_DECISION_DESACTUALIZADA"
+        )
+    except ValueError as error:
+        return respuesta_error(
+            str(error),
+            422,
+            "DECISION_INVALIDA"
+        )
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_GUARDAR_DECISION_DEMO")
+        return respuesta_error(
+            "No se pudo guardar la decisión.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Confirma el guardado y devuelve el evento con su nueva versión.
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "evento": evento
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 201
 
 if __name__ == "__main__":
 
