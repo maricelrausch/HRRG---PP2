@@ -96,6 +96,7 @@
 
       <!-- 3 · RESUMEN -->
       <div class="body" id="s-resumen" hidden>
+        <div class="print-only" id="printHead"></div>
         <div class="chat" id="chat" role="dialog" aria-label="Consultar a la IA" hidden>
           <div class="chat-head"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23" fill="var(--accent)"/><line x1="24" y1="8" x2="24" y2="13" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="7" r="2.5" fill="#fff"/><rect x="12" y="13" width="24" height="19" rx="6" fill="#fff"/><circle cx="19" cy="22" r="3" fill="var(--accent)"/><circle cx="29" cy="22" r="3" fill="var(--accent)"/><rect x="19" y="27" width="10" height="2.5" rx="1.2" fill="var(--accent)"/><rect x="9" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="36" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="16" y="33" width="16" height="6" rx="3" fill="#fff"/></svg><div><b>Consultar a la IA</b><small>Sobre la sugerencia de este episodio</small></div><button type="button" class="x" id="chatX" aria-label="Cerrar">×</button></div>
           <div class="chat-warn"><b>Simulación.</b> Respuestas de ejemplo, no de MedGemma. No diagnostica ni indica tratamientos.</div>
@@ -174,6 +175,7 @@
         <div class="row">
           <button type="button" class="btn" data-go="revision">Volver a medición</button>
           <button type="button" class="btn" data-go="espera">Ver en espera</button>
+          <button type="button" class="btn" id="imprimir" title="Imprimir o guardar como PDF el resumen del episodio">Imprimir / PDF</button>
           <button type="button" class="btn primary" id="nuevo">Nuevo caso</button>
         </div>
       </div>
@@ -184,6 +186,7 @@
           <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span></div>
           <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio</span><input id="epSearch" placeholder="EP-0048…" autocomplete="off"></label>
         </div>
+        <div class="werr" id="wErr" hidden></div>
         <div class="wlist" id="wList"></div>
         <div class="row" style="justify-content:space-between"><div class="hint">Reloj de reevaluación: cada color tiene su tiempo objetivo (tiempos de ejemplo, no oficiales). Al vencerse, el paciente se marca para reevaluar.</div><label class="fast"><input type="checkbox" id="fastT"> Demo: tiempo acelerado (1 s = 1 min)</label></div>
       </div>
