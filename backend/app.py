@@ -48,6 +48,12 @@ app = Flask(
     static_url_path=""
 )
 
+# IA local (Darío): chat con MedGemma y dictado con Whisper. No sale nada a internet.
+from ia.chat import bp as chat_ia_bp
+from ia.transcripcion import bp as voz_bp
+app.register_blueprint(chat_ia_bp)   # /api/ia/estado, /api/ia/consulta
+app.register_blueprint(voz_bp)       # /api/transcribir
+
 app.config["DEMO_DOCUMENTAL_HABILITADA"] = False
 # D03: respuesta predefinida para probar la integración.
 app.config["EXTRACCION_SIMULADA_HABILITADA"] = True
@@ -295,6 +301,9 @@ def verificar_acceso():
         "consultar_estado_episodio_demo",
         "actualizar_estado_episodio_demo",
         "consultar_espera_demo",
+        "iachat.estado",
+        "iachat.consulta",
+        "voz.transcribir",
     }
 
     if request.endpoint not in rutas_protegidas:
