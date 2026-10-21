@@ -530,7 +530,7 @@ async function guardarMediciones(){
   if(!r.ok){st.srv.aviso='No se pudo guardar la medición: '+(r.datos.mensaje||'error del servidor')+' El triage sigue; los datos quedan en pantalla.';return}
   st.srv.medicion={id:r.datos.evento.id,valores:v};st.srv.nuevaToma=false;
 }
-const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado'};
+const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada'};
 const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)'};
 /* Atenciones anteriores del mismo paciente (mismo DNI). Cada una se puede abrir para ver su historial. */
 function htmlAnteriores(){
@@ -561,7 +561,7 @@ async function renderHistorial(){
   const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
   const fila=e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+x).join(' · '):'';
     return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(hora(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
-      (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'};
+      (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'};
   box.innerHTML=htmlAnteriores()+'<b>Historial guardado en el servidor</b> · '+esc(st.srv.ep)+(st.srv.aviso?'<br><span class="w">'+esc(st.srv.aviso)+'</span>':'')+
     '<ul>'+(r.datos.episodio.eventos||[]).map(fila).join('')+'</ul>';
 }
@@ -716,7 +716,43 @@ function commit(lv){
   if(w){w.dni=st.dni;w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
   else WAIT.push({ep:st.ep,dni:st.dni,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
   w=WAIT.find(x=>x.ep===st.ep);w.base=Date.now();w.extra=0;
-  recordarColor(w);ponerEnEspera(w);
+  recordarColor(w);ponerEnEspera(w);guardarDecision(w,decisionActual(lv));
+}
+
+/* ===== Decisión del profesional (ruta de Maricel: POST …/decision) =====
+   Se guarda como un evento nuevo; las anteriores no se borran.
+   Mapeo de la pantalla al contrato:
+   - Aceptar            -> "aceptada", color sugerido
+   - Modificar          -> "modificada", color elegido + motivo
+   - Rechazar           -> "modificada" (el backend usa "rechazada" solo SIN color; acá el profesional
+                           elige un color manual), con el motivo "Sugerencia rechazada…"
+   - Clasificar sin IA  -> "modificada", color manual, motivo "Clasificación manual sin asistencia IA"
+   - Escalar a ROJO     -> "modificada", ROJO, motivo "Escalado manual por deterioro en espera" */
+function textoMotivo(){
+  const m=$('#motivo').value,d=($('#detalle').value||'').trim();
+  return [m,d].filter(Boolean).join('. ');
+}
+function decisionActual(lv){
+  if(st.manual)return {decision:'modificada',color:LEVELS[lv][0],motivo:'Clasificación manual sin asistencia IA.'};
+  if(st.decision==='aceptar')return {decision:'aceptada',color:LEVELS[lv][0],motivo:''};
+  if(st.decision==='rechazar')return {decision:'modificada',color:LEVELS[lv][0],motivo:('Sugerencia rechazada; clasificación manual. '+textoMotivo()).trim()};
+  return {decision:'modificada',color:LEVELS[lv][0],motivo:textoMotivo()||'Criterio clínico del profesional'};
+}
+async function versionDecision(ep){
+  const r=await TriageAPI.consultarEpisodio(ep);
+  if(!r.ok)return null;
+  const ult=(r.datos.episodio.eventos||[]).filter(e=>e.tipo==='DECISION_REGISTRADA').pop();
+  return ult&&ult.datos?ult.datos.version:0;
+}
+async function guardarDecision(w,d){
+  if(!TriageAPI.MODO_REAL||!w.srv||!w.srv.ep||!d)return;
+  const v=await versionDecision(w.ep);
+  if(v==null){w.aviso='No se pudo guardar la decisión: no se pudo leer el episodio.';return}
+  const r=await TriageAPI.registrarDecision(w.ep,d.decision,d.color,d.motivo,v);
+  if(r.estado===401){location.href='index.html';return}
+  if(!r.ok){w.aviso='No se guardó la decisión en el servidor: '+(r.datos.mensaje||'error')+'.';if(st.screen==='espera')renderWait();return}
+  w.decisionGuardada=true;
+  if(st.screen==='resumen')renderHistorial();
 }
 
 /* ===== Espera persistente (con servidor) =====
@@ -760,6 +796,9 @@ async function cargarEspera(){
          srv:Object.assign(nuevoSrv(),{ep:s.codigo_episodio,pac:s.codigo_paciente}),remoto:true};
       WAIT.push(w);}
     w.desde=s.en_espera_desde;w.version=s.version;w.quien=s.profesional_estado;
+    /* El color guardado en el servidor manda (lo ven todas las compus). */
+    if(s.color_final){const i=LEVELS.findIndex(L=>L[0]===s.color_final);if(i>-1)w.lv=i;
+      if(s.decision_actual&&/Escalado manual/.test(s.decision_actual.motivo||''))w.esc=true;}
     if(!w.base)w.base=Date.parse(s.en_espera_desde);
   }
   /* Lo que ya no está en espera en el servidor (lo finalizó otro profesional) sale de la lista. */
@@ -812,7 +851,7 @@ $('#wList').addEventListener('click',e=>{
   if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
-  if(es){const ep=es.dataset.esc;if(escPending===ep){const w=WAIT.find(x=>x.ep===ep);w.lv=0;w.esc=true;w.min=0;if(w.base){w.base=Date.now();w.extra=0}recordarColor(w);escPending=null}else escPending=ep;renderWait()}
+  if(es){const ep=es.dataset.esc;if(escPending===ep){const w=WAIT.find(x=>x.ep===ep);w.lv=0;w.esc=true;w.min=0;if(w.base){w.base=Date.now();w.extra=0}recordarColor(w);guardarDecision(w,{decision:'modificada',color:'ROJO',motivo:'Escalado manual por deterioro en espera.'});escPending=null}else escPending=ep;renderWait()}
 });
 
 /* Acceso (demo: en el sistema real, usuarios locales con contraseña cifrada) */
