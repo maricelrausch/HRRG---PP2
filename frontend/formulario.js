@@ -481,9 +481,26 @@ $('#sinIA').addEventListener('click',async()=>{await guardarMediciones();st.manu
 const VALORES_MEDICION=['ta_sistolica','ta_diastolica','frecuencia_cardiaca','frecuencia_respiratoria','saturacion_o2','temperatura','glucemia','estado_conciencia','glasgow','dolor_intensidad','aspecto_general'];
 const nuevoSrv=()=>({ep:null,pac:null,medicion:null,nuevaToma:false,aviso:null});
 st.srv=nuevoSrv();
+/* Circuito de Maricel:
+   1) Con DNI: POST /api/demo/pacientes/identificar {dni} -> paciente.codigo_paciente (el mismo DNI siempre da el mismo código).
+   2) Ese código se usa para crear el episodio (una atención nueva).
+   3) Las atenciones anteriores se buscan con GET /api/demo/episodios?codigo_paciente=…
+   Sin DNI (paciente sin documento) se usa un código provisorio, como antes. */
 async function asegurarEpisodio(){
   if(st.srv.ep)return true;
-  const pac='PAC-'+Math.random().toString(36).slice(2,8).toUpperCase().padEnd(6,'0');
+  let pac='PAC-'+Math.random().toString(36).slice(2,8).toUpperCase().padEnd(6,'0');
+  st.srv.anteriores=null;st.srv.identificado=false;
+  if(st.dni){
+    const id=await TriageAPI.identificarPaciente(st.dni);
+    if(id.estado===401){location.href='index.html';return false}
+    if(!id.ok){$('#hint').textContent='No se pudo identificar al paciente por DNI: '+(id.datos.mensaje||'error del servidor')+' Tu texto se conservó.';$('#hint').classList.add('err');return false}
+    pac=id.datos.paciente.codigo_paciente;st.srv.identificado=true;
+    /* Atenciones anteriores (antes de crear la nueva, así no se cuenta a sí misma). */
+    if(!id.datos.paciente.creado){
+      const prev=await TriageAPI.episodiosDePaciente(pac);
+      if(prev.ok)st.srv.anteriores=prev.datos.episodios||[];
+    }else st.srv.anteriores=[];
+  }
   const r=await TriageAPI.crearEpisodio(pac);
   if(r.estado===401){location.href='index.html';return false}
   if(!r.ok){$('#hint').textContent='No se pudo crear el episodio: '+(r.datos.mensaje||'error del servidor')+' Tu texto se conservó.';$('#hint').classList.add('err');return false}
@@ -515,6 +532,26 @@ async function guardarMediciones(){
 }
 const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado'};
 const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)'};
+/* Atenciones anteriores del mismo paciente (mismo DNI). Cada una se puede abrir para ver su historial. */
+function htmlAnteriores(){
+  const a=st.srv.anteriores;
+  if(!st.srv.identificado)return '<div class="prev"><b>Atenciones anteriores:</b> paciente sin DNI, no se pueden buscar.</div>';
+  if(!a||!a.length)return '<div class="prev"><b>Atenciones anteriores:</b> es la primera atención registrada de este paciente.</div>';
+  const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
+  return '<div class="prev"><b>Atenciones anteriores ('+a.length+')</b><ul>'+a.map(e=>'<li>'+esc(hora(e.creado_en))+' · '+esc(e.codigo_episodio)+' · '+esc(e.profesional_usuario||'')+
+    ' <button type="button" class="linkbtn" data-prev="'+esc(e.codigo_episodio)+'">ver historial</button><div class="prevdet" id="pd-'+esc(e.codigo_episodio)+'" hidden></div></li>').join('')+'</ul></div>';
+}
+async function verAnterior(ep){
+  const box=document.getElementById('pd-'+ep);if(!box)return;
+  if(!box.hidden){box.hidden=true;return}
+  box.hidden=false;box.textContent='cargando…';
+  const r=await TriageAPI.consultarEpisodio(ep);
+  if(!r.ok){box.textContent='No se pudo consultar: '+(r.datos.mensaje||'error');return}
+  const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
+  box.innerHTML='<ul>'+(r.datos.episodio.eventos||[]).map(e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+x).join(' · '):'';
+    return '<li>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+' · '+esc(hora(e.ocurrido_en))+(d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.color_final?' · '+esc(d.color_final):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'}).join('')+'</ul>';
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-prev]');if(b){e.preventDefault();verAnterior(b.dataset.prev)}});
 async function renderHistorial(){
   const box=$('#histBox');
   if(!TriageAPI.MODO_REAL||!st.srv.ep){box.hidden=true;return}
@@ -525,7 +562,7 @@ async function renderHistorial(){
   const fila=e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+x).join(' · '):'';
     return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(hora(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
       (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'};
-  box.innerHTML='<b>Historial guardado en el servidor</b> · '+esc(st.srv.ep)+(st.srv.aviso?'<br><span class="w">'+esc(st.srv.aviso)+'</span>':'')+
+  box.innerHTML=htmlAnteriores()+'<b>Historial guardado en el servidor</b> · '+esc(st.srv.ep)+(st.srv.aviso?'<br><span class="w">'+esc(st.srv.aviso)+'</span>':'')+
     '<ul>'+(r.datos.episodio.eventos||[]).map(fila).join('')+'</ul>';
 }
 $('#demoWorse').addEventListener('click',()=>{Object.assign(st.rev,{saturacion_o2:'86',frecuencia_cardiaca:'125',frecuencia_respiratoria:'26',br_disnea:true});renderForm()});

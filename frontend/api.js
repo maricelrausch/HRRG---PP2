@@ -122,6 +122,13 @@ function aUsuario(datos) {
     return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/estado',
       { method: 'POST', body: JSON.stringify({ estado: estado, version_esperada: versionEsperada }) });
   }
+  /* Paciente por DNI: el servidor devuelve un código interno (no repite el DNI). */
+  function identificarPaciente(dni) {
+    return pedir('/api/demo/pacientes/identificar', { method: 'POST', body: JSON.stringify({ dni: dni }) });
+  }
+  function episodiosDePaciente(codigoPaciente) {
+    return pedir('/api/demo/episodios?codigo_paciente=' + encodeURIComponent(codigoPaciente) + '&limite=20', { method: 'GET', cache: 'no-store' });
+  }
   function listarEspera() {
     return pedir('/api/demo/espera?limite=100', { method: 'GET', cache: 'no-store' });
   }
@@ -131,5 +138,6 @@ function aUsuario(datos) {
 
   root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
-    consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera };
+    consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
+    identificarPaciente: identificarPaciente, episodiosDePaciente: episodiosDePaciente };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
