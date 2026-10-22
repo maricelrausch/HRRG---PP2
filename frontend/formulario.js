@@ -976,6 +976,8 @@ if (TriageAPI.MODO_REAL) {
 (async function iniciarSesion(){
   st.user=await TriageAPI.sesion();
   if(!st.user){location.href='index.html';return}
+  if(st.user.debeCambiar){location.href='cambiar_password.html';return}
+  if(st.user.rol==='admin'){location.href='admin.html';return}
   if(st.user.modoExtraccion){st.modoServidor=st.user.modoExtraccion;renderSimbar()}
   const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
   $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+' <button type="button" class="linkbtn" id="logout">Salir</button>';

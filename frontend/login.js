@@ -12,8 +12,14 @@
     el.hidden = el.dataset.modo !== (api.MODO_REAL ? 'real' : 'demo');
   });
 
-  // Si ya hay sesión abierta, pasa directo al formulario
-  api.sesion().then(u => { if (u) location.href = 'formulario.html'; });
+  /* A dónde va cada perfil: cambio de contraseña pendiente, administración o formulario. */
+  function destino(u) {
+    if (u.debeCambiar) return 'cambiar_password.html';
+    return u.rol === 'admin' ? 'admin.html' : 'formulario.html';
+  }
+
+  // Si ya hay sesión abierta, pasa directo a su pantalla
+  api.sesion().then(u => { if (u) location.href = destino(u); });
 
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -25,7 +31,7 @@
     btn.disabled = false; btn.textContent = 'Ingresar';
     if (!r.ok) { mostrarError(r.mensaje); document.getElementById('lgPass').value = ''; return; }
     err.hidden = true;
-    location.href = 'formulario.html';
+    location.href = destino(r.usuario);
   });
 
   function mostrarError(msg) {

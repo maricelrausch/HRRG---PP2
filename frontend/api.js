@@ -99,6 +99,7 @@ function aUsuario(datos) {
     nom: datos.nombre,
     rol: datos.rol,
     modo: 'real',
+    debeCambiar: !!datos.debe_cambiar,
     modoExtraccion: datos.modo_extraccion || null
   };
 }
@@ -140,7 +141,12 @@ function aUsuario(datos) {
     return pedir('/api/demo/episodios/' + encodeURIComponent(episodio), { method: 'GET', cache: 'no-store' });
   }
 
-  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir,
+  /* Cambio de la propia contraseña (clave temporal o vencida). Devuelve { ok, estado, datos }. */
+  function cambiarPassword(actual, nueva) {
+    return pedir('/api/cuenta/password', { method: 'POST', body: JSON.stringify({ actual: actual, nueva: nueva }) });
+  }
+
+  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
     identificarPaciente: identificarPaciente, episodiosDePaciente: episodiosDePaciente, registrarDecision: registrarDecision };

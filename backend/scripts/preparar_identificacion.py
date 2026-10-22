@@ -7,6 +7,11 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet
 
+import sys
+
+# Permite importar src/ al correr el script desde backend: python scripts/preparar_identificacion.py
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from src.cifrado_identificacion import (
     RUTA_CLAVES,
     CifradoIdentificacion,
@@ -163,7 +168,7 @@ def main():
     if estado == "anterior" and not argumentos.migrar:
         raise RuntimeError(
             "La base necesita migracion. Con Flask detenido, ejecuta: "
-            "python preparar_identificacion.py --migrar"
+            "python scripts/preparar_identificacion.py --migrar"
         )
 
     preparar_claves(estado)

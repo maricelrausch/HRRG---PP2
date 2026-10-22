@@ -1,4 +1,4 @@
-"""backend/probar_ia.py · Prueba MedGemma sin levantar Flask.
+"""backend/scripts/probar_ia.py · Prueba MedGemma sin levantar Flask.
 Uso (desde backend):  python scripts/probar_ia.py
 """
 import json

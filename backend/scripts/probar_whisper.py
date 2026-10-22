@@ -1,9 +1,9 @@
-"""backend/probar_whisper.py · Mide qué configuración de Whisper es más rápida EN ESTA PC.
+"""backend/scripts/probar_whisper.py · Mide qué configuración de Whisper es más rápida EN ESTA PC.
 
 Uso (con la app cerrada, para que nada más use la CPU):
     cd C:\\Users\\LENOVO\\Documents\\HRRG---PP2\\backend
-    python probar_whisper.py                 # genera una frase de prueba con la voz de Windows
-    python probar_whisper.py mi_audio.wav    # o usa un audio tuyo (wav/mp3/webm)
+    python scripts/probar_whisper.py                 # genera una frase de prueba con la voz de Windows
+    python scripts/probar_whisper.py mi_audio.wav    # o usa un audio tuyo (wav/mp3/webm)
 
 Prueba modelos, hilos y beam; cada combinación se mide 3 veces (descartando el arranque)
 y muestra el tiempo promedio y el texto que salió.
