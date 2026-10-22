@@ -9,6 +9,9 @@ pydantic==2.13.5
 pytest==9.1.1
 chromadb==1.5.9
 faster-whisper==1.2.1   # dictado por voz local (backend/ia/transcripcion.py)
+av>=11,<19
+cryptography==43.0.0
+
 #Instalación:
 # python -m pip install -r requirements.txt
 
