@@ -18,6 +18,9 @@ import ollama
 MODELO = os.environ.get("MEDGEMMA_MODELO", "medgemma:4b")
 HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 KEEP_ALIVE = os.environ.get("MEDGEMMA_KEEP_ALIVE", "30m")   # cuánto queda cargado el modelo sin uso
+# Hilos de CPU para MedGemma. Vacío = los que elija Ollama (todos los núcleos físicos).
+# Para repartir la CPU con Whisper: MEDGEMMA_HILOS=4, por ejemplo.
+HILOS = int(os.environ.get("MEDGEMMA_HILOS") or 0)
 NIVELES = {"ROJO": 0, "NARANJA": 1, "AMARILLO": 2, "VERDE": 3, "AZUL": 4}
 
 CATEGORIAS = ["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
@@ -46,6 +49,8 @@ def _chat(system, user, schema=None, historial=None, max_tokens=None):
         mensajes.append({"role": "assistant", "content": h["respuesta"]})
     mensajes.append({"role": "user", "content": user})
     opciones = {"temperature": 0}
+    if HILOS:
+        opciones["num_thread"] = HILOS
     if max_tokens:
         opciones["num_predict"] = max_tokens
     r = _cli.chat(model=MODELO, messages=mensajes, format=schema,
