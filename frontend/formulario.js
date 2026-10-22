@@ -78,13 +78,21 @@ function reglas(){
 function medgemma(){
   const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),why=[];let lv=3;
   const d=n('dolor_intensidad');
-  if(d!=null&&d>=5&&d<8){lv=2;why.push((r.motivo_categoria||'Dolor')+' moderado ('+d+'/10)'+(r.tiempo_evolucion_valor?' de '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad:''))}
+  /* El motivo va siempre primero: categoría + lo que dijo el paciente + tiempo de evolución */
+  const cat=(r.motivo_categoria||'').trim(),mc=(r.motivo_consulta||'').trim();
+  if(cat||mc){
+    const det=mc&&mc.toLowerCase()!==cat.toLowerCase()?mc.toLowerCase():'';
+    const tpo=r.tiempo_evolucion_valor?' (hace '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad+')':'';
+    why.push('Motivo: '+(cat&&det?cat+' — '+det:(cat||mc))+tpo);
+  }
+  const base=why.length;
+  if(d!=null&&d>=5&&d<8){lv=2;why.push('Dolor moderado ('+d+'/10)')}
   const t=n('temperatura');if(t!=null&&t>=37.5&&t<38.5){lv=Math.min(lv,2);why.push('Febrícula ('+r.temperatura+' °C)')}
   if(t!=null&&t>=38.5){lv=Math.min(lv,2);why.push('Fiebre ('+r.temperatura+' °C)')}
   if(r.ant_diabetes)why.push('Diabetes'+(n('glucemia')>=250?' con glucemia '+r.glucemia+' mg/dL':''));
   if(r.sintomas_asociados)why.push('Refiere: '+r.sintomas_asociados.toLowerCase());
   if(d!=null&&d<=2&&!(t>=37.5)&&lv===3)lv=4;
-  if(!why.length)why.push('Sin discriminadores de mayor urgencia en los datos');
+  if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
   return {lv,why};
 }
 function calcSug(){
@@ -494,7 +502,7 @@ async function asegurarEpisodio(){
     const id=await TriageAPI.identificarPaciente(st.dni);
     if(id.estado===401){location.href='index.html';return false}
     if(!id.ok){$('#hint').textContent='No se pudo identificar al paciente por DNI: '+(id.datos.mensaje||'error del servidor')+' Tu texto se conservó.';$('#hint').classList.add('err');return false}
-    pac=id.datos.paciente.codigo_paciente;st.srv.identificado=true;
+    pac=id.datos.paciente.codigo_paciente;st.srv.identificado=true;DNI_PAC[st.dni]=pac;
     /* Atenciones anteriores (antes de crear la nueva, así no se cuenta a sí misma). */
     if(!id.datos.paciente.creado){
       const prev=await TriageAPI.episodiosDePaciente(pac);
@@ -708,6 +716,8 @@ const WAIT=[
   {ep:'EP-004806',lv:4,mot:'Control de curación',min:150,relato:'Vengo a que me miren la herida de la mano, me la hicieron hace tres días.',rev:mk({motivo_categoria:'Otro',motivo_consulta:'Control de herida en la mano',tiempo_evolucion_valor:'3',tiempo_evolucion_unidad:'días',dolor_localizacion:'Mano izquierda',sintomas_asociados:'',ant_diabetes:false,antecedentes_otros:'',ta_sistolica:'118',ta_diastolica:'76',frecuencia_cardiaca:'72',frecuencia_respiratoria:'14',saturacion_o2:'99',temperatura:'36,4',estado_conciencia:'Alerta',dolor_intensidad:'1'})}
 ];
 let escPending=null,finPending=null;
+/* DNI -> código de paciente, solo en memoria de esta pestaña (no se guarda en el navegador). */
+const DNI_PAC={};
 /* Con servidor, la lista arranca vacía: solo muestra episodios guardados (sin pacientes de ejemplo). */
 if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
@@ -835,12 +845,18 @@ function clock(w){
 }
 function renderWait(){
   const q=($('#epSearch').value||'').trim().toUpperCase();
-  const rows=WAIT.filter(w=>!q||w.ep.includes(q)).sort((a,b)=>(a.lv??9)-(b.lv??9)||minutos(b)-minutos(a));
+  /* Si se escriben solo números (con o sin puntos) se busca por DNI; si no, por código de episodio.
+     Por DNI se encuentran: los episodios cargados con ese DNI en esta pestaña y, si el paciente ya se
+     identificó en esta sesión, todos sus episodios en espera (por su código de paciente). */
+  const qDni=/^[\d.\s]+$/.test(q)?q.replace(/[.\s]/g,''):'';
+  const pacDeDni=qDni&&DNI_PAC[qDni];
+  const coincide=w=>!q||(qDni?((w.dni||'').startsWith(qDni)||(!!pacDeDni&&w.srv&&w.srv.pac===pacDeDni)):w.ep.includes(q));
+  const rows=WAIT.filter(coincide).sort((a,b)=>(a.lv??9)-(b.lv??9)||minutos(b)-minutos(a));
   $('#wCount').textContent=WAIT.length+' pacientes';
   const ro=st.user&&st.user.rol==='auditor';
   $('#wList').innerHTML=rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||'<div class="hint">No hay episodios con ese código.</div>';
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||(qDni?'<div class="hint">No hay pacientes en espera con ese DNI cargado en esta sesión. Para encontrar pacientes identificados desde otra compu hace falta una ruta de búsqueda por DNI en el servidor (pedida a Maricel).</div>':'<div class="hint">No hay episodios con ese código.</div>');
 }
 $('#epSearch').addEventListener('input',renderWait);
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
