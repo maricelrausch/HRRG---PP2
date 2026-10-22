@@ -19,12 +19,11 @@ const SPECS={
     ['3','Banderas rojas y antecedentes con un toque. Lo que mencionó el paciente ya viene marcado.'],
     ['4','Avisa faltantes, rangos y discordancias. Con 3 o más vitales sin medir no se emite prioridad (RF-10). “Clasificar sin IA” siempre disponible (§6).']],src:'Doc. técnico V1.1 · Cuestionario §2 · RNF-01'},
   resumen:{t:'Pantalla 3 · Sugerencia',items:[
-    ['1','Color Manchester sugerido, grande, con su origen: regla de seguridad o extracción + guía (hoy: simulado).'],
+    ['1','Color Manchester sugerido, grande (hoy: simulado con reglas de ejemplo).'],
     ['2','Por qué, con cada motivo marcado REGLA o IA. Las reglas fijan un piso: la IA no puede sugerir menos (no downgrade).'],
     ['3','Aceptar con un toque. Modificar o Rechazar piden motivo.'],
-    ['4','Lo que entendió la IA del relato, corregible. La decisión final es del profesional.'],
+    ['4','Corregir datos del relato: lo que extrajo la IA se puede corregir acá. La decisión final es del profesional.'],
     ['5','Reglas provisorias de ejemplo: los umbrales los aprueban Guardia y Enfermería.'],
-    ['F','Fuente: cada sugerencia cita el diagrama, nivel y discriminador de la guía oficial (en el sistema real; hoy, guía de ejemplo), con el fragmento para verificarlo (trazabilidad).'],
     ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No y recalculan al instante (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
   espera:{t:'Pantalla 4 · En espera',items:[
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],

@@ -222,6 +222,7 @@ fieldset.grp legend{font-family:var(--f-display);font-weight:600;font-size:15px;
 .ia-line .ia-tag{font-size:10px;padding:1px 6px;background:var(--accent-soft);color:var(--accent-text)}
 .ia-line details{width:100%}
 .ia-line details summary{cursor:pointer;color:var(--accent-text);text-decoration:underline;width:max-content;font-size:12px}
+.ia-line details summary .n{display:inline-flex;text-decoration:none;margin:0 4px 0 6px;vertical-align:middle}
 .ia-line details .g{margin-top:8px}
 details.more{border:1px solid var(--line);border-radius:10px;padding:10px 14px}
 details.more[open]{display:flex;flex-direction:column;gap:12px}
