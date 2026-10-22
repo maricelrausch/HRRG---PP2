@@ -738,6 +738,18 @@ const WAIT=[
 let escPending=null,finPending=null;
 /* DNI -> código de paciente, solo en memoria de esta pestaña (no se guarda en el navegador). */
 const DNI_PAC={};
+/* Búsqueda en el servidor por DNI completo (7 u 8 dígitos): encuentra pacientes identificados desde
+   cualquier compu. Resultado por DNI: 'buscando' | 'no' (no existe) | 'error'. No crea pacientes. */
+const DNI_BUSQ={};
+async function buscarDniServidor(dni){
+  if(!TriageAPI.MODO_REAL||!/^\d{7,8}$/.test(dni)||DNI_PAC[dni]||DNI_BUSQ[dni])return;
+  DNI_BUSQ[dni]='buscando';
+  const r=await TriageAPI.buscarPaciente(dni);
+  if(r.estado===401){location.href='index.html';return}
+  if(r.ok&&r.datos.paciente){DNI_PAC[dni]=r.datos.paciente.codigo_paciente;delete DNI_BUSQ[dni]}
+  else DNI_BUSQ[dni]=r.estado===404?'no':'error';
+  if(st.screen==='espera')renderWait();
+}
 /* Con servidor, la lista arranca vacía: solo muestra episodios guardados (sin pacientes de ejemplo). */
 if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
@@ -869,16 +881,26 @@ function renderWait(){
      Por DNI se encuentran: los episodios cargados con ese DNI en esta pestaña y, si el paciente ya se
      identificó en esta sesión, todos sus episodios en espera (por su código de paciente). */
   const qDni=/^[\d.\s]+$/.test(q)?q.replace(/[.\s]/g,''):'';
+  if(qDni)buscarDniServidor(qDni);
   const pacDeDni=qDni&&DNI_PAC[qDni];
+  /* Los episodios de ese paciente que vinieron de otra compu muestran el DNI buscado. */
+  if(pacDeDni)WAIT.forEach(w=>{if(w.srv&&w.srv.pac===pacDeDni&&!w.dni)w.dni=qDni});
   const coincide=w=>!q||(qDni?((w.dni||'').startsWith(qDni)||(!!pacDeDni&&w.srv&&w.srv.pac===pacDeDni)):w.ep.includes(q));
   const rows=WAIT.filter(coincide).sort((a,b)=>(a.lv??9)-(b.lv??9)||minutos(b)-minutos(a));
   $('#wCount').textContent=WAIT.length+' pacientes';
   const ro=st.user&&st.user.rol==='auditor';
   $('#wList').innerHTML=rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||(qDni?'<div class="hint">No hay pacientes en espera con ese DNI cargado en esta sesión. Para encontrar pacientes identificados desde otra compu hace falta una ruta de búsqueda por DNI en el servidor (pedida a Maricel).</div>':'<div class="hint">No hay episodios con ese código.</div>');
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
+    :!TriageAPI.MODO_REAL?'No hay pacientes en espera con ese DNI.'
+    :!/^\d{7,8}$/.test(qDni)?'Escribí el DNI completo (7 u 8 dígitos) para buscarlo en el servidor.'
+    :DNI_BUSQ[qDni]==='buscando'?'Buscando el DNI en el servidor…'
+    :DNI_BUSQ[qDni]==='no'?'No hay ningún paciente identificado con ese DNI.'
+    :DNI_BUSQ[qDni]==='error'?'No se pudo consultar el DNI en el servidor. Probá de nuevo.'
+    :'El paciente está identificado, pero no tiene episodios en espera.')+'</div>';
 }
-$('#epSearch').addEventListener('input',renderWait);
+/* Al escribir de nuevo se puede volver a consultar un DNI que antes no estaba o dio error. */
+$('#epSearch').addEventListener('input',()=>{for(const k in DNI_BUSQ)if(DNI_BUSQ[k]!=='buscando')delete DNI_BUSQ[k];renderWait()});
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
 setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera')renderWait()},1000);
 $('#wList').addEventListener('click',e=>{
