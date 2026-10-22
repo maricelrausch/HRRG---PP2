@@ -282,6 +282,9 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .wt{color:var(--muted);font-size:13px;min-width:96px}
 .wf{display:flex;gap:6px;flex-wrap:wrap}
 .wa{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.escform{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:8px;font-size:13px}
+.escform select,.escform input{flex:1 1 200px;min-width:0}
+.escform .row{display:flex;gap:6px}
 .btn.sm{min-height:40px;padding:0 12px;font-size:13px}
 .btn.esc{color:var(--err);border-color:var(--err)}
 .btn.esc.armed{background:var(--err);color:var(--panel);border-color:var(--err)}

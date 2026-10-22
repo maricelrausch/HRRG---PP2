@@ -736,6 +736,18 @@ const WAIT=[
   {ep:'EP-004806',lv:4,mot:'Control de curación',min:150,relato:'Vengo a que me miren la herida de la mano, me la hicieron hace tres días.',rev:mk({motivo_categoria:'Otro',motivo_consulta:'Control de herida en la mano',tiempo_evolucion_valor:'3',tiempo_evolucion_unidad:'días',dolor_localizacion:'Mano izquierda',sintomas_asociados:'',ant_diabetes:false,antecedentes_otros:'',ta_sistolica:'118',ta_diastolica:'76',frecuencia_cardiaca:'72',frecuencia_respiratoria:'14',saturacion_o2:'99',temperatura:'36,4',estado_conciencia:'Alerta',dolor_intensidad:'1'})}
 ];
 let escPending=null,finPending=null;
+/* Escalar a ROJO desde En espera: pide el motivo (obligatorio) y queda en la decisión guardada. */
+let escForm={mot:'',det:''};
+const MOTIVOS_ESC=['Deterioro del estado general','Empeoraron los signos vitales','Alteración de la conciencia','Dificultad respiratoria','Dolor que aumentó o no cede','Sangrado','Otro'];
+function textoEscalado(mot,det){return 'Escalado manual por deterioro en espera: '+mot+(det?'. '+det:'')+'.'}
+function motivoEscalado(txt){const m=/Escalado manual[^:]*:\s*(.+?)\.?$/.exec(txt||'');return m?m[1]:''}
+function htmlEscForm(w){
+  const ep=esc(w.ep),ok=!!escForm.mot&&(escForm.mot!=='Otro'||!!escForm.det.trim());
+  return '<div class="escform"><b>Escalar a ROJO · motivo (obligatorio)</b>'+
+    '<select data-escmot="'+ep+'"><option value="">Seleccionar…</option>'+MOTIVOS_ESC.map(o=>'<option'+(o===escForm.mot?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
+    '<input data-escdet="'+ep+'" maxlength="300" value="'+esc(escForm.det)+'" placeholder="'+(escForm.mot==='Otro'?'Contá qué observaste (obligatorio)':'Detalle (opcional): qué observaste')+'">'+
+    '<span class="row"><button type="button" class="btn sm esc armed" data-escok="'+ep+'"'+(ok?'':' disabled')+'>Confirmar ROJO</button><button type="button" class="btn sm" data-escno="'+ep+'">Cancelar</button></span></div>';
+}
 /* DNI -> código de paciente, solo en memoria de esta pestaña (no se guarda en el navegador). */
 const DNI_PAC={};
 /* Búsqueda en el servidor por DNI completo (7 u 8 dígitos): encuentra pacientes identificados desde
@@ -840,7 +852,7 @@ async function cargarEspera(){
     w.desde=s.en_espera_desde;w.version=s.version;w.quien=s.profesional_estado;
     /* El color guardado en el servidor manda (lo ven todas las compus). */
     if(s.color_final){const i=LEVELS.findIndex(L=>L[0]===s.color_final);if(i>-1)w.lv=i;
-      if(s.decision_actual&&/Escalado manual/.test(s.decision_actual.motivo||''))w.esc=true;}
+      if(s.decision_actual&&/Escalado manual/.test(s.decision_actual.motivo||'')){w.esc=true;w.escMot=motivoEscalado(s.decision_actual.motivo)}}
     if(!w.base)w.base=Date.parse(s.en_espera_desde);
   }
   /* Lo que ya no está en espera en el servidor (lo finalizó otro profesional) sale de la lista. */
@@ -891,7 +903,7 @@ function renderWait(){
   const ro=st.user&&st.user.rol==='auditor';
   $('#wList').innerHTML=rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual'+(w.escMot?': '+esc(w.escMot):' · deterioro en espera')+'</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button>'+(escPending===w.ep?'':'<button type="button" class="btn sm esc" data-esc="'+esc(w.ep)+'">Escalar a ROJO</button>'):'<span class="hint">Atención inmediata</span>')+fin)+'</span>'+(!ro&&escPending===w.ep?htmlEscForm(w):'')+'</div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
     :!TriageAPI.MODO_REAL?'No hay pacientes en espera con ese DNI.'
     :!/^\d{7,8}$/.test(qDni)?'Escribí el DNI completo (7 u 8 dígitos) para buscarlo en el servidor.'
     :DNI_BUSQ[qDni]==='buscando'?'Buscando el DNI en el servidor…'
@@ -902,15 +914,25 @@ function renderWait(){
 /* Al escribir de nuevo se puede volver a consultar un DNI que antes no estaba o dio error. */
 $('#epSearch').addEventListener('input',()=>{for(const k in DNI_BUSQ)if(DNI_BUSQ[k]!=='buscando')delete DNI_BUSQ[k];renderWait()});
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
-setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera')renderWait()},1000);
+setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera'&&!escPending)renderWait()},1000);
 $('#wList').addEventListener('click',e=>{
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]'),fi=e.target.closest('[data-fin]');
   if(fi){const ep=fi.dataset.fin;if(finPending===ep){finPending=null;const w=WAIT.find(x=>x.ep===ep);if(w)finalizar(w)}else{finPending=ep;renderWait()}return}
   if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
-  if(es){const ep=es.dataset.esc;if(escPending===ep){const w=WAIT.find(x=>x.ep===ep);w.lv=0;w.esc=true;w.min=0;if(w.base){w.base=Date.now();w.extra=0}recordarColor(w);guardarDecision(w,{decision:'modificada',color:'ROJO',motivo:'Escalado manual por deterioro en espera.'});escPending=null}else escPending=ep;renderWait()}
+  if(es){escPending=es.dataset.esc;escForm={mot:'',det:''};renderWait();const sel=$('[data-escmot]');if(sel)sel.focus();return}
+  const no=e.target.closest('[data-escno]');if(no){escPending=null;renderWait();return}
+  const ok=e.target.closest('[data-escok]');
+  if(ok&&!ok.disabled){const w=WAIT.find(x=>x.ep===ok.dataset.escok);if(!w)return;
+    w.lv=0;w.esc=true;w.escMot=escForm.mot+(escForm.det.trim()?'. '+escForm.det.trim():'');w.min=0;if(w.base){w.base=Date.now();w.extra=0}
+    recordarColor(w);guardarDecision(w,{decision:'modificada',color:'ROJO',motivo:textoEscalado(escForm.mot,escForm.det.trim())});
+    escPending=null;escForm={mot:'',det:''};renderWait()}
 });
+/* El formulario de escalado guarda lo escrito aunque la lista se vuelva a dibujar. */
+$('#wList').addEventListener('change',e=>{if(e.target.dataset.escmot!=null){escForm.mot=e.target.value;renderWait();const i=$('[data-escdet]');if(i)i.focus()}});
+$('#wList').addEventListener('input',e=>{if(e.target.dataset.escdet!=null){escForm.det=e.target.value;
+  const b=$('[data-escok]');if(b)b.disabled=!(escForm.mot&&(escForm.mot!=='Otro'||escForm.det.trim()))}});
 
 /* Acceso (demo: en el sistema real, usuarios locales con contraseña cifrada) */
 
