@@ -762,6 +762,8 @@ async function buscarDniServidor(dni){
   else DNI_BUSQ[dni]=r.estado===404?'no':'error';
   if(st.screen==='espera')renderWait();
 }
+/* Chat "Consultar a la IA": con servidor responde MedGemma local (js/chat_ia.js), no la simulación. */
+if(TriageAPI.MODO_REAL&&$('.chat-warn'))$('.chat-warn').innerHTML='<b>MedGemma local.</b> Responde sobre los datos de este caso. No diagnostica ni indica tratamientos: esas preguntas se bloquean. La decisión es del profesional.';
 /* Con servidor, la lista arranca vacía: solo muestra episodios guardados (sin pacientes de ejemplo). */
 if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
