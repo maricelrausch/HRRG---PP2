@@ -90,8 +90,11 @@ function medgemma(){
 function calcSug(){
   const R=reglas(),M=medgemma(),rl=R.length?Math.min(...R.map(x=>x.lv)):9;
   const C=Object.entries(st.disc).filter(([k,v])=>v==='si').map(([k])=>{const [lv,t]=k.split('|');return {lv:+lv,t}});
-  const cl=C.length?Math.min(...C.map(x=>x.lv)):9,fin=Math.min(rl,M.lv,cl);
-  return {R,M,C,rl,cl,fin};
+  const cl=C.length?Math.min(...C.map(x=>x.lv)):9;
+  /* Reevaluación: el color anterior (aceptado o modificado por el profesional) es un piso, como las reglas.
+     Para bajar la prioridad hay que usar Modificar con motivo. */
+  const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl);
+  return {R,M,C,rl,cl,pl,fin};
 }
 function renderCard(){
   const c=calcSug();SUG=c.fin;const L=LEVELS[SUG];
@@ -101,8 +104,24 @@ function renderCard(){
   $('#tcOrigin').innerHTML=c.rl<c.M.lv?'<b>Color fijado por regla de seguridad.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'; la regla no permite bajar.</span><span class="prov">Reglas provisorias</span>'
     :(c.R.length?'<b>Simulación con reglas de ejemplo.</b><span class="old">Coincide o supera las reglas de seguridad.</span>':'<b>Simulación con reglas de ejemplo.</b><span class="old">Reglas de seguridad: sin alertas.</span>');
   if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
-  $('#tcWhy').innerHTML=c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
-  renderFuente();renderSubir();
+  if(c.pl<Math.min(c.rl,c.M.lv,c.cl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
+  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
+  renderFuente();renderSubir();pintarDecision();
+}
+/* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
+   La sugerencia original queda escrita debajo (trazabilidad). */
+function pintarDecision(){
+  const ceja=$('#triageCard .eyebrow'),tag=$('#triageCard .ia-tag'),n=ceja.querySelector('.n'),nH=n?' '+n.outerHTML:'';
+  const fl=(st.decision==='modificar'||st.decision==='rechazar')&&st.level!=null?st.level:null;
+  if(fl==null){
+    if(!/Prioridad|MedGemma|Sin IA/.test(ceja.textContent))ceja.innerHTML='Prioridad de ejemplo · simulada'+nH;
+    tag.textContent=st.decision==='aceptar'?'Sugerencia aceptada':'Sugerencia · requiere validación';return}
+  const L=LEVELS[fl],acc=st.decision==='modificar'?'modificada':'rechazada';
+  $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
+  $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[fl]+' [tiempo de ejemplo]';
+  ceja.innerHTML='Clasificación final · decidida por el profesional'+nH;tag.textContent='Decisión registrada';
+  if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
+  $('#tcOrigin').innerHTML='<b>Sugerencia '+LEVELS[SUG][0]+' '+acc+' a '+L[0]+' por el profesional.</b><span class="old">Motivo: '+esc($('#motivo').value||'—')+'</span>';
 }
 /* Trazabilidad: fragmento de la guía que respalda el color */
 function renderFuente(){
@@ -659,7 +678,7 @@ function renderReg(){
 
 $('#levels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-l="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'" title="'+L[3]+'">'+L[0]+'</button>').join('');
 document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
-  const d=b.dataset.d;st.decision=null;st.level=null;
+  const d=b.dataset.d;st.decision=null;st.level=null;renderCard();
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed',x===b));
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#modForm').hidden=d==='aceptar';$('#motivoForm').hidden=d==='aceptar';$('#lowerBox').hidden=true;
@@ -681,7 +700,7 @@ $('#motivo').addEventListener('change',updReg);$('#lowerOk').addEventListener('c
 $('#registrar').addEventListener('click',()=>{
   const d=$('#registrar').dataset.d;st.decision=d;commit(st.level);$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#okMsg').hidden=false;
   $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+(st.level>SUG?' · Discrepancia registrada.':''):'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+(st.level>SUG?' · Discrepancia registrada.':'');
-  renderReg();
+  renderCard();renderReg();
 });
 $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderResumen()});
 function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
