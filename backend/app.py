@@ -1855,17 +1855,10 @@ def evitar_cache_identificacion(respuesta):
     return respuesta
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-
-
-    app.run(debug=True)
-=======
+    from ia.chat import precargar_modelos
+    precargar_modelos()   # Whisper primero y después MedGemma, sin frenar el arranque de Flask
     app.run(
         host="0.0.0.0", # Permite que Flask escuche en las interfaces de red de la computadora.
         port=5000, # Puerto elegido para ejecutarse
         debug=False # Evita habilitar el depurador interactivo de Flask, que no debe exponerse a otros dispositivos.
     )
-
-
-
->>>>>>> origin/tomas
