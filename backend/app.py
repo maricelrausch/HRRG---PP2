@@ -29,7 +29,9 @@ from werkzeug.exceptions import BadRequest
 from src.identificacion import (
     inicializar_identificacion,
     identificar_paciente_demo,
+    buscar_paciente_por_dni,
 )
+from src.cifrado_identificacion import ErrorCifradoIdentificacion
 import os
 import math
 import time
@@ -315,6 +317,7 @@ def verificar_acceso():
         "voz.transcribir",
         "guardar_decision_demo",
         "identificar_paciente",
+        "buscar_paciente",
     }
 
     if request.endpoint not in rutas_protegidas:
@@ -343,7 +346,7 @@ def verificar_acceso():
 
     g.profesional = profesional
 
-    # El auditor solo puede usar las consultas autorizadas.
+        # El auditor puede consultar información, pero no modificarla.
     if profesional["rol"] == "auditor":
         consultas_permitidas = {
             "consultar_sesion",
@@ -353,16 +356,25 @@ def verificar_acceso():
             "consultar_espera_demo",
         }
 
-        if (
-            request.endpoint not in consultas_permitidas
-            or request.method not in {"GET", "HEAD"}
-        ):
+        consulta_get = (
+            request.endpoint in consultas_permitidas
+            and request.method in {"GET", "HEAD"}
+        )
+
+        # Esta consulta utiliza POST para enviar el DNI en el cuerpo
+        # y evitar incluirlo en la URL. No crea ni modifica registros.
+        consulta_dni = (
+            request.endpoint == "buscar_paciente"
+            and request.method == "POST"
+        )
+
+        if not (consulta_get or consulta_dni):
             return respuesta_error(
                 "Tu perfil tiene acceso de solo lectura.",
                 403,
                 "PERMISO_DENEGADO"
             )
-
+        
     return None
 #---------------------------------------
 # Alta de cuentas desde la terminal de administración.
@@ -1726,6 +1738,14 @@ def identificar_paciente():
             422,
             "IDENTIFICACION_INVALIDA"
         )
+        # Devuelve un error seguro si faltan las claves o falla su verificación.
+    except ErrorCifradoIdentificacion:
+        logger_sistema.error("ERROR_CIFRADO_IDENTIFICAR_PACIENTE")
+        return respuesta_error(
+            "El servicio de identificación no está disponible.",
+            503,
+            "IDENTIFICACION_NO_DISPONIBLE"
+        )
     except sqlite3.Error:
         # Registra el fallo sin incluir el DNI.
         logger_sistema.error("ERROR_IDENTIFICAR_PACIENTE_DEMO")
@@ -1744,6 +1764,95 @@ def identificar_paciente():
     respuesta.headers["Cache-Control"] = "no-store"
 
     return respuesta, 201 if paciente["creado"] else 200
+# Busca una identificación existente por DNI.
+# Devuelve el código interno sin crear pacientes ni episodios.
+# La sesión y el rol se verifican en verificar_acceso().
+@app.route("/api/demo/pacientes/buscar", methods=["POST"])
+def buscar_paciente():
+    # Exige JSON y evita recibir el DNI mediante parámetros de URL.
+    if request.args:
+        return respuesta_error(
+            "Enviá el DNI únicamente en el cuerpo JSON.",
+            400,
+            "PARAMETROS_INVALIDOS"
+        )
+
+    if not request.is_json:
+        return respuesta_error(
+            "Enviá el contenido como application/json.",
+            415,
+            "FORMATO_NO_ADMITIDO"
+        )
+
+    # Distingue un JSON mal formado de una estructura incorrecta.
+    try:
+        datos = request.get_json()
+    except BadRequest:
+        return respuesta_error(
+            "El JSON enviado no es válido.",
+            400,
+            "JSON_INVALIDO"
+        )
+
+    if not isinstance(datos, dict) or set(datos) != {"dni"}:
+        return respuesta_error(
+            "Enviá únicamente el campo dni.",
+            400,
+            "CAMPOS_INVALIDOS"
+        )
+
+    # Consulta la identificación cifrada mediante una conexión de lectura.
+    try:
+        paciente = buscar_paciente_por_dni(
+            ruta_base=BASE_REGISTRO_DEMO,
+            dni=datos["dni"]
+        )
+    except ValueError as error:
+        return respuesta_error(
+            str(error),
+            422,
+            "IDENTIFICACION_INVALIDA"
+        )
+    except ErrorCifradoIdentificacion:
+        # No incluye documentos, claves ni detalles internos en el registro.
+        logger_sistema.error("ERROR_CIFRADO_BUSCAR_PACIENTE")
+        return respuesta_error(
+            "El servicio de identificación no está disponible.",
+            503,
+            "IDENTIFICACION_NO_DISPONIBLE"
+        )
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_BUSCAR_PACIENTE")
+        return respuesta_error(
+            "No se pudo consultar la identificación.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    # Un DNI desconocido no genera automáticamente un paciente nuevo.
+    if paciente is None:
+        return respuesta_error(
+            "No se encontró un paciente con ese DNI.",
+            404,
+            "PACIENTE_NO_ENCONTRADO"
+        )
+
+    respuesta = jsonify({
+        "ok": True,
+        "modo": "demo",
+        "paciente": paciente
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+
+# Evita almacenar respuestas de identificación en cachés,
+# incluyendo los errores y los rechazos por falta de permisos.
+@app.after_request
+def evitar_cache_identificacion(respuesta):
+    if request.endpoint in {"identificar_paciente", "buscar_paciente"}:
+        respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
 
 if __name__ == "__main__":
 
