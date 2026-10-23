@@ -28,7 +28,7 @@ const SPECS={
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],
     ['2','Marca a quien superó el tiempo objetivo de su color (tiempos según guía HRRG).'],
     ['3','Reevaluar abre el mismo episodio con los datos anteriores. La tarjeta muestra antes → ahora y el registro guarda las dos versiones.'],
-    ['4','Escalar a ROJO con dos toques, sin cargar datos. La Guardia no depende de la IA (RNF-04).'],
+    ['4','Escalar a ROJO rápido, sin volver a cargar datos: solo se elige el motivo (y un detalle si hace falta), que queda registrado. La Guardia no depende de la IA (RNF-04).'],
     ['⏱','Reloj de reevaluación: cuenta regresiva según el tiempo objetivo de cada color; al vencerse parpadea y pide reevaluar.']],src:'Doc. técnico V1.1 · Re-triage · Cuestionario §6'}
 };
 const LEVELS=[['ROJO','--m-rojo','#FFFFFF','Inmediato'],['NARANJA','--m-naranja','#1A1D26','Muy urgente · 10 min'],['AMARILLO','--m-amarillo','#1A1D26','Urgente · 60 min'],['VERDE','--m-verde','#FFFFFF','Normal · 120 min'],['AZUL','--m-azul','#FFFFFF','No urgente · 240 min']];
