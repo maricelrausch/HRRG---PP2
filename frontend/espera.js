@@ -59,7 +59,7 @@ function commit(lv){
    - "Finalizar" lo pasa a "finalizado" (atendido) y sale de la lista.
    - El color sale SOLO de la decisión guardada en el servidor (color_final). Ya no hay respaldo en la
      pestaña (sessionStorage): si la decisión no se pudo guardar, la fila lo avisa y al recargar queda "Sin color".
-   - El motivo (categoría) todavía no lo devuelve el servidor: en filas que vienen del servidor se ve "—". */
+   - El motivo (categoría) y el DNI vienen del servidor (datos de ingreso guardados; DNI solo para enfermería y médicos). */
 async function versionEstado(ep){
   const r=await TriageAPI.consultarEstado(ep);
   if(r.estado===401){location.href='index.html';return null}
@@ -91,6 +91,9 @@ async function cargarEspera(){
          srv:Object.assign(nuevoSrv(),{ep:s.codigo_episodio,pac:s.codigo_paciente}),remoto:true};
       WAIT.push(w);}
     w.desde=s.en_espera_desde;w.version=s.version;w.quien=s.profesional_estado;
+    /* Desde 23/10 el servidor devuelve el motivo del último ingreso y, a enfermería y médicos, el DNI. */
+    if(s.motivo_categoria&&(w.remoto||!w.mot||w.mot==='—'))w.mot=s.motivo_categoria;
+    if(s.dni&&!w.dni){w.dni=s.dni;DNI_PAC[s.dni]=s.codigo_paciente}
     /* El color guardado en el servidor manda (lo ven todas las compus). */
     if(s.color_final){const i=LEVELS.findIndex(L=>L[0]===s.color_final);if(i>-1)w.lv=i;
       if(s.decision_actual&&/Escalado manual/.test(s.decision_actual.motivo||'')){w.esc=true;w.escMot=motivoEscalado(s.decision_actual.motivo)}}
@@ -115,9 +118,16 @@ async function finalizar(w){
 async function recuperarUltimaMedicion(w){
   const r=await TriageAPI.consultarEpisodio(w.ep);
   if(!r.ok)return;
-  const ev=(r.datos.episodio.eventos||[]).filter(e=>e.tipo==='MEDICION_REGISTRADA'||e.tipo==='MEDICION_CORREGIDA').pop();
-  if(!ev||!ev.datos||!ev.datos.valores)return;
-  for(const [k,v] of Object.entries(ev.datos.valores))if(k in st.rev&&v!=null)st.rev[k]=String(v).replace('.',',');
+  const eventos=r.datos.episodio.eventos||[];
+  /* Datos de ingreso (motivo, edad, sexo, banderas…) y última medición: se reevalúa sobre lo que ya se cargó. */
+  const ing=eventos.filter(e=>e.tipo==='DATOS_INGRESO_REGISTRADOS').pop();
+  if(ing&&ing.datos&&ing.datos.valores){
+    for(const [k,v] of Object.entries(ing.datos.valores))if(k in st.rev&&v!=null)st.rev[k]=typeof v==='boolean'?v:String(v).replace('.',',');
+    st.srv.ingreso=null;
+  }
+  const ev=eventos.filter(e=>e.tipo==='MEDICION_REGISTRADA'||e.tipo==='MEDICION_CORREGIDA').pop();
+  if(ev&&ev.datos&&ev.datos.valores)
+    for(const [k,v] of Object.entries(ev.datos.valores))if(k in st.rev&&v!=null)st.rev[k]=String(v).replace('.',',');
   w.rev=JSON.parse(JSON.stringify(st.rev));
 }
 /* Minutos en espera: con servidor se cuentan desde la hora real; el modo "tiempo acelerado" suma minutos. */

@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime, timezone
-from src.esquemas import Mediciones
+from src.esquemas import Mediciones, ExtraccionIA, Identificacion
 
 def conectar_registro(ruta_base):
     conexion = sqlite3.connect(ruta_base)
@@ -321,6 +321,93 @@ def registrar_extraccion_demo(
         "ocurrido_en": fecha,
         "profesional_usuario": profesional_usuario,
         "datos": metadatos
+    }
+
+
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Datos de ingreso revisados por el profesional: edad, sexo y lo extraído del relato
+# (categoría, motivo, tiempo, localización, síntomas, banderas rojas, antecedentes).
+# NO guarda el relato completo. Se valida con los esquemas de Darío (Identificacion + ExtraccionIA).
+class _DatosIngreso(ExtraccionIA, Identificacion):
+    pass
+
+
+def registrar_datos_ingreso_demo(
+    ruta_base,
+    codigo_episodio,
+    profesional_usuario,
+    datos,
+    origen_extraccion=None
+):
+    """Agrega un evento DATOS_INGRESO_REGISTRADOS sin sobrescribir los anteriores."""
+
+    for valor in (codigo_episodio, profesional_usuario):
+        if not isinstance(valor, str) or not valor.strip():
+            raise ValueError("El episodio y el profesional son obligatorios.")
+
+    codigo_episodio = codigo_episodio.strip()
+    profesional_usuario = profesional_usuario.strip()
+
+    if not isinstance(datos, dict):
+        raise ValueError("Los datos de ingreso deben enviarse como un objeto.")
+
+    if origen_extraccion not in (None, "simulado", "ia", "manual"):
+        raise ValueError("El origen de la extracción no es válido.")
+
+    validados = _DatosIngreso.model_validate(datos)
+    valores = validados.model_dump(mode="json", exclude_none=True)
+
+    contenido = {
+        "version_evento": 1,
+        "modo": "demo",
+        "origen": "revision_profesional",
+        "origen_extraccion": origen_extraccion,
+        "valores": valores
+    }
+
+    fecha = datetime.now(timezone.utc).isoformat()
+    conexion = conectar_registro(ruta_base)
+
+    try:
+        with conexion:
+            conexion.execute("BEGIN IMMEDIATE")
+
+            episodio = conexion.execute(
+                "SELECT codigo_episodio FROM episodios WHERE codigo_episodio = ?",
+                (codigo_episodio,)
+            ).fetchone()
+
+            if episodio is None:
+                raise ValueError("El episodio no existe.")
+
+            cursor = conexion.execute(
+                """
+                INSERT INTO eventos (
+                    codigo_episodio, tipo, ocurrido_en,
+                    profesional_usuario, datos_json
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    codigo_episodio,
+                    "DATOS_INGRESO_REGISTRADOS",
+                    fecha,
+                    profesional_usuario,
+                    json.dumps(contenido, ensure_ascii=False, allow_nan=False)
+                )
+            )
+
+            evento_id = cursor.lastrowid
+    finally:
+        conexion.close()
+
+    return {
+        "id": evento_id,
+        "codigo_episodio": codigo_episodio,
+        "tipo": "DATOS_INGRESO_REGISTRADOS",
+        "ocurrido_en": fecha,
+        "profesional_usuario": profesional_usuario,
+        "datos": contenido
     }
 
 
@@ -917,7 +1004,8 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
                     d.id AS decision_evento_id,
                     d.ocurrido_en AS decision_fecha,
                     d.profesional_usuario AS decision_profesional,
-                    d.datos_json AS decision_json
+                    d.datos_json AS decision_json,
+                    di.datos_json AS ingreso_json
                 FROM estados_episodio AS s
                 JOIN episodios AS e
                     ON e.codigo_episodio = s.codigo_episodio
@@ -927,6 +1015,15 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
                         FROM eventos AS ev
                         WHERE ev.codigo_episodio = e.codigo_episodio
                           AND ev.tipo = 'DECISION_REGISTRADA'
+                        ORDER BY ev.id DESC
+                        LIMIT 1
+                    )
+                LEFT JOIN eventos AS di
+                    ON di.id = (
+                        SELECT ev.id
+                        FROM eventos AS ev
+                        WHERE ev.codigo_episodio = e.codigo_episodio
+                          AND ev.tipo = 'DATOS_INGRESO_REGISTRADOS'
                         ORDER BY ev.id DESC
                         LIMIT 1
                     )
@@ -946,6 +1043,13 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
                 evento_id = episodio.pop("decision_evento_id")
                 fecha = episodio.pop("decision_fecha")
                 profesional = episodio.pop("decision_profesional")
+
+                # [Propuesta Barby] Motivo del último ingreso revisado (para la columna de la lista).
+                ingreso = episodio.pop("ingreso_json")
+                episodio["motivo_categoria"] = (
+                    json.loads(ingreso)["valores"].get("motivo_categoria")
+                    if ingreso else None
+                )
 
                 # Sin decisión previa, informa ausencia de color.
                 # No inventa una clasificación ni reutiliza otra atención.

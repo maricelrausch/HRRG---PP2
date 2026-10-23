@@ -19,6 +19,7 @@ from src.registro import inicializar_registro, crear_episodio, obtener_episodio
 from src.registro import (
     registrar_medicion_demo,
     corregir_medicion_demo,
+    registrar_datos_ingreso_demo,
 )
 from src.registro import (
     registrar_decision_demo,
@@ -39,6 +40,7 @@ from src.identificacion import (
     inicializar_identificacion,
     identificar_paciente_demo,
     buscar_paciente_por_dni,
+    dnis_de_pacientes,
 )
 from src.cifrado_identificacion import ErrorCifradoIdentificacion
 import os
@@ -351,6 +353,7 @@ def verificar_acceso():
         "extraer",
         "agregar_medicion_demo",
         "agregar_correccion_demo",
+        "agregar_datos_ingreso_demo",
         "analizar_paciente",
         "listar_episodios_demo",
         "consultar_estado_episodio_demo",
@@ -1288,6 +1291,56 @@ def agregar_medicion_demo(codigo_episodio):
     return respuesta, 201
 
 # ------------------------------------------------
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Registrar los datos de ingreso revisados (edad, sexo y lo extraído del relato).
+# No recibe el relato completo. El auditor no puede escribir (verificar_acceso).
+# ------------------------------------------------
+@app.route(
+    "/api/demo/episodios/<codigo_episodio>/datos-ingreso",
+    methods=["POST"]
+)
+def agregar_datos_ingreso_demo(codigo_episodio):
+    entrada, error = leer_entrada_historial({"datos", "origen_extraccion"})
+
+    if error is not None:
+        return error
+
+    try:
+        evento = registrar_datos_ingreso_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            profesional_usuario=g.profesional["usuario"],
+            datos=entrada["datos"],
+            origen_extraccion=entrada["origen_extraccion"]
+        )
+
+    except ValidationError:
+        return respuesta_error(
+            "Revisá los campos y rangos de los datos de ingreso.",
+            422,
+            "DATOS_INGRESO_INVALIDOS"
+        )
+
+    except ValueError:
+        return respuesta_error(
+            "Revisá los datos de ingreso y que el episodio exista.",
+            422,
+            "REGISTRO_INVALIDO"
+        )
+
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_GUARDAR_DATOS_INGRESO_DEMO")
+        return respuesta_error(
+            "No se pudieron guardar los datos de ingreso.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    respuesta = jsonify({"ok": True, "modo": "demo", "evento": evento})
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 201
+
+# ------------------------------------------------
 # Corregir una medición mediante un nuevo evento.
 # Conserva el original, el motivo y el autor de la corrección.
 # ------------------------------------------------
@@ -1670,6 +1723,20 @@ def consultar_espera_demo():
             500,
             "ERROR_REGISTRO"
         )
+
+    # [Propuesta Barby 23/10 · a revisar por Maricel]
+    # Enfermería y médicos ven el DNI en la lista (pedido del HRRG: el triage del hospital lo muestra).
+    # El auditor no lo recibe. Si las claves fallan, la lista sale igual, sin DNI.
+    if g.profesional["rol"] in {"enfermeria", "medico"}:
+        try:
+            dnis = dnis_de_pacientes(
+                BASE_REGISTRO_DEMO,
+                [ep["codigo_paciente"] for ep in resultado["episodios"]]
+            )
+            for ep in resultado["episodios"]:
+                ep["dni"] = dnis.get(ep["codigo_paciente"])
+        except (ErrorCifradoIdentificacion, sqlite3.Error):
+            logger_sistema.error("ERROR_DNI_ESPERA")
 
     # Evita mostrar una lista antigua almacenada en caché.
     respuesta = jsonify({

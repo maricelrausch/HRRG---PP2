@@ -761,3 +761,45 @@ En `~/.hrrg_pp2/usuarios.db`, junto a `profesionales`:
 - Columnas nuevas en `profesionales`: `intentos_fallidos`, `bloqueada`, `debe_cambiar`, `password_cambiada`, `temp_vence`. Se agregan solas al iniciar `app.py`.
 - `historial_passwords`: últimos 5 hashes por profesional.
 - `auditoria_cuentas`: fecha, actor, acción, cuenta e IP de cada operación.
+
+## 14. Datos de ingreso y DNI en la lista de espera — propuesta (Barby, 23/10) · a revisar por Maricel
+
+> Hecho mientras Maricel está de viaje, con el mismo estilo que las rutas de mediciones.
+> Archivos tocados: `backend/src/registro.py`, `backend/src/identificacion.py`, `backend/app.py`.
+> Cada bloque nuevo está marcado con `[Propuesta Barby 23/10 · a revisar por Maricel]`.
+
+### Registrar los datos de ingreso revisados
+
+`POST /api/demo/episodios/<codigo_episodio>/datos-ingreso` (enfermería y médicos; el auditor no puede escribir)
+
+```json
+{
+  "datos": {
+    "edad": 61, "sexo": "Masculino",
+    "motivo_categoria": "Dolor torácico", "motivo_consulta": "Dolor de pecho opresivo con sudoración",
+    "tiempo_evolucion_valor": 30, "tiempo_evolucion_unidad": "minutos",
+    "dolor_localizacion": "Tórax", "sintomas_asociados": "Sudoración",
+    "br_sangrado": false, "ant_cardio": true
+  },
+  "origen_extraccion": "ia"
+}
+```
+
+- `datos` se valida con `Identificacion` + `ExtraccionIA` de `esquemas.py` (mismos nombres, tipos y rangos; campos extra → 422).
+- `origen_extraccion`: `"ia"`, `"simulado"`, `"manual"` o `null`.
+- **No** recibe el relato completo ni el DNI.
+- Guarda un evento nuevo `DATOS_INGRESO_REGISTRADOS` (no pisa los anteriores). El frontend lo manda al confirmar la medición y solo si los datos cambiaron.
+- Respuestas: `201` con el evento · `422 DATOS_INGRESO_INVALIDOS` / `REGISTRO_INVALIDO` · `500 ERROR_REGISTRO`.
+
+### Cambios en `GET /api/demo/espera`
+
+Cada episodio suma dos campos:
+
+| Campo | Qué es | Quién lo recibe |
+|---|---|---|
+| `motivo_categoria` | Categoría del último `DATOS_INGRESO_REGISTRADOS` (o `null`) | Todos |
+| `dni` | DNI descifrado del paciente (o `null` si no se identificó) | **Solo enfermería y médicos.** El auditor no lo recibe |
+
+- El DNI se obtiene con `dnis_de_pacientes()` (nuevo, en `identificacion.py`): solo lectura, verifica claves y que el DNI coincida con su índice.
+- Si las claves fallan, la lista sale igual, sin DNI, y se registra `ERROR_DNI_ESPERA` en el log.
+- Motivo: pedido del HRRG (en su triage se ve el DNI). **Decisión a confirmar por el grupo**; para volver atrás alcanza con borrar ese bloque en `consultar_espera_demo`.

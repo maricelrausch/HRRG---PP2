@@ -400,7 +400,7 @@ $('#sinIA').addEventListener('click',async()=>{await guardarMediciones();st.manu
    - Si después se cambian valores, se registra una CORRECCIÓN (no se pisa la original).
    - Una reevaluación desde En espera es una toma nueva: se registra otra MEDICIÓN. */
 const VALORES_MEDICION=['ta_sistolica','ta_diastolica','frecuencia_cardiaca','frecuencia_respiratoria','saturacion_o2','temperatura','glucemia','estado_conciencia','glasgow','dolor_intensidad','aspecto_general'];
-const nuevoSrv=()=>({ep:null,pac:null,medicion:null,nuevaToma:false,aviso:null});
+const nuevoSrv=()=>({ep:null,pac:null,medicion:null,ingreso:null,nuevaToma:false,aviso:null});
 st.srv=nuevoSrv();
 /* Circuito de Maricel:
    1) Con DNI: POST /api/demo/pacientes/identificar {dni} -> paciente.codigo_paciente (el mismo DNI siempre da el mismo código).
@@ -433,9 +433,34 @@ function valoresMedidos(){
   VALORES_MEDICION.forEach(k=>{if(d[k]!=null&&d[k]!=='')v[k]=d[k]});
   return v;
 }
+/* Datos de ingreso revisados (los guarda el servidor desde 23/10): edad, sexo y lo extraído del relato.
+   Se mandan con su tipo (número, texto, sí/no). No se manda el relato completo ni el DNI.
+   Solo se vuelven a mandar si cambiaron. */
+const CAMPOS_INGRESO=['edad','sexo','motivo_categoria','tiempo_evolucion_valor','tiempo_evolucion_unidad','motivo_consulta',
+  'dolor_localizacion','sintomas_asociados','dolor_caracteristicas','br_sangrado','br_convulsion','br_disnea','br_trauma',
+  'ant_diabetes','ant_cardio','ant_resp','ant_anticoag','ant_inmuno','ant_embarazo','ant_medicacion','alergias','antecedentes_otros'];
+function datosIngreso(){
+  const d={};
+  CAMPOS_INGRESO.forEach(k=>{const f=byK(k);if(!f)return;const v=st.rev[k];
+    if(f.t==='chk'){d[k]=v===true;return}
+    if(v==null||String(v).trim()==='')return;
+    if(f.t==='num'){const n=num(v);if(Number.isFinite(n))d[k]=k==='edad'?Math.round(n):n;return}
+    d[k]=String(v).trim();});
+  return d;
+}
+async function guardarDatosIngreso(){
+  const d=datosIngreso(),clave=JSON.stringify(d);
+  if(st.srv.ingreso===clave)return;
+  const origen=st.manual?'manual':(st.extraccion&&st.extraccion.modo)||null;
+  const r=await TriageAPI.registrarDatosIngreso(st.srv.ep,d,origen);
+  if(r.estado===401){location.href='index.html';return}
+  if(!r.ok){st.srv.aviso='No se pudieron guardar los datos de ingreso: '+(r.datos.mensaje||'error del servidor')+' El triage sigue.';return}
+  st.srv.ingreso=clave;
+}
 async function guardarMediciones(){
   st.srv.aviso=null;
   if(!TriageAPI.MODO_REAL||!st.srv.ep)return;
+  await guardarDatosIngreso();
   const v=valoresMedidos();
   if(!Object.keys(v).length)return;
   let r;
@@ -451,7 +476,7 @@ async function guardarMediciones(){
   if(!r.ok){st.srv.aviso='No se pudo guardar la medición: '+(r.datos.mensaje||'error del servidor')+' El triage sigue; los datos quedan en pantalla.';return}
   st.srv.medicion={id:r.datos.evento.id,valores:v};st.srv.nuevaToma=false;
 }
-const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada'};
+const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada',DATOS_INGRESO_REGISTRADOS:'Datos de ingreso registrados'};
 const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)'};
 /* Atenciones anteriores del mismo paciente (mismo DNI). Cada una se puede abrir para ver su historial. */
 function htmlAnteriores(){
@@ -480,7 +505,7 @@ async function renderHistorial(){
   const r=await TriageAPI.consultarEpisodio(st.srv.ep);
   if(!r.ok){box.innerHTML='<b>Historial guardado en el servidor.</b> No se pudo consultar: '+esc(r.datos.mensaje||'error');return}
   const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
-  const fila=e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+x).join(' · '):'';
+  const fila=e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).filter(([k,x])=>x!==false).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+(x===true?'Sí':x)).join(' · '):'';
     return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(hora(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
       (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'};
   box.innerHTML=htmlAnteriores()+'<b>Historial guardado en el servidor</b> · '+esc(st.srv.ep)+(st.srv.aviso?'<br><span class="w">'+esc(st.srv.aviso)+'</span>':'')+
