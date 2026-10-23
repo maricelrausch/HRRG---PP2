@@ -99,6 +99,7 @@ function aUsuario(datos) {
     nom: datos.nombre,
     rol: datos.rol,
     modo: 'real',
+    debeCambiar: !!datos.debe_cambiar,
     modoExtraccion: datos.modo_extraccion || null
   };
 }
@@ -126,6 +127,11 @@ function aUsuario(datos) {
   function identificarPaciente(dni) {
     return pedir('/api/demo/pacientes/identificar', { method: 'POST', body: JSON.stringify({ dni: dni }) });
   }
+  /* Busca un DNI ya identificado SIN crear paciente (ruta de Maricel). 404 = no existe.
+     El DNI va en el cuerpo, nunca en la URL. */
+  function buscarPaciente(dni) {
+    return pedir('/api/demo/pacientes/buscar', { method: 'POST', body: JSON.stringify({ dni: dni }) });
+  }
   function episodiosDePaciente(codigoPaciente) {
     return pedir('/api/demo/episodios?codigo_paciente=' + encodeURIComponent(codigoPaciente) + '&limite=20', { method: 'GET', cache: 'no-store' });
   }
@@ -140,8 +146,13 @@ function aUsuario(datos) {
     return pedir('/api/demo/episodios/' + encodeURIComponent(episodio), { method: 'GET', cache: 'no-store' });
   }
 
-  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir,
+  /* Cambio de la propia contraseña (clave temporal o vencida). Devuelve { ok, estado, datos }. */
+  function cambiarPassword(actual, nueva) {
+    return pedir('/api/cuenta/password', { method: 'POST', body: JSON.stringify({ actual: actual, nueva: nueva }) });
+  }
+
+  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
-    identificarPaciente: identificarPaciente, episodiosDePaciente: episodiosDePaciente, registrarDecision: registrarDecision };
+    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, registrarDecision: registrarDecision };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

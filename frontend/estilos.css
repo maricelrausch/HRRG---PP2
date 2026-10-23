@@ -222,6 +222,7 @@ fieldset.grp legend{font-family:var(--f-display);font-weight:600;font-size:15px;
 .ia-line .ia-tag{font-size:10px;padding:1px 6px;background:var(--accent-soft);color:var(--accent-text)}
 .ia-line details{width:100%}
 .ia-line details summary{cursor:pointer;color:var(--accent-text);text-decoration:underline;width:max-content;font-size:12px}
+.ia-line details summary .n{display:inline-flex;text-decoration:none;margin:0 4px 0 6px;vertical-align:middle}
 .ia-line details .g{margin-top:8px}
 details.more{border:1px solid var(--line);border-radius:10px;padding:10px 14px}
 details.more[open]{display:flex;flex-direction:column;gap:12px}
@@ -281,6 +282,9 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .wt{color:var(--muted);font-size:13px;min-width:96px}
 .wf{display:flex;gap:6px;flex-wrap:wrap}
 .wa{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.escform{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:8px;font-size:13px}
+.escform select,.escform input{flex:1 1 200px;min-width:0}
+.escform .row{display:flex;gap:6px}
 .btn.sm{min-height:40px;padding:0 12px;font-size:13px}
 .btn.esc{color:var(--err);border-color:var(--err)}
 .btn.esc.armed{background:var(--err);color:var(--panel);border-color:var(--err)}

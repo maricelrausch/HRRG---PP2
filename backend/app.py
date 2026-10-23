@@ -6,6 +6,15 @@ from pathlib import Path
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 from src.auth import iniciar_sesion, profesional_activo, obtener_profesional
+from src.admin_usuarios import (
+    bp as admin_usuarios_bp,
+    migrar_usuarios,
+    estado_acceso,
+    requiere_cambio,
+    temporal_vencida,
+    registrar_fallo,
+    registrar_exito,
+)
 from src.registro import inicializar_registro, crear_episodio, obtener_episodio
 from src.registro import (
     registrar_medicion_demo,
@@ -174,6 +183,11 @@ def inicializar_usuarios():
 
 
 inicializar_usuarios()
+# Gestión de contraseñas (perfil admin): columnas de bloqueo y cambio obligatorio,
+# historial y auditoría de cuentas. Rutas /api/admin/... y /api/cuenta/password.
+migrar_usuarios(BASE_USUARIOS)
+app.config["BASE_USUARIOS"] = BASE_USUARIOS
+app.register_blueprint(admin_usuarios_bp)
 
 
 #--------------------------------------------
@@ -217,14 +231,42 @@ def login():
             codigo="DATOS_INVALIDOS"
         )
 
+    cuenta = estado_acceso(BASE_USUARIOS, usuario)
+
+    if cuenta and cuenta["bloqueada"]:
+        logger_sistema.warning("LOGIN_CUENTA_BLOQUEADA")
+
+        return respuesta_error(
+            mensaje="Cuenta bloqueada por intentos fallidos. Pedile al administrador que la desbloquee.",
+            estado=423,
+            codigo="CUENTA_BLOQUEADA"
+        )
+
     if not iniciar_sesion(BASE_USUARIOS, usuario, password):
         logger_sistema.warning("LOGIN_RECHAZADO")
+
+        # Cinco intentos fallidos bloquean la cuenta.
+        if cuenta and registrar_fallo(BASE_USUARIOS, usuario):
+            return respuesta_error(
+                mensaje="Cuenta bloqueada por intentos fallidos. Pedile al administrador que la desbloquee.",
+                estado=423,
+                codigo="CUENTA_BLOQUEADA"
+            )
 
         return respuesta_error(
             mensaje="Usuario o contraseña incorrectos.",
             estado=401,
             codigo="CREDENCIALES_INVALIDAS"
         )
+
+    if temporal_vencida(cuenta):
+        return respuesta_error(
+            mensaje="La clave temporal venció. Pedile una nueva al administrador.",
+            estado=401,
+            codigo="CLAVE_TEMPORAL_VENCIDA"
+        )
+
+    registrar_exito(BASE_USUARIOS, usuario)
     
 
     # Reemplazamos la sesión anterior.
@@ -236,7 +278,8 @@ def login():
     return jsonify({
         "ok": True,
         "mensaje": "Sesión iniciada correctamente.",
-        "usuario": usuario
+        "usuario": usuario,
+        "debe_cambiar": requiere_cambio(cuenta)
     }), 200
 
 #------------------------------------
@@ -272,6 +315,7 @@ def consultar_sesion():
         "usuario": profesional["usuario"],
         "nombre": profesional["nombre"],
         "rol": profesional["rol"],
+        "debe_cambiar": g.requiere_cambio,
         "modo_extraccion": app.config["MODO_EXTRACCION"]
     })
 
@@ -337,14 +381,44 @@ def verificar_acceso():
             "SESION_REQUERIDA"
         )
 
-    if profesional["rol"] not in {"enfermeria", "medico", "auditor"}:
+    if profesional["rol"] not in {"enfermeria", "medico", "auditor", "admin"}:
         return respuesta_error(
             "Tu cuenta todavía no tiene un perfil asignado.",
             403,
             "ROL_NO_ASIGNADO"
         )
 
+    cuenta = estado_acceso(BASE_USUARIOS, usuario)
+
+    if cuenta is None or cuenta["bloqueada"]:
+        session.clear()
+        return respuesta_error(
+            "Debés iniciar sesión para continuar.",
+            401,
+            "SESION_REQUERIDA"
+        )
+
     g.profesional = profesional
+    g.requiere_cambio = requiere_cambio(cuenta)
+
+    # Con la contraseña pendiente de cambio o con perfil admin solo se consulta
+    # la sesión; el resto de las rutas clínicas quedan bloqueadas.
+    if request.endpoint == "consultar_sesion":
+        return None
+
+    if g.requiere_cambio:
+        return respuesta_error(
+            "Tenés que cambiar tu contraseña antes de continuar.",
+            403,
+            "CAMBIO_PASSWORD_REQUERIDO"
+        )
+
+    if profesional["rol"] == "admin":
+        return respuesta_error(
+            "El perfil administrador gestiona cuentas, no accede a la atención.",
+            403,
+            "PERMISO_DENEGADO"
+        )
 
         # El auditor puede consultar información, pero no modificarla.
     if profesional["rol"] == "auditor":
@@ -387,7 +461,7 @@ def verificar_acceso():
 @click.option(
     "--password",
     prompt="Contraseña",
-    hide_input=False,
+    hide_input=True,
     confirmation_prompt="Repetí la contraseña"
 )
 def crear_profesional(usuario, nombre, password):
@@ -432,7 +506,7 @@ def crear_profesional(usuario, nombre, password):
 @click.option(
     "--password",
     prompt="Nueva contraseña",
-    hide_input=False,
+    hide_input=True,
     confirmation_prompt="Repetí la nueva contraseña"
 )
 def cambiar_password(usuario, password):
@@ -453,7 +527,9 @@ def cambiar_password(usuario, password):
         resultado = conexion.execute(
             """
             UPDATE profesionales
-            SET password_hash = ?
+            SET password_hash = ?, bloqueada = 0, intentos_fallidos = 0,
+                debe_cambiar = 0, temp_vence = NULL,
+                password_cambiada = datetime('now', 'localtime')
             WHERE usuario = ? AND activo = 1
             """,
             (password_hash, usuario)
@@ -904,7 +980,7 @@ Pregunta:
 @click.option("--usuario", prompt="Usuario")
 @click.option(
     "--rol",
-    type=click.Choice(["enfermeria", "medico", "auditor"]),
+    type=click.Choice(["enfermeria", "medico", "auditor", "admin"]),
     prompt="Rol"
 )
 
@@ -1855,6 +1931,10 @@ def evitar_cache_identificacion(respuesta):
     return respuesta
 
 if __name__ == "__main__":
-
-
-    app.run(debug=True)
+    from ia.chat import precargar_modelos
+    precargar_modelos()   # Whisper primero y después MedGemma, sin frenar el arranque de Flask
+    app.run(
+        host="0.0.0.0", # Permite que Flask escuche en las interfaces de red de la computadora.
+        port=5000, # Puerto elegido para ejecutarse
+        debug=False # Evita habilitar el depurador interactivo de Flask, que no debe exponerse a otros dispositivos.
+    )

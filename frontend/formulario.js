@@ -11,7 +11,7 @@ const SPECS={
     ['M','Dictado por voz: transcribe al cuadro y se puede editar.'],
     ['2','No envía texto vacío. Mientras procesa, botón bloqueado.'],
     ['3','Ante un error, el texto se conserva.'],
-    ['S','Modo simulado hasta conectar el modelo.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
+    ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
   revision:{t:'Pantalla 2 · Medición',items:[
     ['1','Solo lo que se mide en el box. Nombre completo, unidad y referencia en cada campo. Enter pasa al siguiente.'],
     ['A','Aviso inmediato: fuera de lo normal (borde oscuro), crítico por regla de seguridad o valor imposible (rojo).'],
@@ -19,12 +19,11 @@ const SPECS={
     ['3','Banderas rojas y antecedentes con un toque. Lo que mencionó el paciente ya viene marcado.'],
     ['4','Avisa faltantes, rangos y discordancias. Con 3 o más vitales sin medir no se emite prioridad (RF-10). “Clasificar sin IA” siempre disponible (§6).']],src:'Doc. técnico V1.1 · Cuestionario §2 · RNF-01'},
   resumen:{t:'Pantalla 3 · Sugerencia',items:[
-    ['1','Color Manchester sugerido, grande, con su origen: regla de seguridad o extracción + guía (hoy: simulado).'],
+    ['1','Color Manchester sugerido, grande (hoy: simulado con reglas de ejemplo).'],
     ['2','Por qué, con cada motivo marcado REGLA o IA. Las reglas fijan un piso: la IA no puede sugerir menos (no downgrade).'],
     ['3','Aceptar con un toque. Modificar o Rechazar piden motivo.'],
-    ['4','Lo que entendió la IA del relato, corregible. La decisión final es del profesional.'],
+    ['4','Corregir datos del relato: lo que extrajo la IA se puede corregir acá. La decisión final es del profesional.'],
     ['5','Reglas provisorias de ejemplo: los umbrales los aprueban Guardia y Enfermería.'],
-    ['F','Fuente: cada sugerencia cita el diagrama, nivel y discriminador de la guía oficial (en el sistema real; hoy, guía de ejemplo), con el fragmento para verificarlo (trazabilidad).'],
     ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No y recalculan al instante (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
   espera:{t:'Pantalla 4 · En espera',items:[
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],
@@ -78,20 +77,31 @@ function reglas(){
 function medgemma(){
   const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),why=[];let lv=3;
   const d=n('dolor_intensidad');
-  if(d!=null&&d>=5&&d<8){lv=2;why.push((r.motivo_categoria||'Dolor')+' moderado ('+d+'/10)'+(r.tiempo_evolucion_valor?' de '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad:''))}
+  /* El motivo va siempre primero: categoría + lo que dijo el paciente + tiempo de evolución */
+  const cat=(r.motivo_categoria||'').trim(),mc=(r.motivo_consulta||'').trim();
+  if(cat||mc){
+    const det=mc&&mc.toLowerCase()!==cat.toLowerCase()?mc.toLowerCase():'';
+    const tpo=r.tiempo_evolucion_valor?' (hace '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad+')':'';
+    why.push('Motivo: '+(cat&&det?cat+' — '+det:(cat||mc))+tpo);
+  }
+  const base=why.length;
+  if(d!=null&&d>=5&&d<8){lv=2;why.push('Dolor moderado ('+d+'/10)')}
   const t=n('temperatura');if(t!=null&&t>=37.5&&t<38.5){lv=Math.min(lv,2);why.push('Febrícula ('+r.temperatura+' °C)')}
   if(t!=null&&t>=38.5){lv=Math.min(lv,2);why.push('Fiebre ('+r.temperatura+' °C)')}
   if(r.ant_diabetes)why.push('Diabetes'+(n('glucemia')>=250?' con glucemia '+r.glucemia+' mg/dL':''));
   if(r.sintomas_asociados)why.push('Refiere: '+r.sintomas_asociados.toLowerCase());
   if(d!=null&&d<=2&&!(t>=37.5)&&lv===3)lv=4;
-  if(!why.length)why.push('Sin discriminadores de mayor urgencia en los datos');
+  if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
   return {lv,why};
 }
 function calcSug(){
   const R=reglas(),M=medgemma(),rl=R.length?Math.min(...R.map(x=>x.lv)):9;
   const C=Object.entries(st.disc).filter(([k,v])=>v==='si').map(([k])=>{const [lv,t]=k.split('|');return {lv:+lv,t}});
-  const cl=C.length?Math.min(...C.map(x=>x.lv)):9,fin=Math.min(rl,M.lv,cl);
-  return {R,M,C,rl,cl,fin};
+  const cl=C.length?Math.min(...C.map(x=>x.lv)):9;
+  /* Reevaluación: el color anterior (aceptado o modificado por el profesional) es un piso, como las reglas.
+     Para bajar la prioridad hay que usar Modificar con motivo. */
+  const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl);
+  return {R,M,C,rl,cl,pl,fin};
 }
 function renderCard(){
   const c=calcSug();SUG=c.fin;const L=LEVELS[SUG];
@@ -101,8 +111,24 @@ function renderCard(){
   $('#tcOrigin').innerHTML=c.rl<c.M.lv?'<b>Color fijado por regla de seguridad.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'; la regla no permite bajar.</span><span class="prov">Reglas provisorias</span>'
     :(c.R.length?'<b>Simulación con reglas de ejemplo.</b><span class="old">Coincide o supera las reglas de seguridad.</span>':'<b>Simulación con reglas de ejemplo.</b><span class="old">Reglas de seguridad: sin alertas.</span>');
   if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
-  $('#tcWhy').innerHTML=c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
-  renderFuente();renderSubir();
+  if(c.pl<Math.min(c.rl,c.M.lv,c.cl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
+  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
+  renderFuente();renderSubir();pintarDecision();
+}
+/* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
+   La sugerencia original queda escrita debajo (trazabilidad). */
+function pintarDecision(){
+  const ceja=$('#triageCard .eyebrow'),tag=$('#triageCard .ia-tag'),n=ceja.querySelector('.n'),nH=n?' '+n.outerHTML:'';
+  const fl=(st.decision==='modificar'||st.decision==='rechazar')&&st.level!=null?st.level:null;
+  if(fl==null){
+    if(!/Prioridad|MedGemma|Sin IA/.test(ceja.textContent))ceja.innerHTML='Prioridad de ejemplo · simulada'+nH;
+    tag.textContent=st.decision==='aceptar'?'Sugerencia aceptada':'Sugerencia · requiere validación';return}
+  const L=LEVELS[fl],acc=st.decision==='modificar'?'modificada':'rechazada';
+  $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
+  $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[fl]+' [tiempo de ejemplo]';
+  ceja.innerHTML='Clasificación final · decidida por el profesional'+nH;tag.textContent='Decisión registrada';
+  if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
+  $('#tcOrigin').innerHTML='<b>Sugerencia '+LEVELS[SUG][0]+' '+acc+' a '+L[0]+' por el profesional.</b><span class="old">Motivo: '+esc($('#motivo').value||'—')+'</span>';
 }
 /* Trazabilidad: fragmento de la guía que respalda el color */
 function renderFuente(){
@@ -494,7 +520,7 @@ async function asegurarEpisodio(){
     const id=await TriageAPI.identificarPaciente(st.dni);
     if(id.estado===401){location.href='index.html';return false}
     if(!id.ok){$('#hint').textContent='No se pudo identificar al paciente por DNI: '+(id.datos.mensaje||'error del servidor')+' Tu texto se conservó.';$('#hint').classList.add('err');return false}
-    pac=id.datos.paciente.codigo_paciente;st.srv.identificado=true;
+    pac=id.datos.paciente.codigo_paciente;st.srv.identificado=true;DNI_PAC[st.dni]=pac;
     /* Atenciones anteriores (antes de crear la nueva, así no se cuenta a sí misma). */
     if(!id.datos.paciente.creado){
       const prev=await TriageAPI.episodiosDePaciente(pac);
@@ -639,6 +665,8 @@ function renderSimbar(){
     ?'<b>Datos ficticios · Extracción con IA local.</b> Los datos del relato los extrajo MedGemma en esta computadora y requieren revisión. La sugerencia de color, el dictado, los tiempos y los registros siguen siendo de demostración (no son guías del hospital).'
     :'<b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.';
   $('#simChip').lastChild.textContent=ia?'IA LOCAL · RESTO SIMULADO':'MODO SIMULADO';
+  /* Chip de estado de la IA: antes de la primera extracción decía siempre "IA: simulada". */
+  if(st.ollama&&!st.extraccion)$('#ollama').innerHTML='<span class="dot"></span>IA: '+(ia?'MedGemma local':'simulada');
 }
 function refreshSummary(){
   $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>'+c+'</em>':'')+'</div>').join('');
@@ -659,7 +687,7 @@ function renderReg(){
 
 $('#levels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-l="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'" title="'+L[3]+'">'+L[0]+'</button>').join('');
 document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
-  const d=b.dataset.d;st.decision=null;st.level=null;
+  const d=b.dataset.d;st.decision=null;st.level=null;renderCard();
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed',x===b));
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#modForm').hidden=d==='aceptar';$('#motivoForm').hidden=d==='aceptar';$('#lowerBox').hidden=true;
@@ -681,7 +709,7 @@ $('#motivo').addEventListener('change',updReg);$('#lowerOk').addEventListener('c
 $('#registrar').addEventListener('click',()=>{
   const d=$('#registrar').dataset.d;st.decision=d;commit(st.level);$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#okMsg').hidden=false;
   $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+(st.level>SUG?' · Discrepancia registrada.':''):'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+(st.level>SUG?' · Discrepancia registrada.':'');
-  renderReg();
+  renderCard();renderReg();
 });
 $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderResumen()});
 function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
@@ -708,6 +736,34 @@ const WAIT=[
   {ep:'EP-004806',lv:4,mot:'Control de curación',min:150,relato:'Vengo a que me miren la herida de la mano, me la hicieron hace tres días.',rev:mk({motivo_categoria:'Otro',motivo_consulta:'Control de herida en la mano',tiempo_evolucion_valor:'3',tiempo_evolucion_unidad:'días',dolor_localizacion:'Mano izquierda',sintomas_asociados:'',ant_diabetes:false,antecedentes_otros:'',ta_sistolica:'118',ta_diastolica:'76',frecuencia_cardiaca:'72',frecuencia_respiratoria:'14',saturacion_o2:'99',temperatura:'36,4',estado_conciencia:'Alerta',dolor_intensidad:'1'})}
 ];
 let escPending=null,finPending=null;
+/* Escalar a ROJO desde En espera: pide el motivo (obligatorio) y queda en la decisión guardada. */
+let escForm={mot:'',det:''};
+const MOTIVOS_ESC=['Deterioro del estado general','Empeoraron los signos vitales','Alteración de la conciencia','Dificultad respiratoria','Dolor que aumentó o no cede','Sangrado','Otro'];
+function textoEscalado(mot,det){return 'Escalado manual por deterioro en espera: '+mot+(det?'. '+det:'')+'.'}
+function motivoEscalado(txt){const m=/Escalado manual[^:]*:\s*(.+?)\.?$/.exec(txt||'');return m?m[1]:''}
+function htmlEscForm(w){
+  const ep=esc(w.ep),ok=!!escForm.mot&&(escForm.mot!=='Otro'||!!escForm.det.trim());
+  return '<div class="escform"><b>Escalar a ROJO · motivo (obligatorio)</b>'+
+    '<select data-escmot="'+ep+'"><option value="">Seleccionar…</option>'+MOTIVOS_ESC.map(o=>'<option'+(o===escForm.mot?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
+    '<input data-escdet="'+ep+'" maxlength="300" value="'+esc(escForm.det)+'" placeholder="'+(escForm.mot==='Otro'?'Contá qué observaste (obligatorio)':'Detalle (opcional): qué observaste')+'">'+
+    '<span class="row"><button type="button" class="btn sm esc armed" data-escok="'+ep+'"'+(ok?'':' disabled')+'>Confirmar ROJO</button><button type="button" class="btn sm" data-escno="'+ep+'">Cancelar</button></span></div>';
+}
+/* DNI -> código de paciente, solo en memoria de esta pestaña (no se guarda en el navegador). */
+const DNI_PAC={};
+/* Búsqueda en el servidor por DNI completo (7 u 8 dígitos): encuentra pacientes identificados desde
+   cualquier compu. Resultado por DNI: 'buscando' | 'no' (no existe) | 'error'. No crea pacientes. */
+const DNI_BUSQ={};
+async function buscarDniServidor(dni){
+  if(!TriageAPI.MODO_REAL||!/^\d{7,8}$/.test(dni)||DNI_PAC[dni]||DNI_BUSQ[dni])return;
+  DNI_BUSQ[dni]='buscando';
+  const r=await TriageAPI.buscarPaciente(dni);
+  if(r.estado===401){location.href='index.html';return}
+  if(r.ok&&r.datos.paciente){DNI_PAC[dni]=r.datos.paciente.codigo_paciente;delete DNI_BUSQ[dni]}
+  else DNI_BUSQ[dni]=r.estado===404?'no':'error';
+  if(st.screen==='espera')renderWait();
+}
+/* Chat "Consultar a la IA": con servidor responde MedGemma local (js/chat_ia.js), no la simulación. */
+if(TriageAPI.MODO_REAL&&$('.chat-warn'))$('.chat-warn').innerHTML='<b>MedGemma local.</b> Responde sobre los datos de este caso. No diagnostica ni indica tratamientos: esas preguntas se bloquean. La decisión es del profesional.';
 /* Con servidor, la lista arranca vacía: solo muestra episodios guardados (sin pacientes de ejemplo). */
 if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
@@ -798,7 +854,7 @@ async function cargarEspera(){
     w.desde=s.en_espera_desde;w.version=s.version;w.quien=s.profesional_estado;
     /* El color guardado en el servidor manda (lo ven todas las compus). */
     if(s.color_final){const i=LEVELS.findIndex(L=>L[0]===s.color_final);if(i>-1)w.lv=i;
-      if(s.decision_actual&&/Escalado manual/.test(s.decision_actual.motivo||''))w.esc=true;}
+      if(s.decision_actual&&/Escalado manual/.test(s.decision_actual.motivo||'')){w.esc=true;w.escMot=motivoEscalado(s.decision_actual.motivo)}}
     if(!w.base)w.base=Date.parse(s.en_espera_desde);
   }
   /* Lo que ya no está en espera en el servidor (lo finalizó otro profesional) sale de la lista. */
@@ -835,24 +891,50 @@ function clock(w){
 }
 function renderWait(){
   const q=($('#epSearch').value||'').trim().toUpperCase();
-  const rows=WAIT.filter(w=>!q||w.ep.includes(q)).sort((a,b)=>(a.lv??9)-(b.lv??9)||minutos(b)-minutos(a));
+  /* Si se escriben solo números (con o sin puntos) se busca por DNI; si no, por código de episodio.
+     Por DNI se encuentran: los episodios cargados con ese DNI en esta pestaña y, si el paciente ya se
+     identificó en esta sesión, todos sus episodios en espera (por su código de paciente). */
+  const qDni=/^[\d.\s]+$/.test(q)?q.replace(/[.\s]/g,''):'';
+  if(qDni)buscarDniServidor(qDni);
+  const pacDeDni=qDni&&DNI_PAC[qDni];
+  /* Los episodios de ese paciente que vinieron de otra compu muestran el DNI buscado. */
+  if(pacDeDni)WAIT.forEach(w=>{if(w.srv&&w.srv.pac===pacDeDni&&!w.dni)w.dni=qDni});
+  const coincide=w=>!q||(qDni?((w.dni||'').startsWith(qDni)||(!!pacDeDni&&w.srv&&w.srv.pac===pacDeDni)):w.ep.includes(q));
+  const rows=WAIT.filter(coincide).sort((a,b)=>(a.lv??9)-(b.lv??9)||minutos(b)-minutos(a));
   $('#wCount').textContent=WAIT.length+' pacientes';
   const ro=st.user&&st.user.rol==='auditor';
   $('#wList').innerHTML=rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual · deterioro en espera</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button><button type="button" class="btn sm esc'+(escPending===w.ep?' armed':'')+'" data-esc="'+esc(w.ep)+'">'+(escPending===w.ep?'Confirmar ROJO':'Escalar a ROJO')+'</button>':'<span class="hint">Atención inmediata</span>')+fin)+'</span></div>'}).join('')||'<div class="hint">No hay episodios con ese código.</div>';
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual'+(w.escMot?': '+esc(w.escMot):' · deterioro en espera')+'</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>':(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button>'+(escPending===w.ep?'':'<button type="button" class="btn sm esc" data-esc="'+esc(w.ep)+'">Escalar a ROJO</button>'):'<span class="hint">Atención inmediata</span>')+fin)+'</span>'+(!ro&&escPending===w.ep?htmlEscForm(w):'')+'</div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
+    :!TriageAPI.MODO_REAL?'No hay pacientes en espera con ese DNI.'
+    :!/^\d{7,8}$/.test(qDni)?'Escribí el DNI completo (7 u 8 dígitos) para buscarlo en el servidor.'
+    :DNI_BUSQ[qDni]==='buscando'?'Buscando el DNI en el servidor…'
+    :DNI_BUSQ[qDni]==='no'?'No hay ningún paciente identificado con ese DNI.'
+    :DNI_BUSQ[qDni]==='error'?'No se pudo consultar el DNI en el servidor. Probá de nuevo.'
+    :'El paciente está identificado, pero no tiene episodios en espera.')+'</div>';
 }
-$('#epSearch').addEventListener('input',renderWait);
+/* Al escribir de nuevo se puede volver a consultar un DNI que antes no estaba o dio error. */
+$('#epSearch').addEventListener('input',()=>{for(const k in DNI_BUSQ)if(DNI_BUSQ[k]!=='buscando')delete DNI_BUSQ[k];renderWait()});
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
-setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera')renderWait()},1000);
+setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera'&&!escPending)renderWait()},1000);
 $('#wList').addEventListener('click',e=>{
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]'),fi=e.target.closest('[data-fin]');
   if(fi){const ep=fi.dataset.fin;if(finPending===ep){finPending=null;const w=WAIT.find(x=>x.ep===ep);if(w)finalizar(w)}else{finPending=ep;renderWait()}return}
   if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
-  if(es){const ep=es.dataset.esc;if(escPending===ep){const w=WAIT.find(x=>x.ep===ep);w.lv=0;w.esc=true;w.min=0;if(w.base){w.base=Date.now();w.extra=0}recordarColor(w);guardarDecision(w,{decision:'modificada',color:'ROJO',motivo:'Escalado manual por deterioro en espera.'});escPending=null}else escPending=ep;renderWait()}
+  if(es){escPending=es.dataset.esc;escForm={mot:'',det:''};renderWait();const sel=$('[data-escmot]');if(sel)sel.focus();return}
+  const no=e.target.closest('[data-escno]');if(no){escPending=null;renderWait();return}
+  const ok=e.target.closest('[data-escok]');
+  if(ok&&!ok.disabled){const w=WAIT.find(x=>x.ep===ok.dataset.escok);if(!w)return;
+    w.lv=0;w.esc=true;w.escMot=escForm.mot+(escForm.det.trim()?'. '+escForm.det.trim():'');w.min=0;if(w.base){w.base=Date.now();w.extra=0}
+    recordarColor(w);guardarDecision(w,{decision:'modificada',color:'ROJO',motivo:textoEscalado(escForm.mot,escForm.det.trim())});
+    escPending=null;escForm={mot:'',det:''};renderWait()}
 });
+/* El formulario de escalado guarda lo escrito aunque la lista se vuelva a dibujar. */
+$('#wList').addEventListener('change',e=>{if(e.target.dataset.escmot!=null){escForm.mot=e.target.value;renderWait();const i=$('[data-escdet]');if(i)i.focus()}});
+$('#wList').addEventListener('input',e=>{if(e.target.dataset.escdet!=null){escForm.det=e.target.value;
+  const b=$('[data-escok]');if(b)b.disabled=!(escForm.mot&&(escForm.mot!=='Otro'||escForm.det.trim()))}});
 
 /* Acceso (demo: en el sistema real, usuarios locales con contraseña cifrada) */
 
@@ -942,6 +1024,8 @@ if (TriageAPI.MODO_REAL) {
 (async function iniciarSesion(){
   st.user=await TriageAPI.sesion();
   if(!st.user){location.href='index.html';return}
+  if(st.user.debeCambiar){location.href='cambiar_password.html';return}
+  if(st.user.rol==='admin'){location.href='admin.html';return}
   if(st.user.modoExtraccion){st.modoServidor=st.user.modoExtraccion;renderSimbar()}
   const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
   $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+' <button type="button" class="linkbtn" id="logout">Salir</button>';

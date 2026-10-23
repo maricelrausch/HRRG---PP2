@@ -702,3 +702,62 @@ El modelo local `modelo_medico_entrenado` y sus dependencias deben estar disponi
 - La integración del chat `/api/chat` de Tomás sigue pendiente. El `app.py` entregado conserva las rutas documentales anteriores (`/chat`, `/upload`), deshabilitadas por defecto; no deben presentarse como chat MedGemma integrado.
 - La espera y las decisiones profesionales todavía no tienen persistencia completa en estas rutas.
 - Este documento describe una propuesta de integración, no una aprobación del equipo ni validación institucional.
+
+## 13. Administración de cuentas y contraseñas
+
+Implementado en `backend/src/admin_usuarios.py` y registrado en `app.py`.
+Pantallas: `frontend/admin.html` (perfil `admin`) y `frontend/cambiar_password.html` (cualquier perfil).
+
+### Perfil `admin`
+
+- Gestiona cuentas y contraseñas. No accede a las rutas clínicas (403 `PERMISO_DENEGADO`).
+- El primer administrador se crea desde la terminal, en la carpeta `backend`:
+
+```powershell
+python -m flask --app app crear-profesional
+python -m flask --app app asignar-rol --rol admin
+```
+
+### Política de contraseñas
+
+- Entre 12 y 256 caracteres, con mayúscula, minúscula, número y símbolo.
+- Vence a los 90 días: al ingresar se exige el cambio.
+- No se puede repetir ninguna de las últimas 5.
+- Cinco intentos fallidos bloquean la cuenta hasta que un administrador la desbloquea.
+- El administrador nunca ve contraseñas: genera una clave temporal de un solo uso (1, 4 o 24 h) que el profesional cambia al ingresar.
+- `flask cambiar-password` (terminal) también desbloquea la cuenta y quita el cambio pendiente: sirve para recuperar un administrador bloqueado.
+
+### Cambios en las rutas existentes
+
+| Ruta | Cambio |
+|---|---|
+| POST /api/login | 423 `CUENTA_BLOQUEADA`; 401 `CLAVE_TEMPORAL_VENCIDA`; la respuesta agrega `debe_cambiar` |
+| GET /api/sesion | Agrega `debe_cambiar`. Responde también al perfil `admin` y a cuentas con cambio pendiente |
+| Rutas protegidas | 403 `CAMBIO_PASSWORD_REQUERIDO` mientras la contraseña esté pendiente de cambio o vencida |
+
+### Rutas nuevas
+
+Todas responden JSON, con `Cache-Control: no-store` y el formato de error común. Los POST exigen `Content-Type: application/json`.
+
+| Ruta | Quién | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET /api/admin/usuarios | admin | — | `usuarios` (id, usuario, nombre, rol, estado, dias_desde_cambio, propia) y `roles` |
+| POST /api/admin/usuarios | admin | `usuario`, `nombre`, `rol` | 201 con `temporal` y `vence_horas` (24) |
+| POST /api/admin/usuarios/<id>/restablecer | admin | `horas`: 1, 4 o 24 | `temporal`, `vence_horas` |
+| POST /api/admin/usuarios/<id>/desbloquear | admin | `{}` | `ok` |
+| POST /api/admin/usuarios/<id>/rol | admin | `rol` | `ok` (no sobre la propia cuenta: 409) |
+| POST /api/admin/usuarios/<id>/activo | admin | `activo`: true/false | `ok` (no sobre la propia cuenta: 409) |
+| GET /api/admin/auditoria | admin | — | `eventos`: las últimas 100 acciones |
+| POST /api/cuenta/password | cualquier sesión | `actual`, `nueva` | `ok` |
+
+Estados de una cuenta: `Activa`, `Vencida`, `Bloqueada`, `Cambio pendiente`, `Desactivada`.
+
+Códigos de error nuevos: `CUENTA_BLOQUEADA` (423), `CLAVE_TEMPORAL_VENCIDA` (401), `CAMBIO_PASSWORD_REQUERIDO` (403), `USUARIO_EXISTENTE` (409), `OPERACION_SOBRE_SI_MISMO` (409), `CUENTA_NO_ENCONTRADA` (404), `PASSWORD_ACTUAL_INCORRECTA`, `PASSWORD_DEBIL` y `PASSWORD_REPETIDA` (400).
+
+### Persistencia
+
+En `~/.hrrg_pp2/usuarios.db`, junto a `profesionales`:
+
+- Columnas nuevas en `profesionales`: `intentos_fallidos`, `bloqueada`, `debe_cambiar`, `password_cambiada`, `temp_vence`. Se agregan solas al iniciar `app.py`.
+- `historial_passwords`: últimos 5 hashes por profesional.
+- `auditoria_cuentas`: fecha, actor, acción, cuenta e IP de cada operación.

@@ -13,14 +13,14 @@ python -m pip install -r requirements.txt
 
 ```powershell
 # Crea las claves si corresponde o verifica las existentes.
-python preparar_identificacion.py
+python scripts/preparar_identificacion.py
 ```
 
 ## Actualización de una base con DNI sin cifrar
 
 ```powershell
 # Crea un respaldo verificado y migra las identificaciones.
-python preparar_identificacion.py --migrar
+python scripts/preparar_identificacion.py --migrar
 ```
 
 La migración conserva los códigos de paciente.

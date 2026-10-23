@@ -16,7 +16,7 @@
       <div class="chips"><span class="chip sim" data-modo="demo"><span class="n">S</span>MODO SIMULADO</span><span class="chip" data-modo="real" hidden>Servidor local</span></div>
     </div>
     <div class="simbar" role="note" data-modo="demo"><b>Acceso simulado, sin autenticación real.</b> Usuarios de demostración y datos ficticios.</div>
-    <div class="simbar" role="note" data-modo="real" hidden><b>Login real contra el servidor local.</b> Datos ficticios: la extracción y la sugerencia siguen simuladas.</div>
+    <div class="simbar" role="note" data-modo="real" hidden><b>Login real contra el servidor local.</b> Solo datos ficticios. La extracción la hace MedGemma si el servidor está en modo IA; la sugerencia de color sigue simulada.</div>
     <div class="body">
       <form class="login" id="loginForm" autocomplete="off" novalidate>
         <h3>Ingreso al triage asistido</h3>
@@ -27,7 +27,7 @@
         <button type="submit" class="btn primary">Ingresar</button>
         <div class="demo-users" data-modo="demo"><b>Usuarios de demostración</b> (contraseña <code>demo</code>):<br><code>enfermeria</code> · Enfermería: triage completo<br><code>medico</code> · Médico/a de guardia: triage completo<br><code>auditor</code> · Calidad: solo lectura de En espera</div>
         <div class="hint" data-modo="demo">Abierta sin servidor: el login es simulado. Para el login real, abrí la app desde Flask (http://127.0.0.1:5000/index.html).</div>
-        <div class="hint" data-modo="real" hidden>Las cuentas se crean desde la terminal (<code>flask crear-profesional</code>). No hay autorregistro.</div>
+        <div class="hint" data-modo="real" hidden>Las cuentas las crea el perfil administrador (pantalla de administración) o la terminal (<code>flask crear-profesional</code>). No hay autorregistro.</div>
       </form>
     </div>
   </section>

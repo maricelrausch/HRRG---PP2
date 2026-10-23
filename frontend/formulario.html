@@ -13,7 +13,7 @@
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="eyebrow">Equipo 1 · PP2 · Sprint 2 · v34 · Datos ficticios / Simulación</div>
+      <div class="eyebrow">Equipo 1 · PP2 · Sprint 2 · v34 · Datos ficticios</div>
       <h1>Maquetado: extracción y revisión de datos</h1>
     </div>
     <nav class="tabs" aria-label="Pantallas">
@@ -125,13 +125,15 @@
             </div>
             <div class="tc-actions"><span class="ia-tag">Sugerencia · requiere validación</span><button type="button" class="robot" id="chatBtn" aria-expanded="false" aria-controls="chat" title="Consultar a la IA sobre esta sugerencia"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="23" fill="var(--accent)"/><line x1="24" y1="8" x2="24" y2="13" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="7" r="2.5" fill="#fff"/><rect x="12" y="13" width="24" height="19" rx="6" fill="#fff"/><circle cx="19" cy="22" r="3" fill="var(--accent)"/><circle cx="29" cy="22" r="3" fill="var(--accent)"/><rect x="19" y="27" width="10" height="2.5" rx="1.2" fill="var(--accent)"/><rect x="9" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="36" y="19" width="3" height="7" rx="1.5" fill="#fff"/><rect x="16" y="33" width="16" height="6" rx="3" fill="#fff"/></svg>Consultar a la IA</button></div>
           </div>
-          <div class="origin" id="tcOrigin"></div>
+          <!-- Origen del color ("Color fijado por regla de seguridad…"): oculto por acuerdo del 21/10. La lógica sigue igual y el chat lo sigue leyendo. -->
+          <div class="origin" id="tcOrigin" hidden></div>
           <div class="triage-body">
             <div><h4>Por qué <span class="n">2</span></h4>
               <ul class="why" id="tcWhy"></ul></div>
             <div id="missBox"><h4>Falta</h4><ul id="triageMiss"></ul></div>
           </div>
-          <details class="fuente" id="fuente"><summary><span class="src f">FUENTE</span><span id="fuenteTxt"></span><span class="prov">ver fragmento</span></summary><div class="frag" id="fuenteFrag"></div></details>
+          <!-- Fuente (guía de EJEMPLO, no oficial): oculta por acuerdo del 21/10. Volver a mostrarla cuando esté la guía del HRRG (A09). -->
+          <details class="fuente" id="fuente" hidden><summary><span class="src f">FUENTE</span><span id="fuenteTxt"></span><span class="prov">ver fragmento</span></summary><div class="frag" id="fuenteFrag"></div></details>
           <div class="subir" id="subir"></div>
           <div class="decision">
             <div class="dbtns"><span class="n" style="position:absolute;margin:-10px 0 0 -10px">3</span>
@@ -153,9 +155,9 @@
             </div>
             <div class="ok" id="okMsg" hidden></div>
           </div>
-          <div class="ia-line" id="iaFix"><span class="ia-tag">IA</span> <span><b>Entendió del relato:</b> <span id="iaRelato"></span></span>
-            <details id="iaDet"><summary>Corregir</summary><div class="g g4" id="g-relato"></div></details></div>
-          <div class="legal"><span class="n">4</span> Herramienta de apoyo a la decisión. No diagnostica ni indica tratamientos. La clasificación final es responsabilidad del profesional interviniente.</div>
+          <!-- Se sacó el texto "IA · Entendió del relato…" (acuerdo 21/10); queda solo la corrección de esos datos. -->
+          <div class="ia-line" id="iaFix"><span id="iaRelato" hidden></span>
+            <details id="iaDet"><summary><span class="n">4</span> Corregir datos del relato</summary><div class="g g4" id="g-relato"></div></details></div>
         </div>
 
         <div id="insufCard" class="insuf" hidden>
@@ -189,7 +191,7 @@
       <div class="body" id="s-espera" hidden>
         <div class="row" style="justify-content:space-between;align-items:flex-end">
           <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span></div>
-          <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio</span><input id="epSearch" placeholder="EP-0048…" autocomplete="off"></label>
+          <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio o DNI</span><input id="epSearch" placeholder="EPI-… o 30.123.456" autocomplete="off"></label>
         </div>
         <div class="werr" id="wErr" hidden></div>
         <div class="wlist" id="wList"></div>

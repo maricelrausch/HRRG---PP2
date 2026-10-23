@@ -15,12 +15,32 @@ En app.py:
     from ia.chat import bp as chat_ia_bp
     app.register_blueprint(chat_ia_bp)
 """
+import threading
+
 from flask import Blueprint, current_app, jsonify, request
 
 from . import medgemma as ia
 from . import transcripcion
 
 bp = Blueprint("iachat", __name__, url_prefix="/api/ia")
+
+
+def precargar_modelos():
+    """Carga los modelos al arrancar la app, EN ORDEN y en segundo plano:
+    primero Whisper (carga + transcripción de prueba) y recién después MedGemma.
+    Si se cargan a la vez compiten por CPU y memoria y los dos tardan más.
+    Se llama desde app.py antes de app.run(); los tests no la usan."""
+    transcripcion._precargando = True   # evita que /api/ia/estado lance otra precarga
+    def en_orden():
+        transcripcion._precalentar()
+        try:
+            if ia.disponible():
+                ia.precalentar()
+            else:
+                print("[MedGemma] Ollama no responde: se intentará en la primera consulta")
+        except Exception as e:
+            print(f"[MedGemma] no se pudo precargar: {e}")
+    threading.Thread(target=en_orden, daemon=True).start()
 
 MAX_PREGUNTA = 1000
 
