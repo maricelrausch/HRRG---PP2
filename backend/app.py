@@ -1725,9 +1725,10 @@ def consultar_espera_demo():
         )
 
     # [Propuesta Barby 23/10 · a revisar por Maricel]
-    # Enfermería y médicos ven el DNI en la lista (pedido del HRRG: el triage del hospital lo muestra).
-    # El auditor no lo recibe. Si las claves fallan, la lista sale igual, sin DNI.
-    if g.profesional["rol"] in {"enfermeria", "medico"}:
+    # Enfermería, médicos y auditor ven el DNI en la lista (pedido del HRRG: el triage del hospital
+    # lo muestra; el auditor lo necesita para cruzar con la historia clínica · acordado en el grupo 23/10).
+    # Si las claves fallan, la lista sale igual, sin DNI.
+    if g.profesional["rol"] in {"enfermeria", "medico", "auditor"}:
         try:
             dnis = dnis_de_pacientes(
                 BASE_REGISTRO_DEMO,

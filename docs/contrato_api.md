@@ -798,8 +798,9 @@ Cada episodio suma dos campos:
 | Campo | Qué es | Quién lo recibe |
 |---|---|---|
 | `motivo_categoria` | Categoría del último `DATOS_INGRESO_REGISTRADOS` (o `null`) | Todos |
-| `dni` | DNI descifrado del paciente (o `null` si no se identificó) | **Solo enfermería y médicos.** El auditor no lo recibe |
+| `dni` | DNI descifrado del paciente (o `null` si no se identificó) | Enfermería, médicos y **auditor** (el auditor se sumó el 23/10, acordado en el grupo, para cruzar con la historia clínica) |
 
 - El DNI se obtiene con `dnis_de_pacientes()` (nuevo, en `identificacion.py`): solo lectura, verifica claves y que el DNI coincida con su índice.
 - Si las claves fallan, la lista sale igual, sin DNI, y se registra `ERROR_DNI_ESPERA` en el log.
-- Motivo: pedido del HRRG (en su triage se ve el DNI). **Decisión a confirmar por el grupo**; para volver atrás alcanza con borrar ese bloque en `consultar_espera_demo`.
+- Motivo: pedido del HRRG (en su triage se ve el DNI) y auditoría. **Acordado en el grupo el 23/10.** Para volver atrás alcanza con quitar roles del conjunto en `consultar_espera_demo`.
+- El auditor ya podía leer el historial (`GET /api/demo/episodios/<ep>`) y la lista por paciente (`GET /api/demo/episodios?codigo_paciente=`): el frontend ahora los muestra (botón "Ver historial" y búsqueda por DNI con todas las atenciones, incluidas las finalizadas).

@@ -36,7 +36,8 @@ const SPECS={
     ['2','Marca a quien superó el tiempo objetivo de su color (tiempos según guía HRRG).'],
     ['3','Reevaluar abre el mismo episodio con los datos anteriores. La tarjeta muestra antes → ahora y el registro guarda las dos versiones.'],
     ['4','Escalar a ROJO rápido, sin volver a cargar datos: solo se elige el motivo (y un detalle si hace falta), que queda registrado. La Guardia no depende de la IA (RNF-04).'],
-    ['⏱','Reloj de reevaluación: cuenta regresiva según el tiempo objetivo de cada color; al vencerse parpadea y pide reevaluar.']],src:'Doc. técnico V1.1 · Re-triage · Cuestionario §6'}
+    ['⏱','Reloj de reevaluación: cuenta regresiva según el tiempo objetivo de cada color; al vencerse parpadea y pide reevaluar.'],
+    ['A','Auditoría (solo lectura): ve el DNI, el historial completo de cada episodio (datos de ingreso, mediciones, correcciones, decisiones y motivos) y, buscando por DNI, todas las atenciones del paciente, incluidas las finalizadas.']],src:'Doc. técnico V1.1 · Re-triage · Cuestionario §6'}
 };
 const LEVELS=[['ROJO','--m-rojo','#FFFFFF','Inmediato'],['NARANJA','--m-naranja','#1A1D26','Muy urgente · 10 min'],['AMARILLO','--m-amarillo','#1A1D26','Urgente · 60 min'],['VERDE','--m-verde','#FFFFFF','Normal · 120 min'],['AZUL','--m-azul','#FFFFFF','No urgente · 240 min']];
 let SUG=2;
@@ -487,29 +488,32 @@ function htmlAnteriores(){
   return '<div class="prev"><b>Atenciones anteriores ('+a.length+')</b><ul>'+a.map(e=>'<li>'+esc(hora(e.creado_en))+' · '+esc(e.codigo_episodio)+' · '+esc(e.profesional_usuario||'')+
     ' <button type="button" class="linkbtn" data-prev="'+esc(e.codigo_episodio)+'">ver historial</button><div class="prevdet" id="pd-'+esc(e.codigo_episodio)+'" hidden></div></li>').join('')+'</ul></div>';
 }
-async function verAnterior(ep){
-  const box=document.getElementById('pd-'+ep);if(!box)return;
+/* Un renglón del historial guardado en el servidor (lo usan el resumen, las atenciones anteriores y el auditor). */
+const horaCorta=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
+function htmlEvento(e){
+  const d=e.datos||{},val=d.valores?Object.entries(d.valores).filter(([k,x])=>x!==false).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+(x===true?'Sí':x)).join(' · '):'';
+  return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(horaCorta(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
+    (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>';
+}
+const htmlEventos=evs=>'<ul>'+(evs||[]).map(htmlEvento).join('')+'</ul>';
+async function verAnterior(ep,btn){
+  /* El detalle va en el recuadro que está justo después del botón (si no, en #pd-<episodio>). */
+  const sig=btn&&btn.nextElementSibling,box=sig&&sig.classList.contains('prevdet')?sig:document.getElementById('pd-'+ep);if(!box)return;
   if(!box.hidden){box.hidden=true;return}
   box.hidden=false;box.textContent='cargando…';
   const r=await TriageAPI.consultarEpisodio(ep);
   if(!r.ok){box.textContent='No se pudo consultar: '+(r.datos.mensaje||'error');return}
-  const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
-  box.innerHTML='<ul>'+(r.datos.episodio.eventos||[]).map(e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+x).join(' · '):'';
-    return '<li>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+' · '+esc(hora(e.ocurrido_en))+(d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.color_final?' · '+esc(d.color_final):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'}).join('')+'</ul>';
+  box.innerHTML=htmlEventos(r.datos.episodio.eventos);
 }
-document.addEventListener('click',e=>{const b=e.target.closest('[data-prev]');if(b){e.preventDefault();verAnterior(b.dataset.prev)}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-prev]');if(b){e.preventDefault();verAnterior(b.dataset.prev,b)}});
 async function renderHistorial(){
   const box=$('#histBox');
   if(!TriageAPI.MODO_REAL||!st.srv.ep){box.hidden=true;return}
   box.hidden=false;box.innerHTML='<b>Historial guardado en el servidor</b> · cargando…';
   const r=await TriageAPI.consultarEpisodio(st.srv.ep);
   if(!r.ok){box.innerHTML='<b>Historial guardado en el servidor.</b> No se pudo consultar: '+esc(r.datos.mensaje||'error');return}
-  const hora=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'});
-  const fila=e=>{const d=e.datos||{},val=d.valores?Object.entries(d.valores).filter(([k,x])=>x!==false).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+(x===true?'Sí':x)).join(' · '):'';
-    return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(hora(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
-      (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>'};
   box.innerHTML=htmlAnteriores()+'<b>Historial guardado en el servidor</b> · '+esc(st.srv.ep)+(st.srv.aviso?'<br><span class="w">'+esc(st.srv.aviso)+'</span>':'')+
-    '<ul>'+(r.datos.episodio.eventos||[]).map(fila).join('')+'</ul>';
+    htmlEventos(r.datos.episodio.eventos);
 }
 $('#demoWorse').addEventListener('click',()=>{Object.assign(st.rev,{saturacion_o2:'86',frecuencia_cardiaca:'125',frecuencia_respiratoria:'26',br_disnea:true});renderForm()});
 $('#demoVitals').addEventListener('click',()=>{Object.assign(st.rev,DEMO);renderForm()});
