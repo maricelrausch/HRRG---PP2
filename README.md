@@ -120,7 +120,9 @@ HRRG---PP2/
 │   ├── maquetado_extraccion_v33.html
 │   ├── formulario.html
 │   ├── estilos.css
-│   ├── formulario.js
+│   ├── formulario.js      # lógica común (ingreso, medición, resumen, sesión)
+│   ├── sugerencia.js      # tarjeta de sugerencia y decisión (A09)
+│   ├── espera.js          # En espera y reevaluación (A10)
 │   ├── validacion.js
 │   └── img/
 │       └── logo-hrrg.png

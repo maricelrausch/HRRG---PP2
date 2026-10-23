@@ -108,6 +108,11 @@ function aUsuario(datos) {
   function crearEpisodio(codigoPaciente) {
     return pedir('/api/demo/episodios', { method: 'POST', body: JSON.stringify({ codigo_paciente: codigoPaciente }) });
   }
+  /* Datos de ingreso revisados (edad, sexo y lo extraído del relato). Nunca el relato ni el DNI. */
+  function registrarDatosIngreso(episodio, datos, origenExtraccion) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/datos-ingreso',
+      { method: 'POST', body: JSON.stringify({ datos: datos, origen_extraccion: origenExtraccion || null }) });
+  }
   function registrarMedicion(episodio, medidoEn, valores) {
     return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/mediciones',
       { method: 'POST', body: JSON.stringify({ medido_en: medidoEn, valores: valores }) });
@@ -152,7 +157,7 @@ function aUsuario(datos) {
   }
 
   root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
-    crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
+    crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, registrarDatosIngreso: registrarDatosIngreso, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
     identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, registrarDecision: registrarDecision };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -295,3 +295,51 @@ def identificar_paciente_demo(ruta_base, dni, profesional_usuario):
 
     finally:
         conexion.close()
+
+
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Devuelve {codigo_paciente: dni} para mostrar el DNI en la lista de espera.
+# Solo lectura: no crea pacientes. Verifica que el DNI descifrado coincida con su índice.
+# La ruta Flask decide qué roles lo reciben (enfermería y médicos, no auditor).
+def dnis_de_pacientes(ruta_base, codigos_paciente):
+    codigos = [
+        codigo for codigo in dict.fromkeys(codigos_paciente or [])
+        if isinstance(codigo, str) and codigo.strip()
+    ]
+
+    if not codigos:
+        return {}
+
+    cifrado = CifradoIdentificacion()
+    conexion = _conectar(ruta_base, solo_lectura=True)
+
+    try:
+        conexion.execute("BEGIN")
+        _verificar_base(conexion, cifrado)
+
+        marcas = ",".join("?" for _ in codigos)
+        filas = conexion.execute(
+            f"""
+            SELECT codigo_paciente, dni_cifrado, dni_indice
+            FROM identificacion_pacientes
+            WHERE codigo_paciente IN ({marcas})
+            """,
+            codigos,
+        ).fetchall()
+
+        resultado = {}
+
+        for fila in filas:
+            dni = cifrado.descifrar(fila["dni_cifrado"])
+
+            if not hmac.compare_digest(cifrado.indice(dni), fila["dni_indice"]):
+                raise ErrorCifradoIdentificacion(
+                    "La identificación almacenada no coincide con su índice."
+                )
+
+            resultado[fila["codigo_paciente"]] = dni
+
+        return resultado
+
+    finally:
+        conexion.close()

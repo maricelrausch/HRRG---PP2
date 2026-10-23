@@ -282,6 +282,8 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .wt{color:var(--muted);font-size:13px;min-width:96px}
 .wf{display:flex;gap:6px;flex-wrap:wrap}
 .wa{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.histpanel{flex-basis:100%;margin:6px 0 0;font-size:13px}
+.histpanel .prev{margin-top:8px}
 .escform{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:8px;font-size:13px}
 .escform select,.escform input{flex:1 1 200px;min-width:0}
 .escform .row{display:flex;gap:6px}
@@ -408,6 +410,7 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 
 /* DNI del paciente (ingreso) */
 .ident-pac{margin-bottom:12px}
+.label .opt{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
 .ident-pac .opt{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
 .ident-pac input{width:200px;max-width:100%;font-family:var(--f-mono);font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ident-pac input.bad{border:2px solid var(--err)}
