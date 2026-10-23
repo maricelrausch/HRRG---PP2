@@ -26,11 +26,11 @@ const SPECS={
     ['4','Avisa faltantes, rangos y discordancias. Con 3 o más vitales sin medir no se emite prioridad (RF-10). “Clasificar sin IA” siempre disponible (§6).']],src:'Doc. técnico V1.1 · Cuestionario §2 · RNF-01'},
   resumen:{t:'Pantalla 3 · Sugerencia',items:[
     ['1','Color Manchester sugerido, grande (hoy: simulado con reglas de ejemplo).'],
-    ['2','Por qué, con cada motivo marcado REGLA o IA. Las reglas fijan un piso: la IA no puede sugerir menos (no downgrade).'],
+    ['2','Por qué: explicación clínica comprensible. Agrupa las variables que van juntas y dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso respiratorio"), marcadas REGLA, GUÍA o IA. Las reglas fijan un piso: la IA no puede sugerir menos (no downgrade).'],
     ['3','Aceptar con un toque. Modificar o Rechazar piden motivo.'],
     ['4','Corregir datos del relato: lo que extrajo la IA se puede corregir acá. La decisión final es del profesional.'],
     ['5','Reglas provisorias de ejemplo: los umbrales los aprueban Guardia y Enfermería.'],
-    ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No y recalculan al instante (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
+    ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No, recalculan al instante y quedan guardados en la decisión del servidor (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
   espera:{t:'Pantalla 4 · En espera',items:[
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],
     ['2','Marca a quien superó el tiempo objetivo de su color (tiempos según guía HRRG).'],

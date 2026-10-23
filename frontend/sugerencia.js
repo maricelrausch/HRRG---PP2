@@ -26,20 +26,36 @@ const PAGE={'Dolor abdominal':'[pág. —]','Dolor torácico':'[pág. —]','_':
 const diag=()=>DISC[st.rev.motivo_categoria]?st.rev.motivo_categoria:'_';
 const diagName=()=>diag()==='_'?'Malestar en adulto (general)':diag();
 /* Reglas de seguridad PROVISORIAS (ejemplo para el prototipo; umbrales a aprobar por Guardia y Enfermería del HRRG) */
+/* Explicación clínica comprensible (pedido del documento del proyecto): en vez de listar valores sueltos,
+   agrupa los que van juntos en una frase que dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso
+   respiratorio"). Los umbrales y niveles son los mismos de antes: solo cambia cómo se explica. */
 function reglas(){
   const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),out=[];
   const add=(lv,t)=>out.push({lv,t});
-  if(r.br_convulsion)add(0,'Convulsión activa');
-  if(n('glasgow')!=null&&n('glasgow')<=8)add(0,'Glasgow '+r.glasgow);
-  if(r.br_sangrado&&n('ta_sistolica')!=null&&n('ta_sistolica')<90)add(0,'Sangrado con hipotensión');
-  else if(r.br_sangrado)add(1,'Sangrado evidente');
-  if(n('saturacion_o2')!=null&&n('saturacion_o2')<90)add(1,'SpO₂ '+r.saturacion_o2+' %');
-  if(n('ta_sistolica')!=null&&n('ta_sistolica')<90)add(1,'Hipotensión (TA '+r.ta_sistolica+'/'+(r.ta_diastolica||'—')+')');
-  if(n('frecuencia_cardiaca')!=null&&(n('frecuencia_cardiaca')>130||n('frecuencia_cardiaca')<40))add(1,'FC '+r.frecuencia_cardiaca+' lpm');
-  if(n('frecuencia_respiratoria')!=null&&(n('frecuencia_respiratoria')>30||n('frecuencia_respiratoria')<8))add(1,'FR '+r.frecuencia_respiratoria+' rpm');
-  if((r.estado_conciencia&&r.estado_conciencia!=='Alerta')||(n('glasgow')!=null&&n('glasgow')>8&&n('glasgow')<15))add(1,'Alteración del nivel de conciencia');
-  if(r.br_disnea)add(1,'Dificultad para respirar');
-  if(r.ant_inmuno&&n('temperatura')!=null&&n('temperatura')>=38)add(1,'Fiebre en inmunosuprimido');
+  const lista=a=>a.length<2?a[0]:a.slice(0,-1).join(', ')+' y '+a[a.length-1];
+  /* Neurológico */
+  if(r.br_convulsion)add(0,'Convulsión activa: compromiso neurológico agudo');
+  if(n('glasgow')!=null&&n('glasgow')<=8)add(0,'Glasgow '+r.glasgow+': conciencia muy deprimida, riesgo para la vía aérea');
+  else if((r.estado_conciencia&&r.estado_conciencia!=='Alerta')||(n('glasgow')!=null&&n('glasgow')<15))
+    add(1,'Alteración del nivel de conciencia ('+(n('glasgow')!=null&&n('glasgow')<15?'Glasgow '+r.glasgow:r.estado_conciencia)+'): posible compromiso neurológico');
+  /* Respiratorio: SpO₂ baja, FR alterada y disnea se explican juntas */
+  const resp=[];
+  if(n('saturacion_o2')!=null&&n('saturacion_o2')<90)resp.push('SpO₂ '+r.saturacion_o2+' %');
+  if(n('frecuencia_respiratoria')!=null&&n('frecuencia_respiratoria')>30)resp.push('taquipnea (FR '+r.frecuencia_respiratoria+' rpm)');
+  if(n('frecuencia_respiratoria')!=null&&n('frecuencia_respiratoria')<8)resp.push('bradipnea (FR '+r.frecuencia_respiratoria+' rpm)');
+  if(r.br_disnea)resp.push('dificultad para respirar');
+  if(resp.length){const t=lista(resp);add(1,t.charAt(0).toUpperCase()+t.slice(1)+': posible compromiso respiratorio')}
+  /* Circulatorio: sangrado, hipotensión y FC alterada */
+  const hipo=n('ta_sistolica')!=null&&n('ta_sistolica')<90,ta='TA '+r.ta_sistolica+'/'+(r.ta_diastolica||'—');
+  const fc=n('frecuencia_cardiaca')!=null&&(n('frecuencia_cardiaca')>130||n('frecuencia_cardiaca')<40)?(n('frecuencia_cardiaca')>130?'taquicardia':'bradicardia')+' (FC '+r.frecuencia_cardiaca+' lpm)':null;
+  if(r.br_sangrado&&hipo)add(0,'Sangrado con hipotensión ('+ta+(fc?', FC '+r.frecuencia_cardiaca+' lpm':'')+'): posible shock por pérdida de sangre');
+  else{
+    if(r.br_sangrado)add(1,'Sangrado evidente: riesgo de pérdida de volumen');
+    const circ=[];if(hipo)circ.push('hipotensión ('+ta+')');if(fc)circ.push(fc);
+    if(circ.length){const t=lista(circ);add(1,t.charAt(0).toUpperCase()+t.slice(1)+(hipo?': posible compromiso circulatorio (shock)':': alteración del ritmo o compromiso circulatorio'))}
+  }
+  /* Otros */
+  if(r.ant_inmuno&&n('temperatura')!=null&&n('temperatura')>=38)add(1,'Fiebre ('+r.temperatura+' °C) en paciente inmunosuprimido: riesgo de infección grave');
   if(n('dolor_intensidad')!=null&&n('dolor_intensidad')>=8)add(1,'Dolor intenso ('+r.dolor_intensidad+'/10)');
   return out;
 }
@@ -167,7 +183,20 @@ function textoMotivo(){
   const m=$('#motivo').value,d=($('#detalle').value||'').trim();
   return [m,d].filter(Boolean).join('. ');
 }
+/* Discriminadores de la guía que el profesional respondió (Sí/No en "Pasaría a…"): van a la decisión guardada,
+   así quedan en el historial del servidor y no solo en el registro de la pantalla. */
+function textoDiscriminadores(){
+  const si=[],no=[];
+  Object.entries(st.disc).forEach(([k,v])=>{const t=k.split('|')[1];if(v==='si')si.push(t);else if(v==='no')no.push(t)});
+  return [si.length?'Discriminadores confirmados: '+si.join(', ')+'.':'',no.length?'Descartados: '+no.join(', ')+'.':''].filter(Boolean).join(' ');
+}
 function decisionActual(lv){
+  const d=decisionBase(lv),disc=st.manual?'':textoDiscriminadores();
+  if(disc)d.motivo=(d.motivo?d.motivo.replace(/\.?$/,'. '):'')+disc;
+  d.motivo=d.motivo.slice(0,1000);
+  return d;
+}
+function decisionBase(lv){
   if(st.manual)return {decision:'modificada',color:LEVELS[lv][0],motivo:'Clasificación manual sin asistencia IA.'};
   if(st.decision==='aceptar')return {decision:'aceptada',color:LEVELS[lv][0],motivo:''};
   if(st.decision==='rechazar')return {decision:'modificada',color:LEVELS[lv][0],motivo:('Sugerencia rechazada; clasificación manual. '+textoMotivo()).trim()};
