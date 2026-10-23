@@ -408,6 +408,7 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 
 /* DNI del paciente (ingreso) */
 .ident-pac{margin-bottom:12px}
+.label .opt{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
 .ident-pac .opt{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
 .ident-pac input{width:200px;max-width:100%;font-family:var(--f-mono);font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ident-pac input.bad{border:2px solid var(--err)}

@@ -10,7 +10,6 @@ const SPECS={
     ['P','Si detecta un DNI o teléfono en el relato, avisa y no lo envía a la IA (§4).'],
     ['M','Dictado por voz: transcribe al cuadro y se puede editar.'],
     ['2','No envía texto vacío. Mientras procesa, botón bloqueado.'],
-    ['3','Ante un error, el texto se conserva.'],
     ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
   revision:{t:'Pantalla 2 · Medición',items:[
     ['1','Solo lo que se mide en el box. Nombre completo, unidad y referencia en cada campo. Enter pasa al siguiente.'],

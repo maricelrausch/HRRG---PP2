@@ -49,12 +49,11 @@
         <div class="banner" id="errBanner" hidden><b id="errTitle"></b><span id="errMsg"></span><span class="code" id="errCode"></span></div>
         <div class="banner" id="piiBanner" hidden><b>El relato parece tener un dato personal (DNI o teléfono).</b><span>La IA no puede recibir datos identificatorios. Quitalo antes de seguir.</span><div class="row" style="margin-top:6px"><button type="button" class="btn" id="piiFix">Quitar dato y continuar</button></div></div>
         <div class="ident-pac">
-          <label class="label" for="dni">DNI del paciente <span class="opt">opcional · para vincular con la historia clínica</span></label>
+          <label class="label" for="dni">DNI</label>
           <input id="dni" inputmode="numeric" autocomplete="off" placeholder="Ej. 30.123.456" maxlength="11">
-          <div class="hint" id="dniHint">El DNI <b>no se envía a la IA</b>: queda aparte del relato. El servidor lo vincula con un código de paciente para juntar todas sus atenciones. En pruebas, usar un DNI ficticio.</div>
         </div>
-        <div class="note"><b>Caso ficticio.</b> En el relato no escribas ni dictes nombre, DNI, domicilio ni teléfono: el DNI va solo en su campo, arriba.</div>
-        <label class="label" for="caso">Descripción del evento. <span class="n">1</span></label>
+        <!-- Textos del ingreso simplificados (pedido 22/10): el aviso de caso ficticio va al lado del título. -->
+        <label class="label" for="caso">Descripción del evento. <span class="n">1</span> <span class="opt">Caso ficticio: sin nombre, DNI, domicilio ni teléfono en el relato.</span></label>
         <div class="field-wrap">
           <textarea id="caso">Me duele mucho la panza, acá arriba, desde hace unas 6 horas. Tengo ganas de vomitar y me siento afiebrada. Soy diabética, tomo pastillas.</textarea>
           <button type="button" class="mic" id="mic" aria-pressed="false">
@@ -68,7 +67,6 @@
           <button type="button" class="btn" id="borrar">Borrar texto</button>
         </div>
         <div class="processing" id="proc" hidden>Simulando la extracción… El texto queda guardado.</div>
-        <div class="hint"><span class="n">3</span> Si algo falla, el mensaje aparece arriba y el texto se conserva.</div>
       </div>
 
       <!-- 2 · MEDICIÓN -->
