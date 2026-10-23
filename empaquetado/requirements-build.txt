@@ -1,0 +1,4 @@
+# Solo para construir el instalador (además de backend/requirements.txt)
+pyinstaller==6.11.1
+waitress==3.0.2
+pillow==11.0.0
