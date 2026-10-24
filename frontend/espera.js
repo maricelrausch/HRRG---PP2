@@ -36,10 +36,18 @@ async function cargarHistorialAuditor(w){
 }
 /* Historial de casos (auditoría): todos los episodios, también los finalizados, de a 50.
    Se puede filtrar por estado y abrir el historial de cada uno. Solo lectura. */
-const CASOS={lista:[],total:0,abierto:false,cargando:false,filtro:''};
+const CASOS={lista:[],total:0,abierto:false,cargando:false,filtro:'',desde:'',hasta:''};
+/* Fechas del filtro (AAAA-MM-DD, hora local) → rango ISO para el servidor: desde 00:00 hasta el día siguiente 00:00. */
+const fechaLocal=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function rangoCasos(){
+  const iso=(f,mas)=>{if(!f)return null;const [a,m,d]=f.split('-').map(Number);return new Date(a,m-1,d+(mas||0)).toISOString()};
+  return {desde:iso(CASOS.desde),hasta:iso(CASOS.hasta,1)};
+}
+const fmtFecha=f=>f?f.split('-').reverse().join('/'):'';
 async function cargarCasos(mas){
   if(CASOS.cargando)return;CASOS.cargando=true;renderCasos();
-  const r=await TriageAPI.listarCasos(50,mas?CASOS.lista.length:0);
+  if(CASOS.desde&&CASOS.hasta&&CASOS.desde>CASOS.hasta){CASOS.cargando=false;CASOS.error='La fecha "desde" tiene que ser anterior o igual a "hasta".';CASOS.lista=[];CASOS.total=0;renderCasos();return}
+  const r=await TriageAPI.listarCasos(50,mas?CASOS.lista.length:0,rangoCasos());
   CASOS.cargando=false;
   if(r.estado===401){location.href='index.html';return}
   if(!r.ok){CASOS.error='No se pudo consultar el historial de casos: '+((r.datos&&r.datos.mensaje)||'error');renderCasos();return}
@@ -53,8 +61,14 @@ function renderCasos(){
   const est={'':'Todos los estados',en_espera:'En espera',finalizado:'Finalizados',en_ingreso:'En ingreso'};
   const vis=CASOS.lista.filter(c=>!CASOS.filtro||c.estado===CASOS.filtro);
   const chip=c=>{const L=LEVELS.find(x=>x[0]===c.color_final);return L?'<span class="chipc" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</span>':'<span class="hint">sin color</span>'};
-  box.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><b>Historial de casos</b> <span class="hint">'+CASOS.lista.length+' de '+CASOS.total+' episodios · solo lectura</span>'+
-    '<select id="casosFiltro">'+Object.entries(est).map(([k,v])=>'<option value="'+k+'"'+(k===CASOS.filtro?' selected':'')+'>'+v+'</option>').join('')+'</select></div>'+
+  const rangoTxt=CASOS.desde||CASOS.hasta?' · '+(CASOS.desde&&CASOS.hasta&&CASOS.desde===CASOS.hasta?'del '+fmtFecha(CASOS.desde):(CASOS.desde?'desde '+fmtFecha(CASOS.desde):'')+(CASOS.hasta?' hasta '+fmtFecha(CASOS.hasta):'')):'';
+  box.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><b>Historial de casos</b> <span class="hint">'+CASOS.lista.length+' de '+CASOS.total+' episodios'+rangoTxt+' · solo lectura</span>'+
+    '<span class="row"><select id="casosFiltro">'+Object.entries(est).map(([k,v])=>'<option value="'+k+'"'+(k===CASOS.filtro?' selected':'')+'>'+v+'</option>').join('')+'</select>'+
+    '<button type="button" class="btn sm" id="casosExcel"'+(CASOS.exportando?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Exportar a Excel (sin DNI)')+'</button></span></div>'+
+    '<div class="row casos-fechas"><label class="hint">Desde <input type="date" id="casosDesde" value="'+CASOS.desde+'"></label>'+
+    '<label class="hint">Hasta <input type="date" id="casosHasta" value="'+CASOS.hasta+'"></label>'+
+    '<button type="button" class="btn sm" data-rango="hoy">Hoy</button><button type="button" class="btn sm" data-rango="7">Últimos 7 días</button>'+
+    (CASOS.desde||CASOS.hasta?'<button type="button" class="linkbtn" data-rango="todo">Quitar fechas</button>':'')+'</div>'+
     (CASOS.error?'<div class="werr">'+esc(CASOS.error)+'</div>':'')+
     '<ul>'+vis.map(c=>'<li>'+esc(horaCorta(c.creado_en))+' · <b>'+esc(c.codigo_episodio)+'</b>'+(c.dni?' · DNI '+esc(fmtDni(c.dni)):'')+' · '+esc(c.motivo_categoria||'—')+' · '+
       esc(NOMBRE_ESTADO[c.estado]||c.estado||'sin estado')+' · '+chip(c)+' · '+esc(c.profesional_usuario||'')+
@@ -63,8 +77,24 @@ function renderCasos(){
     (CASOS.cargando?'<div class="hint">Cargando…</div>':CASOS.lista.length<CASOS.total?'<button type="button" class="btn sm" id="casosMas">Ver más</button>':'');
 }
 $('#verCasos').addEventListener('click',()=>{CASOS.abierto=!CASOS.abierto;if(CASOS.abierto)cargarCasos(false);else renderCasos()});
-$('#casosBox').addEventListener('change',e=>{if(e.target.id==='casosFiltro'){CASOS.filtro=e.target.value;renderCasos()}});
-$('#casosBox').addEventListener('click',e=>{if(e.target.id==='casosMas')cargarCasos(true)});
+$('#casosBox').addEventListener('change',e=>{if(e.target.id==='casosFiltro'){CASOS.filtro=e.target.value;renderCasos()}
+  if(e.target.id==='casosDesde'||e.target.id==='casosHasta'){CASOS[e.target.id==='casosDesde'?'desde':'hasta']=e.target.value;cargarCasos(false)}});
+$('#casosBox').addEventListener('click',e=>{if(e.target.id==='casosMas')cargarCasos(true);if(e.target.id==='casosExcel')exportarCasos();
+  const rg=e.target.closest('[data-rango]');if(rg){const hoy=new Date(),h=fechaLocal(hoy);
+    if(rg.dataset.rango==='hoy'){CASOS.desde=h;CASOS.hasta=h}
+    else if(rg.dataset.rango==='7'){CASOS.desde=fechaLocal(new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-6));CASOS.hasta=h}
+    else{CASOS.desde='';CASOS.hasta=''}
+    cargarCasos(false)}});
+/* Exporta TODOS los episodios del filtro elegido (no solo los cargados en pantalla). Sin DNI. */
+async function exportarCasos(){
+  CASOS.exportando=true;CASOS.error=null;renderCasos();
+  const r=await TriageAPI.exportarCasos(CASOS.filtro,rangoCasos());
+  CASOS.exportando=false;
+  if(r.estado===401){location.href='index.html';return}
+  if(!r.ok){CASOS.error='No se pudo exportar: '+r.mensaje;renderCasos();return}
+  const url=URL.createObjectURL(r.blob),a=document.createElement('a');a.href=url;a.download=r.nombre;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);renderCasos();
+}
 async function cargarAtencionesPaciente(pac){
   if(PAC_ATENC[pac]!==undefined)return;PAC_ATENC[pac]=null;
   const r=await TriageAPI.episodiosDePaciente(pac);

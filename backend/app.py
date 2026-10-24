@@ -20,6 +20,8 @@ from src.registro import (
     registrar_medicion_demo,
     corregir_medicion_demo,
     registrar_datos_ingreso_demo,
+    exportar_episodios_demo,
+    COLUMNAS_EXPORTACION,
 )
 from src.registro import (
     registrar_decision_demo,
@@ -354,6 +356,7 @@ def verificar_acceso():
         "agregar_medicion_demo",
         "agregar_correccion_demo",
         "agregar_datos_ingreso_demo",
+        "exportar_episodios_demo_csv",
         "analizar_paciente",
         "listar_episodios_demo",
         "consultar_estado_episodio_demo",
@@ -431,6 +434,7 @@ def verificar_acceso():
             "listar_episodios_demo",
             "consultar_estado_episodio_demo",
             "consultar_espera_demo",
+            "exportar_episodios_demo_csv",
         }
 
         consulta_get = (
@@ -1467,7 +1471,9 @@ def listar_episodios_demo():
         "codigo_paciente",
         "codigo_episodio",
         "limite",
-        "desplazamiento"
+        "desplazamiento",
+        "desde",
+        "hasta"
     }
 
     # Rechaza parámetros desconocidos o repetidos.
@@ -1522,8 +1528,12 @@ def listar_episodios_demo():
             codigo_paciente=filtros["codigo_paciente"],
             codigo_episodio=filtros["codigo_episodio"],
             limite=limite,
-            desplazamiento=desplazamiento
+            desplazamiento=desplazamiento,
+            desde=request.args.get("desde"),
+            hasta=request.args.get("hasta")
         )
+    except ValueError as error:
+        return respuesta_error(str(error), 422, "FECHAS_INVALIDAS")
     except sqlite3.Error:
         logger_sistema.error("ERROR_LISTAR_EPISODIOS_DEMO")
         return respuesta_error(
@@ -1554,6 +1564,85 @@ def listar_episodios_demo():
         "limite": limite,
         "desplazamiento": desplazamiento
     })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+# ------------------------------------------------
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Exportar el historial de casos a CSV (se abre con Excel). Solo auditor.
+# NO incluye el DNI: cada paciente aparece con su código interno.
+# Queda registrado en sistema.log quién exportó y cuántas filas.
+# ------------------------------------------------
+@app.route("/api/demo/episodios/exportar.csv", methods=["GET"])
+def exportar_episodios_demo_csv():
+    if g.profesional["rol"] != "auditor":
+        return respuesta_error(
+            "Solo el perfil auditor puede exportar el historial de casos.",
+            403,
+            "PERMISO_DENEGADO"
+        )
+
+    if set(request.args) - {"estado", "desde", "hasta"}:
+        return respuesta_error(
+            "Los parámetros de consulta no son válidos.",
+            400,
+            "PARAMETROS_INVALIDOS"
+        )
+
+    try:
+        filas = exportar_episodios_demo(
+            BASE_REGISTRO_DEMO,
+            estado=request.args.get("estado") or None,
+            desde=request.args.get("desde"),
+            hasta=request.args.get("hasta")
+        )
+    except ValueError as error:
+        return respuesta_error(str(error), 422, "FILTRO_INVALIDO")
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_EXPORTAR_CASOS")
+        return respuesta_error(
+            "No se pudo exportar el historial de casos.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    import csv
+    import io
+    from datetime import datetime as _dt
+
+    def celda(valor, campo):
+        if valor is None:
+            return ""
+        if campo.startswith("fecha_"):
+            try:
+                return _dt.fromisoformat(valor).astimezone().strftime("%d/%m/%Y %H:%M")
+            except ValueError:
+                return valor
+        if isinstance(valor, float):
+            return f"{valor:g}".replace(".", ",")   # Excel en español usa coma decimal
+        texto = str(valor)
+        # Evita que Excel interprete el texto como fórmula (inyección CSV).
+        if texto[:1] in ("=", "+", "-", "@"):
+            texto = "'" + texto
+        return texto
+
+    salida = io.StringIO()
+    escritor = csv.writer(salida, delimiter=";", lineterminator="\r\n")
+    escritor.writerow([titulo for _, titulo in COLUMNAS_EXPORTACION])
+    for fila in filas:
+        escritor.writerow([celda(fila.get(campo), campo) for campo, _ in COLUMNAS_EXPORTACION])
+
+    logger_sistema.info(
+        "EXPORTAR_CASOS_CSV | %s | %d filas",
+        g.profesional["usuario"], len(filas)
+    )
+
+    nombre = "casos_triage_" + _dt.now().strftime("%Y%m%d_%H%M") + ".csv"
+    respuesta = app.response_class(
+        "\ufeff" + salida.getvalue(),           # BOM: Excel reconoce los acentos
+        mimetype="text/csv; charset=utf-8"
+    )
+    respuesta.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
 

@@ -138,8 +138,26 @@ function aUsuario(datos) {
     return pedir('/api/demo/pacientes/buscar', { method: 'POST', body: JSON.stringify({ dni: dni }) });
   }
   /* Historial de casos (todos los episodios, del más nuevo al más viejo), de a páginas. */
-  function listarCasos(limite, desplazamiento) {
-    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0), { method: 'GET', cache: 'no-store' });
+  /* rango = { desde, hasta } en ISO con zona horaria (desde inclusive, hasta exclusivo); opcional. */
+  function paramsRango(rango) {
+    let q = '';
+    if (rango && rango.desde) q += '&desde=' + encodeURIComponent(rango.desde);
+    if (rango && rango.hasta) q += '&hasta=' + encodeURIComponent(rango.hasta);
+    return q;
+  }
+  function listarCasos(limite, desplazamiento, rango) {
+    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango), { method: 'GET', cache: 'no-store' });
+  }
+  /* Exportación del historial de casos (auditor): CSV para Excel, sin DNI. Devuelve el archivo como Blob. */
+  async function exportarCasos(estado, rango) {
+    try {
+      const q = ((estado ? '&estado=' + encodeURIComponent(estado) : '') + paramsRango(rango)).replace(/^&/, '?');
+      const r = await fetch('/api/demo/episodios/exportar.csv' + q,
+        { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) { let m = 'error ' + r.status; try { m = (await r.json()).mensaje || m; } catch (e) {} return { ok: false, estado: r.status, mensaje: m }; }
+      const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'casos_triage.csv';
+      return { ok: true, blob: await r.blob(), nombre: nombre };
+    } catch (e) { return { ok: false, estado: 0, mensaje: 'No se pudo conectar con el servidor.' }; }
   }
   function episodiosDePaciente(codigoPaciente) {
     return pedir('/api/demo/episodios?codigo_paciente=' + encodeURIComponent(codigoPaciente) + '&limite=20', { method: 'GET', cache: 'no-store' });
@@ -163,5 +181,5 @@ function aUsuario(datos) {
   root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, registrarDatosIngreso: registrarDatosIngreso, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
-    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, listarCasos: listarCasos, registrarDecision: registrarDecision };
+    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, listarCasos: listarCasos, exportarCasos: exportarCasos, registrarDecision: registrarDecision };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

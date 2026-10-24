@@ -674,15 +674,47 @@ def corregir_medicion_demo(
 
 # Busca episodios por código exacto de paciente o de episodio.
 # Devuelve una página de resultados; no modifica los registros.
+# [Propuesta Barby 23/10] Rango de fechas para el historial de casos y la exportación.
+# Recibe fechas ISO con zona horaria; las compara en UTC con creado_en.
+# desde = inclusive, hasta = exclusivo.
+def normalizar_rango(desde=None, hasta=None):
+    resultado = []
+    for valor in (desde, hasta):
+        if valor in (None, ""):
+            resultado.append(None)
+            continue
+        if not isinstance(valor, str):
+            raise ValueError("Las fechas deben enviarse como texto ISO 8601.")
+        fecha = datetime.fromisoformat(valor.replace("Z", "+00:00"))
+        if fecha.utcoffset() is None:
+            raise ValueError("Las fechas deben incluir la zona horaria.")
+        resultado.append(
+            fecha.astimezone(timezone.utc).isoformat(timespec="microseconds")
+        )
+    if resultado[0] and resultado[1] and resultado[0] >= resultado[1]:
+        raise ValueError("La fecha 'desde' debe ser anterior a 'hasta'.")
+    return resultado
+
+
 def buscar_episodios(
     ruta_base,
     codigo_paciente=None,
     codigo_episodio=None,
     limite=50,
-    desplazamiento=0
+    desplazamiento=0,
+    desde=None,
+    hasta=None
 ):
     condiciones = []
     parametros = []
+
+    desde, hasta = normalizar_rango(desde, hasta)
+    if desde:
+        condiciones.append("e.creado_en >= ?")
+        parametros.append(desde)
+    if hasta:
+        condiciones.append("e.creado_en < ?")
+        parametros.append(hasta)
 
     # Los valores se pasan como parámetros para evitar inyección SQL.
     if codigo_paciente:
@@ -1257,3 +1289,151 @@ def registrar_decision_demo(
         # Libera la conexión también si se rechaza o falla el guardado.
         conexion.close()
         
+
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Exportación para auditoría: una fila por episodio, SIN DNI (solo el código de paciente).
+# Datos de ingreso, última medición vigente (con correcciones), decisión final y conteos.
+COLUMNAS_EXPORTACION = [
+    ("fecha_ingreso", "Fecha de ingreso"),
+    ("codigo_episodio", "Episodio"),
+    ("codigo_paciente", "Código de paciente"),
+    ("profesional_ingreso", "Profesional que ingresó"),
+    ("estado", "Estado"),
+    ("edad", "Edad"),
+    ("sexo", "Sexo"),
+    ("motivo_categoria", "Categoría"),
+    ("motivo_consulta", "Motivo de consulta"),
+    ("tiempo_evolucion", "Tiempo de evolución"),
+    ("banderas_rojas", "Banderas rojas"),
+    ("antecedentes", "Antecedentes"),
+    ("ta_sistolica", "TA sistólica"),
+    ("ta_diastolica", "TA diastólica"),
+    ("frecuencia_cardiaca", "FC"),
+    ("frecuencia_respiratoria", "FR"),
+    ("saturacion_o2", "SpO2"),
+    ("temperatura", "Temperatura"),
+    ("glucemia", "Glucemia"),
+    ("estado_conciencia", "Conciencia"),
+    ("glasgow", "Glasgow"),
+    ("dolor_intensidad", "Dolor (0-10)"),
+    ("mediciones", "Cantidad de mediciones"),
+    ("correcciones", "Cantidad de correcciones"),
+    ("color_final", "Color final"),
+    ("decision", "Decisión"),
+    ("motivo_decision", "Motivo de la decisión"),
+    ("profesional_decision", "Profesional que decidió"),
+    ("fecha_decision", "Fecha de la decisión"),
+    ("decisiones", "Cantidad de decisiones"),
+    ("escalado_rojo", "Escalado a ROJO en espera"),
+    ("fecha_finalizacion", "Fecha de finalización"),
+]
+
+_BANDERAS = {
+    "br_sangrado": "Sangrado", "br_convulsion": "Convulsión",
+    "br_disnea": "Dificultad para respirar", "br_trauma": "Trauma",
+}
+_ANTECEDENTES = {
+    "ant_diabetes": "Diabetes", "ant_cardio": "Cardiovascular", "ant_resp": "Respiratorio",
+    "ant_anticoag": "Anticoagulación", "ant_inmuno": "Inmunosupresión",
+    "ant_embarazo": "Embarazo", "ant_medicacion": "Medicación crítica",
+}
+
+
+def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, hasta=None):
+    if estado not in (None, "en_ingreso", "en_espera", "finalizado"):
+        raise ValueError("El estado no es válido.")
+    desde, hasta = normalizar_rango(desde, hasta)
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        with conexion:
+            conexion.execute("BEGIN")
+            condiciones, parametros = [], []
+            if estado:
+                condiciones.append("s.estado = ?")
+                parametros.append(estado)
+            if desde:
+                condiciones.append("e.creado_en >= ?")
+                parametros.append(desde)
+            if hasta:
+                condiciones.append("e.creado_en < ?")
+                parametros.append(hasta)
+            filtro = (" WHERE " + " AND ".join(condiciones)) if condiciones else ""
+
+            episodios = conexion.execute(
+                """
+                SELECT e.codigo_episodio, e.codigo_paciente, e.creado_en,
+                       e.profesional_usuario, s.estado
+                FROM episodios AS e
+                LEFT JOIN estados_episodio AS s
+                    ON s.codigo_episodio = e.codigo_episodio
+                """ + filtro + """
+                ORDER BY e.creado_en DESC, e.codigo_episodio DESC
+                LIMIT ?
+                """,
+                parametros + [limite]
+            ).fetchall()
+
+            filas = []
+            for ep in episodios:
+                eventos = conexion.execute(
+                    """
+                    SELECT tipo, ocurrido_en, profesional_usuario, datos_json
+                    FROM eventos WHERE codigo_episodio = ? ORDER BY id
+                    """,
+                    (ep["codigo_episodio"],)
+                ).fetchall()
+
+                fila = {
+                    "fecha_ingreso": ep["creado_en"],
+                    "codigo_episodio": ep["codigo_episodio"],
+                    "codigo_paciente": ep["codigo_paciente"],
+                    "profesional_ingreso": ep["profesional_usuario"],
+                    "estado": {"en_ingreso": "En ingreso", "en_espera": "En espera",
+                               "finalizado": "Finalizado"}.get(ep["estado"], ep["estado"]),
+                    "mediciones": 0, "correcciones": 0, "decisiones": 0,
+                    "escalado_rojo": "No",
+                }
+
+                for ev in eventos:
+                    datos = json.loads(ev["datos_json"])
+                    tipo = ev["tipo"]
+
+                    if tipo == "DATOS_INGRESO_REGISTRADOS":
+                        v = datos.get("valores", {})
+                        for campo in ("edad", "sexo", "motivo_categoria", "motivo_consulta"):
+                            fila[campo] = v.get(campo)
+                        if v.get("tiempo_evolucion_valor") is not None:
+                            fila["tiempo_evolucion"] = f'{v["tiempo_evolucion_valor"]:g} {v.get("tiempo_evolucion_unidad") or ""}'.strip()
+                        fila["banderas_rojas"] = ", ".join(t for k, t in _BANDERAS.items() if v.get(k)) or "Ninguna"
+                        fila["antecedentes"] = ", ".join(
+                            [t for k, t in _ANTECEDENTES.items() if v.get(k)]
+                            + [x for x in (v.get("antecedentes_otros"),) if x]
+                        ) or "Ninguno"
+
+                    elif tipo in ("MEDICION_REGISTRADA", "MEDICION_CORREGIDA"):
+                        fila["mediciones" if tipo == "MEDICION_REGISTRADA" else "correcciones"] += 1
+                        for campo, valor in datos.get("valores", {}).items():
+                            if campo in dict(COLUMNAS_EXPORTACION):
+                                fila[campo] = valor
+
+                    elif tipo == "DECISION_REGISTRADA":
+                        fila["decisiones"] += 1
+                        fila["color_final"] = datos.get("color_final")
+                        fila["decision"] = datos.get("decision")
+                        fila["motivo_decision"] = datos.get("motivo")
+                        fila["profesional_decision"] = ev["profesional_usuario"]
+                        fila["fecha_decision"] = ev["ocurrido_en"]
+                        if "Escalado manual" in (datos.get("motivo") or ""):
+                            fila["escalado_rojo"] = "Sí"
+
+                    elif tipo == "ESTADO_CAMBIADO" and datos.get("estado_nuevo") == "finalizado":
+                        fila["fecha_finalizacion"] = ev["ocurrido_en"]
+
+                filas.append(fila)
+
+        return filas
+    finally:
+        conexion.close()
