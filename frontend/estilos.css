@@ -421,3 +421,12 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 /* Atenciones anteriores del paciente */
 .note.hist .prev{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
 .note.hist .prevdet{margin:4px 0 6px 6px;font-size:13px}
+
+/* Indicador de carga al consultar al backend (api.js) */
+.carga-global{position:fixed;inset:0 0 auto 0;z-index:9999;pointer-events:none;opacity:0;transition:opacity .15s}
+.carga-global.on{opacity:1}
+.carga-global .carga-barra{display:block;height:3px;background:linear-gradient(90deg,transparent,var(--accent,#6b5bd2),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:carga-mov 1.1s linear infinite}
+.carga-global .carga-txt{position:absolute;top:8px;right:12px;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--panel,#fff);color:var(--ink,#1a1d26);border:1px solid var(--line,#ccc);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+html.cargando,html.cargando *{cursor:progress}
+@keyframes carga-mov{from{background-position:-40% 0}to{background-position:140% 0}}
+@media (prefers-reduced-motion:reduce){.carga-global .carga-barra{animation:none;background:var(--accent,#6b5bd2)}}

@@ -13,6 +13,54 @@
   const MODO_REAL =
     location.protocol === 'http:' || location.protocol === 'https:';
 
+  /* ===== Indicador de carga (pedido 24/10) =====
+     Cada consulta al backend (/api/…) muestra una barra arriba y un cartel "Consultando al servidor…".
+     Aparece recién a los 250 ms (las consultas rápidas no parpadean) y, si pasa de 6 s, aclara que
+     MedGemma puede tardar. Cubre todas las pantallas que cargan api.js, el chat y el dictado. */
+  let enCurso = 0, tAparece = null, tLento = null, aviso = null;
+  function avisoCarga() {
+    if (!aviso && document.body) {
+      aviso = document.createElement('div');
+      aviso.className = 'carga-global';
+      aviso.setAttribute('role', 'status');
+      aviso.setAttribute('aria-live', 'polite');
+      aviso.innerHTML = '<span class="carga-barra"></span><span class="carga-txt"></span>';
+      document.body.appendChild(aviso);
+    }
+    return aviso;
+  }
+  function empezarCarga() {
+    if (enCurso++ > 0) return;
+    tAparece = setTimeout(function () {
+      const a = avisoCarga(); if (!a) return;
+      a.querySelector('.carga-txt').textContent = 'Consultando al servidor…';
+      a.classList.add('on'); document.documentElement.classList.add('cargando');
+      if (document.body) document.body.setAttribute('aria-busy', 'true');
+    }, 250);
+    tLento = setTimeout(function () {
+      if (aviso) aviso.querySelector('.carga-txt').textContent = 'Sigue procesando… (MedGemma puede tardar uno o dos minutos)';
+    }, 6000);
+  }
+  function terminarCarga() {
+    if (--enCurso > 0) return;
+    enCurso = 0; clearTimeout(tAparece); clearTimeout(tLento);
+    if (aviso) aviso.classList.remove('on');
+    document.documentElement.classList.remove('cargando');
+    if (document.body) document.body.removeAttribute('aria-busy');
+  }
+  if (MODO_REAL && root.fetch && !root.fetch.__hrrgCarga) {
+    const fetchOriginal = root.fetch.bind(root);
+    const conIndicador = function (recurso, opciones) {
+      const url = typeof recurso === 'string' ? recurso : (recurso && recurso.url) || '';
+      const propio = /^\/(api|upload|chat)\b/.test(url) || url.indexOf(location.origin + '/api') === 0;
+      if (!propio) return fetchOriginal(recurso, opciones);
+      empezarCarga();
+      return fetchOriginal(recurso, opciones).finally(terminarCarga);
+    };
+    conIndicador.__hrrgCarga = true;
+    root.fetch = conIndicador;
+  }
+
   const CLAVE_DEMO = 'hrrg_demo_user';
   const USUARIOS_DEMO = {
     enfermeria: { nom: 'Enfermería', rol: 'triage' },
