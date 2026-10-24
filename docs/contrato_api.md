@@ -804,3 +804,16 @@ Cada episodio suma dos campos:
 - Si las claves fallan, la lista sale igual, sin DNI, y se registra `ERROR_DNI_ESPERA` en el log.
 - Motivo: pedido del HRRG (en su triage se ve el DNI) y auditoría. **Acordado en el grupo el 23/10.** Para volver atrás alcanza con quitar roles del conjunto en `consultar_espera_demo`.
 - El auditor ya podía leer el historial (`GET /api/demo/episodios/<ep>`) y la lista por paciente (`GET /api/demo/episodios?codigo_paciente=`): el frontend ahora los muestra (botón "Ver historial" y búsqueda por DNI con todas las atenciones, incluidas las finalizadas).
+
+### Historial de casos — `GET /api/demo/episodios` (propuesta Barby 23/10, noche)
+
+Sin cambios en los parámetros. Cada episodio suma campos (los anteriores siguen igual):
+
+| Campo | Qué es | Quién lo recibe |
+|---|---|---|
+| `estado` | `en_ingreso` / `en_espera` / `finalizado` (o `null`) | Todos |
+| `color_final` | Color de la última decisión registrada (o `null`) | Todos |
+| `motivo_categoria` | Categoría del último `DATOS_INGRESO_REGISTRADOS` (o `null`) | Todos |
+| `dni` | DNI del paciente (o `null`) | Enfermería, médicos y auditor (mismo criterio que la lista de espera) |
+
+Lo usa la pantalla "Historial de casos" del auditor (todos los episodios, de a 50, filtrables por estado) y las atenciones anteriores.

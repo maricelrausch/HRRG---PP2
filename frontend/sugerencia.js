@@ -76,7 +76,8 @@ function medgemma(){
   if(t!=null&&t>=38.5){lv=Math.min(lv,2);why.push('Fiebre ('+r.temperatura+' °C)')}
   if(r.ant_diabetes)why.push('Diabetes'+(n('glucemia')>=250?' con glucemia '+r.glucemia+' mg/dL':''));
   if(r.sintomas_asociados)why.push('Refiere: '+r.sintomas_asociados.toLowerCase());
-  if(d!=null&&d<=2&&!(t>=37.5)&&lv===3)lv=4;
+  /* AZUL: la simulación ya no lo sugiere (reunión 21/10: en el HRRG el Azul se usa para casos como presos o
+     policiales, no por dolor leve). Queda solo como elección manual del profesional hasta confirmar el criterio. */
   if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
   return {lv,why};
 }

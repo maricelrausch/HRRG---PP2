@@ -1532,6 +1532,19 @@ def listar_episodios_demo():
             "ERROR_REGISTRO"
         )
 
+    # [Propuesta Barby 23/10] Mismo criterio que la lista de espera: enfermería,
+    # médicos y auditor reciben el DNI del paciente (historial de casos y atenciones anteriores).
+    if g.profesional["rol"] in {"enfermeria", "medico", "auditor"}:
+        try:
+            dnis = dnis_de_pacientes(
+                BASE_REGISTRO_DEMO,
+                [ep["codigo_paciente"] for ep in resultado["episodios"]]
+            )
+            for ep in resultado["episodios"]:
+                ep["dni"] = dnis.get(ep["codigo_paciente"])
+        except (ErrorCifradoIdentificacion, sqlite3.Error):
+            logger_sistema.error("ERROR_DNI_EPISODIOS")
+
     # Devuelve los resultados sin permitir su almacenamiento en caché.
     respuesta = jsonify({
         "ok": True,

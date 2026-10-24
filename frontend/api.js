@@ -137,6 +137,10 @@ function aUsuario(datos) {
   function buscarPaciente(dni) {
     return pedir('/api/demo/pacientes/buscar', { method: 'POST', body: JSON.stringify({ dni: dni }) });
   }
+  /* Historial de casos (todos los episodios, del más nuevo al más viejo), de a páginas. */
+  function listarCasos(limite, desplazamiento) {
+    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0), { method: 'GET', cache: 'no-store' });
+  }
   function episodiosDePaciente(codigoPaciente) {
     return pedir('/api/demo/episodios?codigo_paciente=' + encodeURIComponent(codigoPaciente) + '&limite=20', { method: 'GET', cache: 'no-store' });
   }
@@ -159,5 +163,5 @@ function aUsuario(datos) {
   root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, registrarDatosIngreso: registrarDatosIngreso, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
-    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, registrarDecision: registrarDecision };
+    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, listarCasos: listarCasos, registrarDecision: registrarDecision };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

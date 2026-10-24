@@ -686,11 +686,11 @@ def buscar_episodios(
 
     # Los valores se pasan como parámetros para evitar inyección SQL.
     if codigo_paciente:
-        condiciones.append("codigo_paciente = ?")
+        condiciones.append("e.codigo_paciente = ?")
         parametros.append(codigo_paciente)
 
     if codigo_episodio:
-        condiciones.append("codigo_episodio = ?")
+        condiciones.append("e.codigo_episodio = ?")
         parametros.append(codigo_episodio)
 
     filtro = (
@@ -704,25 +704,49 @@ def buscar_episodios(
     try:
         # Consulta primero la cantidad total que coincide con los filtros.
         total = conexion.execute(
-            "SELECT COUNT(*) FROM episodios" + filtro,
+            "SELECT COUNT(*) FROM episodios AS e" + filtro,
             parametros
         ).fetchone()[0]
 
         # Ordena de más reciente a más antiguo y limita la respuesta.
+        # [Propuesta Barby 23/10] Suma el estado, el color de la última decisión
+        # y la categoría del último ingreso, para el historial de casos.
         filas = conexion.execute(
             """
-            SELECT codigo_episodio, codigo_paciente,
-                   creado_en, profesional_usuario
-            FROM episodios
+            SELECT e.codigo_episodio, e.codigo_paciente,
+                   e.creado_en, e.profesional_usuario,
+                   s.estado,
+                   (SELECT ev.datos_json FROM eventos AS ev
+                     WHERE ev.codigo_episodio = e.codigo_episodio
+                       AND ev.tipo = 'DECISION_REGISTRADA'
+                     ORDER BY ev.id DESC LIMIT 1) AS decision_json,
+                   (SELECT ev.datos_json FROM eventos AS ev
+                     WHERE ev.codigo_episodio = e.codigo_episodio
+                       AND ev.tipo = 'DATOS_INGRESO_REGISTRADOS'
+                     ORDER BY ev.id DESC LIMIT 1) AS ingreso_json
+            FROM episodios AS e
+            LEFT JOIN estados_episodio AS s
+                ON s.codigo_episodio = e.codigo_episodio
             """ + filtro + """
-            ORDER BY creado_en DESC, codigo_episodio DESC
+            ORDER BY e.creado_en DESC, e.codigo_episodio DESC
             LIMIT ? OFFSET ?
             """,
             parametros + [limite, desplazamiento]
         ).fetchall()
 
+        episodios = []
+        for fila in filas:
+            episodio = dict(fila)
+            decision = episodio.pop("decision_json")
+            ingreso = episodio.pop("ingreso_json")
+            episodio["color_final"] = json.loads(decision).get("color_final") if decision else None
+            episodio["motivo_categoria"] = (
+                json.loads(ingreso).get("valores", {}).get("motivo_categoria") if ingreso else None
+            )
+            episodios.append(episodio)
+
         return {
-            "episodios": [dict(fila) for fila in filas],
+            "episodios": episodios,
             "total": total
         }
     finally:
