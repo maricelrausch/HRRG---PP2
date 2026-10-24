@@ -21,8 +21,8 @@ from src.registro import (
     corregir_medicion_demo,
     registrar_datos_ingreso_demo,
     exportar_episodios_demo,
-    COLUMNAS_EXPORTACION,
 )
+from src.exportacion import generar_csv, generar_pdf
 from src.registro import (
     registrar_decision_demo,
     ConflictoDecisionError,
@@ -356,7 +356,7 @@ def verificar_acceso():
         "agregar_medicion_demo",
         "agregar_correccion_demo",
         "agregar_datos_ingreso_demo",
-        "exportar_episodios_demo_csv",
+        "exportar_episodios_demo_archivo",
         "analizar_paciente",
         "listar_episodios_demo",
         "consultar_estado_episodio_demo",
@@ -434,7 +434,6 @@ def verificar_acceso():
             "listar_episodios_demo",
             "consultar_estado_episodio_demo",
             "consultar_espera_demo",
-            "exportar_episodios_demo_csv",
         }
 
         consulta_get = (
@@ -449,7 +448,13 @@ def verificar_acceso():
             and request.method == "POST"
         )
 
-        if not (consulta_get or consulta_dni):
+        # Exportación: POST para mandar la contraseña en el cuerpo (no en la URL).
+        consulta_exportar = (
+            request.endpoint == "exportar_episodios_demo_archivo"
+            and request.method == "POST"
+        )
+
+        if not (consulta_get or consulta_dni or consulta_exportar):
             return respuesta_error(
                 "Tu perfil tiene acceso de solo lectura.",
                 403,
@@ -1569,12 +1574,14 @@ def listar_episodios_demo():
 
 # ------------------------------------------------
 # [Propuesta Barby 23/10 · a revisar por Maricel]
-# Exportar el historial de casos a CSV (se abre con Excel). Solo auditor.
-# NO incluye el DNI: cada paciente aparece con su código interno.
-# Queda registrado en sistema.log quién exportó y cuántas filas.
+# Exportar el historial de casos (Excel o PDF). Solo auditor.
+# Por seguridad pide de nuevo la contraseña del auditor (evita que alguien
+# con la sesión abierta se lleve los datos). Tras 3 contraseñas incorrectas
+# se bloquea la exportación hasta volver a iniciar sesión.
+# NO incluye el DNI. Cada exportación (y cada intento fallido) queda en sistema.log.
 # ------------------------------------------------
-@app.route("/api/demo/episodios/exportar.csv", methods=["GET"])
-def exportar_episodios_demo_csv():
+@app.route("/api/demo/episodios/exportar", methods=["POST"])
+def exportar_episodios_demo_archivo():
     if g.profesional["rol"] != "auditor":
         return respuesta_error(
             "Solo el perfil auditor puede exportar el historial de casos.",
@@ -1582,19 +1589,51 @@ def exportar_episodios_demo_csv():
             "PERMISO_DENEGADO"
         )
 
-    if set(request.args) - {"estado", "desde", "hasta"}:
+    if session.get("exportar_bloqueado"):
         return respuesta_error(
-            "Los parámetros de consulta no son válidos.",
+            "Exportación bloqueada por contraseñas incorrectas. Cerrá sesión y volvé a entrar.",
+            403,
+            "EXPORTACION_BLOQUEADA"
+        )
+
+    entrada = request.get_json(silent=True)
+    if (
+        not isinstance(entrada, dict)
+        or set(entrada) - {"password", "formato", "estado", "desde", "hasta"}
+        or not isinstance(entrada.get("password"), str)
+        or entrada.get("formato") not in ("excel", "pdf")
+    ):
+        return respuesta_error(
+            "Los datos de la exportación no son válidos.",
             400,
             "PARAMETROS_INVALIDOS"
         )
 
+    usuario = g.profesional["usuario"]
+    if not iniciar_sesion(BASE_USUARIOS, usuario, entrada["password"]):
+        fallos = session.get("exportar_fallos", 0) + 1
+        session["exportar_fallos"] = fallos
+        logger_sistema.warning("EXPORTAR_PASSWORD_INCORRECTA | %s | intento %d", usuario, fallos)
+        if fallos >= 3:
+            session["exportar_bloqueado"] = True
+            return respuesta_error(
+                "Contraseña incorrecta. Se bloqueó la exportación: cerrá sesión y volvé a entrar.",
+                403,
+                "EXPORTACION_BLOQUEADA"
+            )
+        return respuesta_error(
+            f"Contraseña incorrecta. Te quedan {3 - fallos} intento(s).",
+            401,
+            "PASSWORD_INCORRECTA"
+        )
+    session.pop("exportar_fallos", None)
+
     try:
         filas = exportar_episodios_demo(
             BASE_REGISTRO_DEMO,
-            estado=request.args.get("estado") or None,
-            desde=request.args.get("desde"),
-            hasta=request.args.get("hasta")
+            estado=entrada.get("estado") or None,
+            desde=entrada.get("desde"),
+            hasta=entrada.get("hasta")
         )
     except ValueError as error:
         return respuesta_error(str(error), 422, "FILTRO_INVALIDO")
@@ -1606,42 +1645,39 @@ def exportar_episodios_demo_csv():
             "ERROR_REGISTRO"
         )
 
-    import csv
-    import io
     from datetime import datetime as _dt
+    marca = _dt.now().strftime("%Y%m%d_%H%M")
 
-    def celda(valor, campo):
-        if valor is None:
-            return ""
-        if campo.startswith("fecha_"):
-            try:
-                return _dt.fromisoformat(valor).astimezone().strftime("%d/%m/%Y %H:%M")
-            except ValueError:
-                return valor
-        if isinstance(valor, float):
-            return f"{valor:g}".replace(".", ",")   # Excel en español usa coma decimal
-        texto = str(valor)
-        # Evita que Excel interprete el texto como fórmula (inyección CSV).
-        if texto[:1] in ("=", "+", "-", "@"):
-            texto = "'" + texto
-        return texto
-
-    salida = io.StringIO()
-    escritor = csv.writer(salida, delimiter=";", lineterminator="\r\n")
-    escritor.writerow([titulo for _, titulo in COLUMNAS_EXPORTACION])
-    for fila in filas:
-        escritor.writerow([celda(fila.get(campo), campo) for campo, _ in COLUMNAS_EXPORTACION])
+    if entrada["formato"] == "pdf":
+        nombres = {"en_ingreso": "en ingreso", "en_espera": "en espera", "finalizado": "finalizados"}
+        filtros = ["Estado: " + nombres.get(entrada.get("estado") or "", "todos")]
+        if entrada.get("desde") or entrada.get("hasta"):
+            def fmt(v):
+                return _dt.fromisoformat(v.replace("Z", "+00:00")).astimezone().strftime("%d/%m/%Y %H:%M")
+            filtros.append(
+                "Fechas: "
+                + (("desde " + fmt(entrada["desde"])) if entrada.get("desde") else "")
+                + ((" hasta " + fmt(entrada["hasta"])) if entrada.get("hasta") else "")
+            )
+        try:
+            contenido = generar_pdf(filas, " · ".join(filtros), usuario)
+        except ImportError:
+            return respuesta_error(
+                "Falta instalar la librería del PDF: python -m pip install reportlab",
+                503,
+                "PDF_NO_DISPONIBLE"
+            )
+        mime, nombre = "application/pdf", f"casos_triage_{marca}.pdf"
+    else:
+        contenido = generar_csv(filas)
+        mime, nombre = "text/csv; charset=utf-8", f"casos_triage_{marca}.csv"
 
     logger_sistema.info(
-        "EXPORTAR_CASOS_CSV | %s | %d filas",
-        g.profesional["usuario"], len(filas)
+        "EXPORTAR_CASOS | %s | %s | %d filas",
+        usuario, entrada["formato"], len(filas)
     )
 
-    nombre = "casos_triage_" + _dt.now().strftime("%Y%m%d_%H%M") + ".csv"
-    respuesta = app.response_class(
-        "\ufeff" + salida.getvalue(),           # BOM: Excel reconoce los acentos
-        mimetype="text/csv; charset=utf-8"
-    )
+    respuesta = app.response_class(contenido, mimetype=mime)
     respuesta.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200

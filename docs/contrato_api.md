@@ -818,16 +818,24 @@ Sin cambios en los parámetros. Cada episodio suma campos (los anteriores siguen
 
 Lo usa la pantalla "Historial de casos" del auditor (todos los episodios, de a 50, filtrables por estado) y las atenciones anteriores.
 
-### Exportar el historial de casos — `GET /api/demo/episodios/exportar.csv` (propuesta Barby 23/10)
+### Exportar el historial de casos — `POST /api/demo/episodios/exportar` (propuesta Barby 23/10)
 
-- **Solo auditor** (los demás perfiles reciben `403 PERMISO_DENEGADO`). Parámetro opcional `estado` = `en_ingreso` / `en_espera` / `finalizado`.
-- Devuelve un CSV para Excel (UTF-8 con BOM, separador `;`, coma decimal), una fila por episodio.
-- **No incluye el DNI**: el paciente aparece con su código interno (`PAC-…`), así se pueden agrupar sus atenciones sin identificarlo.
-- Columnas: fecha de ingreso, episodio, código de paciente, profesional, estado, edad, sexo, categoría, motivo, tiempo de evolución, banderas rojas, antecedentes, última medición vigente (TA, FC, FR, SpO2, temperatura, glucemia, conciencia, Glasgow, dolor), cantidad de mediciones y correcciones, color final, decisión, motivo de la decisión, quién y cuándo decidió, cantidad de decisiones, escalado a ROJO y fecha de finalización.
+```json
+{ "password": "<contraseña del auditor>", "formato": "excel", "estado": "finalizado",
+  "desde": "2026-10-23T00:00:00-03:00", "hasta": "2026-10-24T00:00:00-03:00" }
+```
+
+- **Solo auditor** (los demás perfiles: `403 PERMISO_DENEGADO`). `estado`, `desde` y `hasta` son opcionales.
+- **Vuelve a pedir la contraseña** del auditor (va en el cuerpo, nunca en la URL). Incorrecta → `401 PASSWORD_INCORRECTA` con los intentos que quedan; a la tercera → `403 EXPORTACION_BLOQUEADA` hasta cerrar sesión y volver a entrar.
+- `formato: "excel"` → CSV para Excel (UTF-8 con BOM, `;`, coma decimal), una fila por episodio con el detalle completo.
+- `formato: "pdf"` → tabla resumida en A4 apaisado (requiere `reportlab`, agregado a `requirements.txt`; si falta → `503 PDF_NO_DISPONIBLE`).
+- **No incluye el DNI**: el paciente aparece con su código interno (`PAC-…`).
+- Columnas del Excel: fecha de ingreso, episodio, código de paciente, profesional, estado, edad, sexo, categoría, motivo, tiempo de evolución, banderas rojas, antecedentes, última medición vigente, cantidad de mediciones y correcciones, color final, decisión, motivo de la decisión, quién y cuándo decidió, cantidad de decisiones, escalado a ROJO y fecha de finalización.
 - Textos que empiezan con `= + - @` se exportan con `'` adelante (evita fórmulas en Excel).
-- Cada exportación queda en `sistema.log`: `EXPORTAR_CASOS_CSV | <usuario> | <n> filas`.
+- `sistema.log`: `EXPORTAR_CASOS | <usuario> | <formato> | <n> filas` y `EXPORTAR_PASSWORD_INCORRECTA | <usuario> | intento <n>`.
+- El armado de los archivos está en `backend/src/exportacion.py` (archivo nuevo).
 
 ### Filtro por fecha (propuesta Barby 23/10)
 
-`GET /api/demo/episodios` y `GET /api/demo/episodios/exportar.csv` aceptan `desde` (inclusive) y `hasta` (exclusivo), en ISO 8601 **con zona horaria** (por ejemplo `2026-10-23T00:00:00-03:00`). Se comparan en UTC con la fecha de creación del episodio. Fechas sin zona o `desde >= hasta` → `422`.
+`GET /api/demo/episodios` y la exportación aceptan `desde` (inclusive) y `hasta` (exclusivo), en ISO 8601 **con zona horaria** (por ejemplo `2026-10-23T00:00:00-03:00`). Se comparan en UTC con la fecha de creación del episodio. Fechas sin zona o `desde >= hasta` → `422`.
 El frontend manda el día elegido desde las 00:00 hasta las 00:00 del día siguiente, en la hora de la compu.

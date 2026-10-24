@@ -149,13 +149,17 @@ function aUsuario(datos) {
     return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango), { method: 'GET', cache: 'no-store' });
   }
   /* Exportación del historial de casos (auditor): CSV para Excel, sin DNI. Devuelve el archivo como Blob. */
-  async function exportarCasos(estado, rango) {
+  /* Pide de nuevo la contraseña del auditor (va en el cuerpo, nunca en la URL). formato: 'excel' | 'pdf'. */
+  async function exportarCasos(estado, rango, formato, password) {
     try {
-      const q = ((estado ? '&estado=' + encodeURIComponent(estado) : '') + paramsRango(rango)).replace(/^&/, '?');
-      const r = await fetch('/api/demo/episodios/exportar.csv' + q,
-        { credentials: 'same-origin', cache: 'no-store' });
-      if (!r.ok) { let m = 'error ' + r.status; try { m = (await r.json()).mensaje || m; } catch (e) {} return { ok: false, estado: r.status, mensaje: m }; }
-      const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'casos_triage.csv';
+      const cuerpo = { password: password, formato: formato };
+      if (estado) cuerpo.estado = estado;
+      if (rango && rango.desde) cuerpo.desde = rango.desde;
+      if (rango && rango.hasta) cuerpo.hasta = rango.hasta;
+      const r = await fetch('/api/demo/episodios/exportar', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+      if (!r.ok) { let m = 'error ' + r.status, c = null; try { const j = await r.json(); m = j.mensaje || m; c = j.codigo || null; } catch (e) {} return { ok: false, estado: r.status, codigo: c, mensaje: m }; }
+      const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || ('casos_triage.' + (formato === 'pdf' ? 'pdf' : 'csv'));
       return { ok: true, blob: await r.blob(), nombre: nombre };
     } catch (e) { return { ok: false, estado: 0, mensaje: 'No se pudo conectar con el servidor.' }; }
   }

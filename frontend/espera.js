@@ -64,7 +64,16 @@ function renderCasos(){
   const rangoTxt=CASOS.desde||CASOS.hasta?' · '+(CASOS.desde&&CASOS.hasta&&CASOS.desde===CASOS.hasta?'del '+fmtFecha(CASOS.desde):(CASOS.desde?'desde '+fmtFecha(CASOS.desde):'')+(CASOS.hasta?' hasta '+fmtFecha(CASOS.hasta):'')):'';
   box.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><b>Historial de casos</b> <span class="hint">'+CASOS.lista.length+' de '+CASOS.total+' episodios'+rangoTxt+' · solo lectura</span>'+
     '<span class="row"><select id="casosFiltro">'+Object.entries(est).map(([k,v])=>'<option value="'+k+'"'+(k===CASOS.filtro?' selected':'')+'>'+v+'</option>').join('')+'</select>'+
-    '<button type="button" class="btn sm" id="casosExcel"'+(CASOS.exportando?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Exportar a Excel (sin DNI)')+'</button></span></div>'+
+    '<button type="button" class="btn sm" id="casosExcel"'+(CASOS.exportando||CASOS.exp?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Exportar')+'</button></span></div>'+
+    (CASOS.exp?'<div class="expform"><b>Exportar</b>'+
+      '<label><input type="radio" name="expFmt" value="excel"'+(CASOS.exp.formato!=='pdf'?' checked':'')+'> Excel</label>'+
+      '<label><input type="radio" name="expFmt" value="pdf"'+(CASOS.exp.formato==='pdf'?' checked':'')+'> PDF</label>'+
+      '<label>Tu contraseña <input type="password" id="expPass" autocomplete="current-password"></label>'+
+      '<button type="button" class="btn sm primary" id="expOk"'+(CASOS.exportando?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Confirmar')+'</button>'+
+      '<button type="button" class="btn sm" id="expNo">Cancelar</button>'+
+      '<div class="hint" style="flex-basis:100%">Por seguridad se vuelve a pedir tu contraseña. Se exportan los episodios del estado y las fechas elegidos, sin DNI, y queda registrado quién exportó.</div>'+
+      (CASOS.exp.error?'<div class="werr" style="flex-basis:100%">'+esc(CASOS.exp.error)+'</div>':'')+'</div>':'')+
+    (CASOS.listo?'<div class="ok">'+esc(CASOS.listo)+'</div>':'')+
     '<div class="row casos-fechas"><label class="hint">Desde <input type="date" id="casosDesde" value="'+CASOS.desde+'"></label>'+
     '<label class="hint">Hasta <input type="date" id="casosHasta" value="'+CASOS.hasta+'"></label>'+
     '<button type="button" class="btn sm" data-rango="hoy">Hoy</button><button type="button" class="btn sm" data-rango="7">Últimos 7 días</button>'+
@@ -77,23 +86,33 @@ function renderCasos(){
     (CASOS.cargando?'<div class="hint">Cargando…</div>':CASOS.lista.length<CASOS.total?'<button type="button" class="btn sm" id="casosMas">Ver más</button>':'');
 }
 $('#verCasos').addEventListener('click',()=>{CASOS.abierto=!CASOS.abierto;if(CASOS.abierto)cargarCasos(false);else renderCasos()});
-$('#casosBox').addEventListener('change',e=>{if(e.target.id==='casosFiltro'){CASOS.filtro=e.target.value;renderCasos()}
+$('#casosBox').addEventListener('keydown',e=>{if(e.target.id==='expPass'&&e.key==='Enter'){e.preventDefault();exportarCasos()}});
+$('#casosBox').addEventListener('change',e=>{if(e.target.name==='expFmt'&&CASOS.exp){CASOS.exp.formato=e.target.value;return}
+  if(e.target.id==='casosFiltro'){CASOS.filtro=e.target.value;renderCasos()}
   if(e.target.id==='casosDesde'||e.target.id==='casosHasta'){CASOS[e.target.id==='casosDesde'?'desde':'hasta']=e.target.value;cargarCasos(false)}});
-$('#casosBox').addEventListener('click',e=>{if(e.target.id==='casosMas')cargarCasos(true);if(e.target.id==='casosExcel')exportarCasos();
+$('#casosBox').addEventListener('click',e=>{if(e.target.id==='casosMas')cargarCasos(true);
+  if(e.target.id==='casosExcel'){CASOS.exp={formato:'excel',error:null};CASOS.listo=null;renderCasos();const i=$('#expPass');if(i)i.focus()}
+  if(e.target.id==='expNo'){CASOS.exp=null;renderCasos()}
+  if(e.target.id==='expOk')exportarCasos();
   const rg=e.target.closest('[data-rango]');if(rg){const hoy=new Date(),h=fechaLocal(hoy);
     if(rg.dataset.rango==='hoy'){CASOS.desde=h;CASOS.hasta=h}
     else if(rg.dataset.rango==='7'){CASOS.desde=fechaLocal(new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-6));CASOS.hasta=h}
     else{CASOS.desde='';CASOS.hasta=''}
     cargarCasos(false)}});
-/* Exporta TODOS los episodios del filtro elegido (no solo los cargados en pantalla). Sin DNI. */
+/* Exporta TODOS los episodios del filtro elegido (no solo los cargados en pantalla), en Excel o PDF, sin DNI.
+   Pide de nuevo la contraseña; el archivo se descarga en la carpeta de Descargas del navegador. */
 async function exportarCasos(){
-  CASOS.exportando=true;CASOS.error=null;renderCasos();
-  const r=await TriageAPI.exportarCasos(CASOS.filtro,rangoCasos());
+  if(!CASOS.exp||CASOS.exportando)return;
+  const pass=($('#expPass')||{}).value||'';
+  if(!pass){CASOS.exp.error='Escribí tu contraseña para exportar.';renderCasos();$('#expPass').focus();return}
+  CASOS.exportando=true;CASOS.exp.error=null;renderCasos();
+  const r=await TriageAPI.exportarCasos(CASOS.filtro,rangoCasos(),CASOS.exp.formato,pass);
   CASOS.exportando=false;
-  if(r.estado===401){location.href='index.html';return}
-  if(!r.ok){CASOS.error='No se pudo exportar: '+r.mensaje;renderCasos();return}
+  if(r.codigo==='SESION_REQUERIDA'){location.href='index.html';return}
+  if(!r.ok){CASOS.exp.error=r.mensaje;renderCasos();const i=$('#expPass');if(i)i.focus();return}
   const url=URL.createObjectURL(r.blob),a=document.createElement('a');a.href=url;a.download=r.nombre;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);renderCasos();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  CASOS.exp=null;CASOS.listo='Listo: se descargó "'+r.nombre+'" en tu carpeta Descargas.';renderCasos();
 }
 async function cargarAtencionesPaciente(pac){
   if(PAC_ATENC[pac]!==undefined)return;PAC_ATENC[pac]=null;
