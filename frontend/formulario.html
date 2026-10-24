@@ -145,10 +145,10 @@
             </div>
             <div class="form" id="motivoForm" hidden>
               <label for="motivo" class="hint">Motivo (obligatorio)</label>
-              <select id="motivo"><option value="">Seleccionar…</option><option>Signo clínico observado no capturado en los datos</option><option>Dato ingresado incorrecto</option><option>Criterio clínico del profesional</option><option>Otro</option></select>
+              <select id="motivo"><option value="">Seleccionar…</option><option>Signo clínico observado no capturado en los datos</option><option>Dato ingresado incorrecto</option><option>Criterio clínico del profesional</option><option>Caso policial o judicial (categoría AZUL)</option><option>Otro</option></select>
               <label for="detalle" class="hint">Detalle (opcional)</label>
               <textarea id="detalle" placeholder="Ej.: palidez marcada no capturada en los datos iniciales"></textarea>
-              <label class="hint" id="lowerBox" hidden><input type="checkbox" id="lowerOk"> Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.</label>
+              <label class="hint" id="lowerBox" hidden><input type="checkbox" id="lowerOk"> <span id="lowerTxt">Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.</span></label>
               <div class="row"><button type="button" class="btn primary" id="registrar" disabled>Registrar decisión</button></div>
             </div>
             <div class="ok" id="okMsg" hidden></div>
@@ -188,10 +188,12 @@
       <!-- 4 · EN ESPERA -->
       <div class="body" id="s-espera" hidden>
         <div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span></div>
+          <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span>
+            <button type="button" class="btn sm" id="verCasos" hidden>Historial de casos</button></div>
           <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio o DNI</span><input id="epSearch" placeholder="EPI-… o 30.123.456" autocomplete="off"></label>
         </div>
         <div class="werr" id="wErr" hidden></div>
+        <div class="casos note hist" id="casosBox" hidden></div>
         <div class="wlist" id="wList"></div>
         <div class="row" style="justify-content:space-between"><div class="hint">Reloj de reevaluación: cada color tiene su tiempo objetivo (tiempos de ejemplo, no oficiales). Al vencerse, el paciente se marca para reevaluar.</div><label class="fast"><input type="checkbox" id="fastT"> Demo: tiempo acelerado (1 s = 1 min)</label></div>
       </div>

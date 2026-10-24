@@ -76,7 +76,8 @@ function medgemma(){
   if(t!=null&&t>=38.5){lv=Math.min(lv,2);why.push('Fiebre ('+r.temperatura+' °C)')}
   if(r.ant_diabetes)why.push('Diabetes'+(n('glucemia')>=250?' con glucemia '+r.glucemia+' mg/dL':''));
   if(r.sintomas_asociados)why.push('Refiere: '+r.sintomas_asociados.toLowerCase());
-  if(d!=null&&d<=2&&!(t>=37.5)&&lv===3)lv=4;
+  /* AZUL: la simulación ya no lo sugiere (reunión 21/10: en el HRRG el Azul se usa para casos como presos o
+     policiales, no por dolor leve). Queda solo como elección manual del profesional hasta confirmar el criterio. */
   if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
   return {lv,why};
 }
@@ -146,7 +147,13 @@ document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>
 }));
 $('#levels').addEventListener('click',e=>{const b=e.target.closest('.lvl');if(!b)return;st.level=+b.dataset.l;
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));
-  $('#lowerBox').hidden=!(st.level>SUG);updReg()});
+  /* AZUL no es "menos grave": en el HRRG es una categoría especial (p. ej. casos policiales o judiciales).
+     Se confirma igual, pero con su propio texto y sin registrarlo como discrepancia de gravedad. */
+  const azul=st.level===4;
+  $('#lowerTxt').textContent=azul?'Confirmo asignar AZUL: categoría especial del HRRG (p. ej. caso policial o judicial), no una prioridad menor por gravedad. Criterio a confirmar con el hospital.'
+    :'Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.';
+  if(azul&&!$('#motivo').value)$('#motivo').value='Caso policial o judicial (categoría AZUL)';
+  $('#lowerOk').checked=false;$('#lowerBox').hidden=!(st.level>SUG);updReg()});
 function updReg(){
   const d=$('#registrar').dataset.d;let ok=!!$('#motivo').value;
   if(d==='modificar')ok=ok&&st.level!=null&&st.level!==SUG;
@@ -155,9 +162,10 @@ function updReg(){
   $('#registrar').disabled=!ok;
 }
 $('#motivo').addEventListener('change',updReg);$('#lowerOk').addEventListener('change',updReg);
+const notaMenor=()=>st.level===4?' · Categoría AZUL (caso especial).':st.level>SUG?' · Discrepancia registrada.':'';
 $('#registrar').addEventListener('click',()=>{
   const d=$('#registrar').dataset.d;st.decision=d;commit(st.level);$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#okMsg').hidden=false;
-  $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+(st.level>SUG?' · Discrepancia registrada.':''):'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+(st.level>SUG?' · Discrepancia registrada.':'');
+  $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+notaMenor():'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+notaMenor();
   renderCard();renderReg();
 });
 $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderResumen()});

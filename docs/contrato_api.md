@@ -804,3 +804,38 @@ Cada episodio suma dos campos:
 - Si las claves fallan, la lista sale igual, sin DNI, y se registra `ERROR_DNI_ESPERA` en el log.
 - Motivo: pedido del HRRG (en su triage se ve el DNI) y auditoría. **Acordado en el grupo el 23/10.** Para volver atrás alcanza con quitar roles del conjunto en `consultar_espera_demo`.
 - El auditor ya podía leer el historial (`GET /api/demo/episodios/<ep>`) y la lista por paciente (`GET /api/demo/episodios?codigo_paciente=`): el frontend ahora los muestra (botón "Ver historial" y búsqueda por DNI con todas las atenciones, incluidas las finalizadas).
+
+### Historial de casos — `GET /api/demo/episodios` (propuesta Barby 23/10, noche)
+
+Sin cambios en los parámetros. Cada episodio suma campos (los anteriores siguen igual):
+
+| Campo | Qué es | Quién lo recibe |
+|---|---|---|
+| `estado` | `en_ingreso` / `en_espera` / `finalizado` (o `null`) | Todos |
+| `color_final` | Color de la última decisión registrada (o `null`) | Todos |
+| `motivo_categoria` | Categoría del último `DATOS_INGRESO_REGISTRADOS` (o `null`) | Todos |
+| `dni` | DNI del paciente (o `null`) | Enfermería, médicos y auditor (mismo criterio que la lista de espera) |
+
+Lo usa la pantalla "Historial de casos" del auditor (todos los episodios, de a 50, filtrables por estado) y las atenciones anteriores.
+
+### Exportar el historial de casos — `POST /api/demo/episodios/exportar` (propuesta Barby 23/10)
+
+```json
+{ "password": "<contraseña del auditor>", "formato": "excel", "estado": "finalizado",
+  "desde": "2026-10-23T00:00:00-03:00", "hasta": "2026-10-24T00:00:00-03:00" }
+```
+
+- **Solo auditor** (los demás perfiles: `403 PERMISO_DENEGADO`). `estado`, `desde` y `hasta` son opcionales.
+- **Vuelve a pedir la contraseña** del auditor (va en el cuerpo, nunca en la URL). Incorrecta → `401 PASSWORD_INCORRECTA` con los intentos que quedan; a la tercera → `403 EXPORTACION_BLOQUEADA` hasta cerrar sesión y volver a entrar.
+- `formato: "excel"` → CSV para Excel (UTF-8 con BOM, `;`, coma decimal), una fila por episodio con el detalle completo.
+- `formato: "pdf"` → tabla resumida en A4 apaisado (requiere `reportlab`, agregado a `requirements.txt`; si falta → `503 PDF_NO_DISPONIBLE`).
+- **No incluye el DNI**: el paciente aparece con su código interno (`PAC-…`).
+- Columnas del Excel: fecha de ingreso, episodio, código de paciente, profesional, estado, edad, sexo, categoría, motivo, tiempo de evolución, banderas rojas, antecedentes, última medición vigente, cantidad de mediciones y correcciones, color final, decisión, motivo de la decisión, quién y cuándo decidió, cantidad de decisiones, escalado a ROJO y fecha de finalización.
+- Textos que empiezan con `= + - @` se exportan con `'` adelante (evita fórmulas en Excel).
+- `sistema.log`: `EXPORTAR_CASOS | <usuario> | <formato> | <n> filas` y `EXPORTAR_PASSWORD_INCORRECTA | <usuario> | intento <n>`.
+- El armado de los archivos está en `backend/src/exportacion.py` (archivo nuevo).
+
+### Filtro por fecha (propuesta Barby 23/10)
+
+`GET /api/demo/episodios` y la exportación aceptan `desde` (inclusive) y `hasta` (exclusivo), en ISO 8601 **con zona horaria** (por ejemplo `2026-10-23T00:00:00-03:00`). Se comparan en UTC con la fecha de creación del episodio. Fechas sin zona o `desde >= hasta` → `422`.
+El frontend manda el día elegido desde las 00:00 hasta las 00:00 del día siguiente, en la hora de la compu.

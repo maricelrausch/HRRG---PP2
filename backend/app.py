@@ -20,7 +20,9 @@ from src.registro import (
     registrar_medicion_demo,
     corregir_medicion_demo,
     registrar_datos_ingreso_demo,
+    exportar_episodios_demo,
 )
+from src.exportacion import generar_csv, generar_pdf
 from src.registro import (
     registrar_decision_demo,
     ConflictoDecisionError,
@@ -354,6 +356,7 @@ def verificar_acceso():
         "agregar_medicion_demo",
         "agregar_correccion_demo",
         "agregar_datos_ingreso_demo",
+        "exportar_episodios_demo_archivo",
         "analizar_paciente",
         "listar_episodios_demo",
         "consultar_estado_episodio_demo",
@@ -445,7 +448,13 @@ def verificar_acceso():
             and request.method == "POST"
         )
 
-        if not (consulta_get or consulta_dni):
+        # Exportación: POST para mandar la contraseña en el cuerpo (no en la URL).
+        consulta_exportar = (
+            request.endpoint == "exportar_episodios_demo_archivo"
+            and request.method == "POST"
+        )
+
+        if not (consulta_get or consulta_dni or consulta_exportar):
             return respuesta_error(
                 "Tu perfil tiene acceso de solo lectura.",
                 403,
@@ -1467,7 +1476,9 @@ def listar_episodios_demo():
         "codigo_paciente",
         "codigo_episodio",
         "limite",
-        "desplazamiento"
+        "desplazamiento",
+        "desde",
+        "hasta"
     }
 
     # Rechaza parámetros desconocidos o repetidos.
@@ -1522,8 +1533,12 @@ def listar_episodios_demo():
             codigo_paciente=filtros["codigo_paciente"],
             codigo_episodio=filtros["codigo_episodio"],
             limite=limite,
-            desplazamiento=desplazamiento
+            desplazamiento=desplazamiento,
+            desde=request.args.get("desde"),
+            hasta=request.args.get("hasta")
         )
+    except ValueError as error:
+        return respuesta_error(str(error), 422, "FECHAS_INVALIDAS")
     except sqlite3.Error:
         logger_sistema.error("ERROR_LISTAR_EPISODIOS_DEMO")
         return respuesta_error(
@@ -1531,6 +1546,19 @@ def listar_episodios_demo():
             500,
             "ERROR_REGISTRO"
         )
+
+    # [Propuesta Barby 23/10] Mismo criterio que la lista de espera: enfermería,
+    # médicos y auditor reciben el DNI del paciente (historial de casos y atenciones anteriores).
+    if g.profesional["rol"] in {"enfermeria", "medico", "auditor"}:
+        try:
+            dnis = dnis_de_pacientes(
+                BASE_REGISTRO_DEMO,
+                [ep["codigo_paciente"] for ep in resultado["episodios"]]
+            )
+            for ep in resultado["episodios"]:
+                ep["dni"] = dnis.get(ep["codigo_paciente"])
+        except (ErrorCifradoIdentificacion, sqlite3.Error):
+            logger_sistema.error("ERROR_DNI_EPISODIOS")
 
     # Devuelve los resultados sin permitir su almacenamiento en caché.
     respuesta = jsonify({
@@ -1541,6 +1569,143 @@ def listar_episodios_demo():
         "limite": limite,
         "desplazamiento": desplazamiento
     })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+# ------------------------------------------------
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Exportar el historial de casos (Excel o PDF). Solo auditor.
+# Por seguridad pide de nuevo la contraseña del auditor (evita que alguien
+# con la sesión abierta se lleve los datos). Tras 3 contraseñas incorrectas
+# se bloquea la exportación hasta volver a iniciar sesión.
+# NO incluye el DNI. Cada exportación (y cada intento fallido) queda en sistema.log.
+# ------------------------------------------------
+@app.route("/api/demo/episodios/exportar", methods=["POST"])
+def exportar_episodios_demo_archivo():
+    if g.profesional["rol"] != "auditor":
+        return respuesta_error(
+            "Solo el perfil auditor puede exportar el historial de casos.",
+            403,
+            "PERMISO_DENEGADO"
+        )
+
+    if session.get("exportar_bloqueado"):
+        return respuesta_error(
+            "Exportación bloqueada por contraseñas incorrectas. Cerrá sesión y volvé a entrar.",
+            403,
+            "EXPORTACION_BLOQUEADA"
+        )
+
+    entrada = request.get_json(silent=True)
+    if (
+        not isinstance(entrada, dict)
+        or set(entrada) - {"password", "formato", "estado", "desde", "hasta"}
+        or not isinstance(entrada.get("password"), str)
+        or entrada.get("formato") not in ("excel", "pdf")
+    ):
+        return respuesta_error(
+            "Los datos de la exportación no son válidos.",
+            400,
+            "PARAMETROS_INVALIDOS"
+        )
+
+    usuario = g.profesional["usuario"]
+    if not iniciar_sesion(BASE_USUARIOS, usuario, entrada["password"]):
+        fallos = session.get("exportar_fallos", 0) + 1
+        session["exportar_fallos"] = fallos
+        logger_sistema.warning("EXPORTAR_PASSWORD_INCORRECTA | %s | intento %d", usuario, fallos)
+        if fallos >= 3:
+            session["exportar_bloqueado"] = True
+            return respuesta_error(
+                "Contraseña incorrecta. Se bloqueó la exportación: cerrá sesión y volvé a entrar.",
+                403,
+                "EXPORTACION_BLOQUEADA"
+            )
+        return respuesta_error(
+            f"Contraseña incorrecta. Te quedan {3 - fallos} intento(s).",
+            401,
+            "PASSWORD_INCORRECTA"
+        )
+    session.pop("exportar_fallos", None)
+
+    try:
+        filas = exportar_episodios_demo(
+            BASE_REGISTRO_DEMO,
+            estado=entrada.get("estado") or None,
+            desde=entrada.get("desde"),
+            hasta=entrada.get("hasta")
+        )
+    except ValueError as error:
+        return respuesta_error(str(error), 422, "FILTRO_INVALIDO")
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_EXPORTAR_CASOS")
+        return respuesta_error(
+            "No se pudo exportar el historial de casos.",
+            500,
+            "ERROR_REGISTRO"
+        )
+        # Recupera los DNI asociados a los episodios para el informe del auditor.
+    # No modifica la identificación cifrada que está guardada en SQLite.
+    try:
+        dnis = dnis_de_pacientes(
+            BASE_REGISTRO_DEMO,
+            [fila["codigo_paciente"] for fila in filas]
+        )
+
+        for fila in filas:
+            fila["dni"] = dnis.get(fila["codigo_paciente"])
+
+    # Si falla el descifrado, evita entregar un informe identificado incompleto.
+    except ErrorCifradoIdentificacion:
+        logger_sistema.error("ERROR_IDENTIFICACION_EXPORTACION")
+        return respuesta_error(
+            "No se pudo recuperar la identificación de los pacientes.",
+            503,
+            "IDENTIFICACION_NO_DISPONIBLE"
+        )
+
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_BASE_IDENTIFICACION_EXPORTACION")
+        return respuesta_error(
+            "No se pudo consultar la identificación de los pacientes.",
+            500,
+            "ERROR_REGISTRO"
+        )
+
+    from datetime import datetime as _dt
+    marca = _dt.now().strftime("%Y%m%d_%H%M")
+
+    if entrada["formato"] == "pdf":
+        nombres = {"en_ingreso": "en ingreso", "en_espera": "en espera", "finalizado": "finalizados"}
+        filtros = ["Estado: " + nombres.get(entrada.get("estado") or "", "todos")]
+        if entrada.get("desde") or entrada.get("hasta"):
+            def fmt(v):
+                return _dt.fromisoformat(v.replace("Z", "+00:00")).astimezone().strftime("%d/%m/%Y %H:%M")
+            filtros.append(
+                "Fechas: "
+                + (("desde " + fmt(entrada["desde"])) if entrada.get("desde") else "")
+                + ((" hasta " + fmt(entrada["hasta"])) if entrada.get("hasta") else "")
+            )
+        try:
+            contenido = generar_pdf(filas, " · ".join(filtros), usuario)
+        except ImportError:
+            return respuesta_error(
+                "Falta instalar la librería del PDF: python -m pip install reportlab",
+                503,
+                "PDF_NO_DISPONIBLE"
+            )
+        mime, nombre = "application/pdf", f"casos_triage_{marca}.pdf"
+    else:
+        contenido = generar_csv(filas)
+        mime, nombre = "text/csv; charset=utf-8", f"casos_triage_{marca}.csv"
+
+    logger_sistema.info(
+        "EXPORTAR_CASOS | %s | %s | %d filas",
+        usuario, entrada["formato"], len(filas)
+    )
+
+    respuesta = app.response_class(contenido, mimetype=mime)
+    respuesta.headers["Content-Disposition"] = f'attachment; filename="{nombre}"'
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
 

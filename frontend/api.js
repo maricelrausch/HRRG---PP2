@@ -13,6 +13,54 @@
   const MODO_REAL =
     location.protocol === 'http:' || location.protocol === 'https:';
 
+  /* ===== Indicador de carga (pedido 24/10) =====
+     Cada consulta al backend (/api/…) muestra una barra arriba y un cartel "Consultando al servidor…".
+     Aparece recién a los 250 ms (las consultas rápidas no parpadean) y, si pasa de 6 s, aclara que
+     MedGemma puede tardar. Cubre todas las pantallas que cargan api.js, el chat y el dictado. */
+  let enCurso = 0, tAparece = null, tLento = null, aviso = null;
+  function avisoCarga() {
+    if (!aviso && document.body) {
+      aviso = document.createElement('div');
+      aviso.className = 'carga-global';
+      aviso.setAttribute('role', 'status');
+      aviso.setAttribute('aria-live', 'polite');
+      aviso.innerHTML = '<span class="carga-barra"></span><span class="carga-txt"></span>';
+      document.body.appendChild(aviso);
+    }
+    return aviso;
+  }
+  function empezarCarga() {
+    if (enCurso++ > 0) return;
+    tAparece = setTimeout(function () {
+      const a = avisoCarga(); if (!a) return;
+      a.querySelector('.carga-txt').textContent = 'Consultando al servidor…';
+      a.classList.add('on'); document.documentElement.classList.add('cargando');
+      if (document.body) document.body.setAttribute('aria-busy', 'true');
+    }, 250);
+    tLento = setTimeout(function () {
+      if (aviso) aviso.querySelector('.carga-txt').textContent = 'Sigue procesando… (MedGemma puede tardar uno o dos minutos)';
+    }, 6000);
+  }
+  function terminarCarga() {
+    if (--enCurso > 0) return;
+    enCurso = 0; clearTimeout(tAparece); clearTimeout(tLento);
+    if (aviso) aviso.classList.remove('on');
+    document.documentElement.classList.remove('cargando');
+    if (document.body) document.body.removeAttribute('aria-busy');
+  }
+  if (MODO_REAL && root.fetch && !root.fetch.__hrrgCarga) {
+    const fetchOriginal = root.fetch.bind(root);
+    const conIndicador = function (recurso, opciones) {
+      const url = typeof recurso === 'string' ? recurso : (recurso && recurso.url) || '';
+      const propio = /^\/(api|upload|chat)\b/.test(url) || url.indexOf(location.origin + '/api') === 0;
+      if (!propio) return fetchOriginal(recurso, opciones);
+      empezarCarga();
+      return fetchOriginal(recurso, opciones).finally(terminarCarga);
+    };
+    conIndicador.__hrrgCarga = true;
+    root.fetch = conIndicador;
+  }
+
   const CLAVE_DEMO = 'hrrg_demo_user';
   const USUARIOS_DEMO = {
     enfermeria: { nom: 'Enfermería', rol: 'triage' },
@@ -137,6 +185,32 @@ function aUsuario(datos) {
   function buscarPaciente(dni) {
     return pedir('/api/demo/pacientes/buscar', { method: 'POST', body: JSON.stringify({ dni: dni }) });
   }
+  /* Historial de casos (todos los episodios, del más nuevo al más viejo), de a páginas. */
+  /* rango = { desde, hasta } en ISO con zona horaria (desde inclusive, hasta exclusivo); opcional. */
+  function paramsRango(rango) {
+    let q = '';
+    if (rango && rango.desde) q += '&desde=' + encodeURIComponent(rango.desde);
+    if (rango && rango.hasta) q += '&hasta=' + encodeURIComponent(rango.hasta);
+    return q;
+  }
+  function listarCasos(limite, desplazamiento, rango) {
+    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango), { method: 'GET', cache: 'no-store' });
+  }
+  /* Exportación del historial de casos (auditor): CSV para Excel, sin DNI. Devuelve el archivo como Blob. */
+  /* Pide de nuevo la contraseña del auditor (va en el cuerpo, nunca en la URL). formato: 'excel' | 'pdf'. */
+  async function exportarCasos(estado, rango, formato, password) {
+    try {
+      const cuerpo = { password: password, formato: formato };
+      if (estado) cuerpo.estado = estado;
+      if (rango && rango.desde) cuerpo.desde = rango.desde;
+      if (rango && rango.hasta) cuerpo.hasta = rango.hasta;
+      const r = await fetch('/api/demo/episodios/exportar', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+      if (!r.ok) { let m = 'error ' + r.status, c = null; try { const j = await r.json(); m = j.mensaje || m; c = j.codigo || null; } catch (e) {} return { ok: false, estado: r.status, codigo: c, mensaje: m }; }
+      const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || ('casos_triage.' + (formato === 'pdf' ? 'pdf' : 'csv'));
+      return { ok: true, blob: await r.blob(), nombre: nombre };
+    } catch (e) { return { ok: false, estado: 0, mensaje: 'No se pudo conectar con el servidor.' }; }
+  }
   function episodiosDePaciente(codigoPaciente) {
     return pedir('/api/demo/episodios?codigo_paciente=' + encodeURIComponent(codigoPaciente) + '&limite=20', { method: 'GET', cache: 'no-store' });
   }
@@ -159,5 +233,5 @@ function aUsuario(datos) {
   root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, registrarDatosIngreso: registrarDatosIngreso, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
-    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, registrarDecision: registrarDecision };
+    identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, listarCasos: listarCasos, exportarCasos: exportarCasos, registrarDecision: registrarDecision };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

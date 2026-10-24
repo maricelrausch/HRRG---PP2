@@ -674,23 +674,55 @@ def corregir_medicion_demo(
 
 # Busca episodios por código exacto de paciente o de episodio.
 # Devuelve una página de resultados; no modifica los registros.
+# [Propuesta Barby 23/10] Rango de fechas para el historial de casos y la exportación.
+# Recibe fechas ISO con zona horaria; las compara en UTC con creado_en.
+# desde = inclusive, hasta = exclusivo.
+def normalizar_rango(desde=None, hasta=None):
+    resultado = []
+    for valor in (desde, hasta):
+        if valor in (None, ""):
+            resultado.append(None)
+            continue
+        if not isinstance(valor, str):
+            raise ValueError("Las fechas deben enviarse como texto ISO 8601.")
+        fecha = datetime.fromisoformat(valor.replace("Z", "+00:00"))
+        if fecha.utcoffset() is None:
+            raise ValueError("Las fechas deben incluir la zona horaria.")
+        resultado.append(
+            fecha.astimezone(timezone.utc).isoformat(timespec="microseconds")
+        )
+    if resultado[0] and resultado[1] and resultado[0] >= resultado[1]:
+        raise ValueError("La fecha 'desde' debe ser anterior a 'hasta'.")
+    return resultado
+
+
 def buscar_episodios(
     ruta_base,
     codigo_paciente=None,
     codigo_episodio=None,
     limite=50,
-    desplazamiento=0
+    desplazamiento=0,
+    desde=None,
+    hasta=None
 ):
     condiciones = []
     parametros = []
 
+    desde, hasta = normalizar_rango(desde, hasta)
+    if desde:
+        condiciones.append("e.creado_en >= ?")
+        parametros.append(desde)
+    if hasta:
+        condiciones.append("e.creado_en < ?")
+        parametros.append(hasta)
+
     # Los valores se pasan como parámetros para evitar inyección SQL.
     if codigo_paciente:
-        condiciones.append("codigo_paciente = ?")
+        condiciones.append("e.codigo_paciente = ?")
         parametros.append(codigo_paciente)
 
     if codigo_episodio:
-        condiciones.append("codigo_episodio = ?")
+        condiciones.append("e.codigo_episodio = ?")
         parametros.append(codigo_episodio)
 
     filtro = (
@@ -704,25 +736,49 @@ def buscar_episodios(
     try:
         # Consulta primero la cantidad total que coincide con los filtros.
         total = conexion.execute(
-            "SELECT COUNT(*) FROM episodios" + filtro,
+            "SELECT COUNT(*) FROM episodios AS e" + filtro,
             parametros
         ).fetchone()[0]
 
         # Ordena de más reciente a más antiguo y limita la respuesta.
+        # [Propuesta Barby 23/10] Suma el estado, el color de la última decisión
+        # y la categoría del último ingreso, para el historial de casos.
         filas = conexion.execute(
             """
-            SELECT codigo_episodio, codigo_paciente,
-                   creado_en, profesional_usuario
-            FROM episodios
+            SELECT e.codigo_episodio, e.codigo_paciente,
+                   e.creado_en, e.profesional_usuario,
+                   s.estado,
+                   (SELECT ev.datos_json FROM eventos AS ev
+                     WHERE ev.codigo_episodio = e.codigo_episodio
+                       AND ev.tipo = 'DECISION_REGISTRADA'
+                     ORDER BY ev.id DESC LIMIT 1) AS decision_json,
+                   (SELECT ev.datos_json FROM eventos AS ev
+                     WHERE ev.codigo_episodio = e.codigo_episodio
+                       AND ev.tipo = 'DATOS_INGRESO_REGISTRADOS'
+                     ORDER BY ev.id DESC LIMIT 1) AS ingreso_json
+            FROM episodios AS e
+            LEFT JOIN estados_episodio AS s
+                ON s.codigo_episodio = e.codigo_episodio
             """ + filtro + """
-            ORDER BY creado_en DESC, codigo_episodio DESC
+            ORDER BY e.creado_en DESC, e.codigo_episodio DESC
             LIMIT ? OFFSET ?
             """,
             parametros + [limite, desplazamiento]
         ).fetchall()
 
+        episodios = []
+        for fila in filas:
+            episodio = dict(fila)
+            decision = episodio.pop("decision_json")
+            ingreso = episodio.pop("ingreso_json")
+            episodio["color_final"] = json.loads(decision).get("color_final") if decision else None
+            episodio["motivo_categoria"] = (
+                json.loads(ingreso).get("valores", {}).get("motivo_categoria") if ingreso else None
+            )
+            episodios.append(episodio)
+
         return {
-            "episodios": [dict(fila) for fila in filas],
+            "episodios": episodios,
             "total": total
         }
     finally:
@@ -1232,4 +1288,256 @@ def registrar_decision_demo(
     finally:
         # Libera la conexión también si se rechaza o falla el guardado.
         conexion.close()
-        
+
+
+# [Propuesta Barby 23/10 · a revisar por Maricel]
+# Exportación para auditoría: una fila por episodio, SIN DNI (solo el código de paciente).
+# Datos de ingreso, última medición vigente (con correcciones), decisión final y conteos.
+COLUMNAS_EXPORTACION = [
+    ("fecha_ingreso", "Fecha de ingreso"),
+    ("codigo_episodio", "Episodio"),
+    ("codigo_paciente", "Código de paciente"),
+    ("profesional_ingreso", "Profesional que ingresó"),
+    ("estado", "Estado"),
+    ("edad", "Edad"),
+    ("sexo", "Sexo"),
+    ("motivo_categoria", "Categoría"),
+    ("motivo_consulta", "Motivo de consulta"),
+    ("tiempo_evolucion", "Tiempo de evolución"),
+    ("banderas_rojas", "Banderas rojas"),
+    ("antecedentes", "Antecedentes"),
+    ("ta_sistolica", "TA sistólica"),
+    ("ta_diastolica", "TA diastólica"),
+    ("frecuencia_cardiaca", "FC"),
+    ("frecuencia_respiratoria", "FR"),
+    ("saturacion_o2", "SpO2"),
+    ("temperatura", "Temperatura"),
+    ("glucemia", "Glucemia"),
+    ("estado_conciencia", "Conciencia"),
+    ("glasgow", "Glasgow"),
+    ("dolor_intensidad", "Dolor (0-10)"),
+    ("mediciones", "Cantidad de mediciones"),
+    ("correcciones", "Cantidad de correcciones"),
+    ("color_final", "Color final"),
+    ("decision", "Decisión"),
+    ("motivo_decision", "Motivo de la decisión"),
+    ("profesional_decision", "Profesional que decidió"),
+    ("fecha_decision", "Fecha de la decisión"),
+    ("decisiones", "Cantidad de decisiones"),
+    ("escalado_rojo", "Escalado a ROJO en espera"),
+    ("fecha_finalizacion", "Fecha de finalización"),
+]
+
+_BANDERAS = {
+    "br_sangrado": "Sangrado", "br_convulsion": "Convulsión",
+    "br_disnea": "Dificultad para respirar", "br_trauma": "Trauma",
+}
+_ANTECEDENTES = {
+    "ant_diabetes": "Diabetes", "ant_cardio": "Cardiovascular", "ant_resp": "Respiratorio",
+    "ant_anticoag": "Anticoagulación", "ant_inmuno": "Inmunosupresión",
+    "ant_embarazo": "Embarazo", "ant_medicacion": "Medicación crítica",
+}
+
+# Reconstruye cada medición con sus correcciones.
+# Devuelve los valores de la medición más reciente por fecha de toma.
+# Una corrección de una medición antigua no reemplaza una más nueva.
+def _ultima_medicion_exportable(eventos):
+    raices = {}
+    mediciones = {}
+
+    for evento in eventos:
+        tipo = evento["tipo"]
+        if tipo not in {"MEDICION_REGISTRADA", "MEDICION_CORREGIDA"}:
+            continue
+
+        datos = json.loads(evento["datos_json"])
+        evento_id = evento["id"]
+
+        if tipo == "MEDICION_REGISTRADA":
+            fecha = datetime.fromisoformat(datos["medido_en"])
+            if fecha.utcoffset() is None:
+                raise ValueError("La medición no tiene zona horaria.")
+
+            raices[evento_id] = evento_id
+            mediciones[evento_id] = {
+                "fecha": fecha.astimezone(timezone.utc),
+                "valores": dict(datos["valores"]),
+            }
+        else:
+            anterior_id = datos["evento_corregido_id"]
+            if anterior_id not in raices:
+                raise ValueError("La corrección no tiene una medición válida.")
+
+            raiz_id = raices[anterior_id]
+            raices[evento_id] = raiz_id
+
+            # Cada corrección contiene la versión completa de esa medición.
+            # Reemplazarla también respeta los campos que fueron retirados.
+            mediciones[raiz_id]["valores"] = dict(datos["valores"])
+
+    if not mediciones:
+        return {}
+
+    # Si coinciden las fechas, usa el ID de la medición original como desempate.
+    ultima_id = max(
+        mediciones,
+        key=lambda identificador: (
+            mediciones[identificador]["fecha"],
+            identificador,
+        ),
+    )
+    return mediciones[ultima_id]["valores"]
+
+def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, hasta=None):
+    if estado not in (None, "en_ingreso", "en_espera", "finalizado"):
+        raise ValueError("El estado no es válido.")
+    desde, hasta = normalizar_rango(desde, hasta)
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        with conexion:
+            conexion.execute("BEGIN")
+            condiciones, parametros = [], []
+            if estado:
+                condiciones.append("s.estado = ?")
+                parametros.append(estado)
+            if desde:
+                condiciones.append("e.creado_en >= ?")
+                parametros.append(desde)
+            if hasta:
+                condiciones.append("e.creado_en < ?")
+                parametros.append(hasta)
+            filtro = (" WHERE " + " AND ".join(condiciones)) if condiciones else ""
+
+            episodios = conexion.execute(
+                """
+                SELECT e.codigo_episodio, e.codigo_paciente, e.creado_en,
+                       e.profesional_usuario, s.estado
+                FROM episodios AS e
+                LEFT JOIN estados_episodio AS s
+                    ON s.codigo_episodio = e.codigo_episodio
+                """ + filtro + """
+                ORDER BY e.creado_en DESC, e.codigo_episodio DESC
+                LIMIT ?
+                """,
+                parametros + [limite]
+            ).fetchall()
+
+            filas = []
+            for ep in episodios:
+                eventos = conexion.execute(
+                    """
+                    SELECT id, tipo, ocurrido_en, profesional_usuario, datos_json
+                    FROM eventos WHERE codigo_episodio = ? ORDER BY id
+                    """,
+                    (ep["codigo_episodio"],)
+                ).fetchall()
+
+                fila = {
+                    "fecha_ingreso": ep["creado_en"],
+                    "codigo_episodio": ep["codigo_episodio"],
+                    "codigo_paciente": ep["codigo_paciente"],
+                    "profesional_ingreso": ep["profesional_usuario"],
+                    "estado": {"en_ingreso": "En ingreso", "en_espera": "En espera",
+                               "finalizado": "Finalizado"}.get(ep["estado"], ep["estado"]),
+                    "mediciones": 0, "correcciones": 0, "decisiones": 0,
+                    "escalado_rojo": "No",
+                }
+
+                for ev in eventos:
+                    datos = json.loads(ev["datos_json"])
+                    tipo = ev["tipo"]
+
+                    if tipo == "DATOS_INGRESO_REGISTRADOS":
+                        v = datos.get("valores", {})
+                        for campo in ("edad", "sexo", "motivo_categoria", "motivo_consulta"):
+                            fila[campo] = v.get(campo)
+                        if v.get("tiempo_evolucion_valor") is not None:
+                            fila["tiempo_evolucion"] = f'{v["tiempo_evolucion_valor"]:g} {v.get("tiempo_evolucion_unidad") or ""}'.strip()
+                        fila["banderas_rojas"] = ", ".join(t for k, t in _BANDERAS.items() if v.get(k)) or "Ninguna"
+                        fila["antecedentes"] = ", ".join(
+                            [t for k, t in _ANTECEDENTES.items() if v.get(k)]
+                            + [x for x in (v.get("antecedentes_otros"),) if x]
+                        ) or "Ninguno"
+
+                    elif tipo in ("MEDICION_REGISTRADA", "MEDICION_CORREGIDA"):
+                        contador = (
+                            "mediciones"
+                            if tipo == "MEDICION_REGISTRADA"
+                            else "correcciones"
+                        )
+                        fila[contador] += 1
+
+                    elif tipo == "DECISION_REGISTRADA":
+                        fila["decisiones"] += 1
+                        fila["color_final"] = datos.get("color_final")
+                        fila["decision"] = datos.get("decision")
+                        fila["motivo_decision"] = datos.get("motivo")
+                        fila["profesional_decision"] = ev["profesional_usuario"]
+                        fila["fecha_decision"] = ev["ocurrido_en"]
+                        if "Escalado manual" in (datos.get("motivo") or ""):
+                            fila["escalado_rojo"] = "Sí"
+
+                    elif tipo == "ESTADO_CAMBIADO" and datos.get("estado_nuevo") == "finalizado":
+                        fila["fecha_finalizacion"] = ev["ocurrido_en"]
+
+                                # Completa el resumen con la última toma y sus correcciones.
+                # Este resumen no reemplaza el historial detallado.
+                valores_actuales = _ultima_medicion_exportable(eventos)
+                columnas = dict(COLUMNAS_EXPORTACION)
+
+                for campo, valor in valores_actuales.items():
+                    if campo in columnas:
+                        fila[campo] = valor
+
+                # Prepara todos los eventos del episodio para la exportación.
+                # Conserva el orden de registro, el autor y los vínculos
+                # entre una medición y sus correcciones.
+                historial = []
+
+                for evento in eventos:
+                    datos_evento = json.loads(evento["datos_json"])
+
+                    # Selecciona los campos del historial que se exportarán.
+                    # No consulta ni incorpora la tabla de identificación.
+                    campos_detalle = (
+                        "medido_en",
+                        "valores",
+                        "valores_anteriores",
+                        "evento_corregido_id",
+                        "motivo",
+                        "estado_anterior",
+                        "estado_nuevo",
+                        "decision",
+                        "color_final",
+                        "evento_anterior_id",
+                        "version",
+                        "version_anterior",
+                        "origen",
+                        "origen_extraccion",
+                    )
+
+                    detalle = {
+                        campo: datos_evento[campo]
+                        for campo in campos_detalle
+                        if campo in datos_evento
+                    }
+
+                    historial.append({
+                        "evento_id": evento["id"],
+                        "tipo": evento["tipo"],
+                        "registrado_en": evento["ocurrido_en"],
+                        "profesional_usuario": evento["profesional_usuario"],
+                        "detalle": detalle,
+                    })
+
+                # Mantiene cada evento original, incluso cuando fue corregido.
+                fila["historial"] = historial
+                filas.append(fila)
+                
+
+        return filas
+    finally:
+        conexion.close()

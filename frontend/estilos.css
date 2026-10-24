@@ -282,6 +282,8 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .wt{color:var(--muted);font-size:13px;min-width:96px}
 .wf{display:flex;gap:6px;flex-wrap:wrap}
 .wa{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.casos{margin:10px 0 14px}.expform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.expform input[type=password]{font-size:13px;padding:4px 6px;margin-left:4px}
+.casos-fechas{gap:8px;align-items:center;margin:6px 0}.casos-fechas input{font-size:13px;padding:3px 6px}.casos select{font-size:13px;padding:4px 6px}.casos li{margin:6px 0}.casos .chipc{font-size:11px;padding:1px 6px;border-radius:4px}
 .histpanel{flex-basis:100%;margin:6px 0 0;font-size:13px}
 .histpanel .prev{margin-top:8px}
 .escform{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:8px;font-size:13px}
@@ -419,3 +421,12 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 /* Atenciones anteriores del paciente */
 .note.hist .prev{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
 .note.hist .prevdet{margin:4px 0 6px 6px;font-size:13px}
+
+/* Indicador de carga al consultar al backend (api.js) */
+.carga-global{position:fixed;inset:0 0 auto 0;z-index:9999;pointer-events:none;opacity:0;transition:opacity .15s}
+.carga-global.on{opacity:1}
+.carga-global .carga-barra{display:block;height:3px;background:linear-gradient(90deg,transparent,var(--accent,#6b5bd2),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:carga-mov 1.1s linear infinite}
+.carga-global .carga-txt{position:absolute;top:8px;right:12px;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--panel,#fff);color:var(--ink,#1a1d26);border:1px solid var(--line,#ccc);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+html.cargando,html.cargando *{cursor:progress}
+@keyframes carga-mov{from{background-position:-40% 0}to{background-position:140% 0}}
+@media (prefers-reduced-motion:reduce){.carga-global .carga-barra{animation:none;background:var(--accent,#6b5bd2)}}
