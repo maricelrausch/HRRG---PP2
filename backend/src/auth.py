@@ -39,3 +39,21 @@ def profesional_activo(base_usuarios, usuario):
         conexion.close()
 
     return profesional is not None
+
+def obtener_profesional(base_usuarios, usuario):
+    conexion = sqlite3.connect(base_usuarios)
+    conexion.row_factory = sqlite3.Row
+
+    try:
+        fila = conexion.execute(
+            """
+            SELECT id, usuario, nombre, rol
+            FROM profesionales
+            WHERE usuario = ? AND activo = 1
+            """,
+            (usuario,)
+        ).fetchone()
+
+        return dict(fila) if fila else None
+    finally:
+        conexion.close()

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administración · Gestión de accesos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Estilos propios de esta pantalla (mismos tokens que estilos.css) */
+:root{
+  --bg:#EFF0F4;--panel:#FFFFFF;--panel-2:#F5F6F9;--line:#E1E3EA;--ink:#1A1D26;--muted:#5A5F6E;
+  --accent:#4A3C93;--accent-soft:#ECE8F8;--accent-text:#3E3180;--tab:#1B2030;
+  --sim:#F6E3EE;--sim-ink:#7A2457;--err:#B3261E;--err-soft:#FCEDEC;
+  --f-display:'IBM Plex Sans Condensed','Arial Narrow',sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1440px;margin:0 auto;padding:20px}
+.app{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+
+/* Cabecera */
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:18px 20px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:16px;min-width:0}
+.brand img{height:52px;width:auto;background:#fff;border-radius:6px;padding:6px 10px;box-shadow:0 0 0 1px var(--line)}
+.brand .sep{width:1px;align-self:stretch;background:var(--line)}
+.brand h1{margin:0;font-family:var(--f-display);font-size:22px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:13px;font-weight:500;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);white-space:nowrap}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--ink)}
+.chip .n{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--tab);color:#fff;font-size:11px;font-weight:600}
+.chip.sim{background:var(--sim);color:var(--sim-ink);border-color:transparent}
+.chip button{background:none;border:0;padding:0;color:var(--accent-text);text-decoration:underline;cursor:pointer;font-size:12px}
+
+.body{padding:24px 14px 20px;display:flex;flex-direction:column;gap:20px}
+.intro{display:flex;flex-wrap:wrap;gap:14px;align-items:stretch}
+.note{flex:1 1 480px;background:var(--panel-2);border-radius:10px;padding:16px 18px;font-size:16px;display:flex;align-items:center}
+.banner{border:1px solid var(--err);background:var(--err-soft);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.banner b{color:var(--err)}
+
+/* Botones */
+.btn{min-height:44px;padding:0 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.big{min-height:54px;padding:0 24px;font-size:17px;border-radius:10px}
+.btn.dark{background:var(--tab);border-color:var(--tab);color:#fff}
+.btn.danger{border-color:var(--err);color:var(--err)}
+.btn.sm{min-height:50px;padding:0 16px;font-size:15px}
+
+/* Contadores */
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.summary div{padding:18px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.summary div:last-child{border-right:0}
+.summary span{font-size:14px;color:var(--muted)}
+.summary b{font-family:var(--f-display);font-size:28px;font-weight:600;line-height:1}
+@media (max-width:760px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.summary div:nth-child(2){border-right:0}.summary div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+
+/* Columnas */
+.cols{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.card{border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.main{flex:999 1 560px}
+.side{flex:1 1 360px}
+
+/* Filtros */
+.filters{display:flex;flex-wrap:wrap;gap:12px}
+.filters label,.campo{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:#3A3F4C;flex:1 1 180px}
+.side .campo{flex:none}
+.filters input,.filters select,.campo select,dialog input,dialog select{height:50px;border:1px solid var(--line);border-radius:10px;padding:0 14px;background:var(--panel);font-size:16px;color:var(--ink);font-weight:400}
+.filters input{font-family:var(--f-mono);font-size:15px}
+
+/* Tabla */
+.tablebox{overflow-x:auto}
+table{width:100%;min-width:640px;border-collapse:collapse;font-size:16px}
+th{font-family:var(--f-mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px;border-bottom:1px solid var(--line);font-weight:500}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.sel{background:var(--panel-2);box-shadow:inset 3px 0 0 var(--accent)}
+.nom{font-weight:600}
+.code{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
+td.mono{font-family:var(--f-mono);font-size:15px}
+
+/* Estados */
+.st{display:inline-block;font-family:var(--f-mono);font-size:13px;font-weight:500;padding:4px 10px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.st.venc{border:1.5px solid var(--ink);font-weight:600}
+.st.bloq{color:var(--err);border-color:var(--err);background:var(--err-soft)}
+.st.fix{background:var(--accent-soft);color:var(--accent-text);border-color:transparent}
+.st.off{color:var(--muted);border-style:dashed}
+
+/* Panel lateral */
+.eyebrow{font-family:var(--f-mono);font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.side h2{margin:0;font-family:var(--f-display);font-size:24px;font-weight:600}
+.sub{color:var(--muted);font-size:16px}
+.sub .code{font-size:16px}
+.side h3{margin:0;font-family:var(--f-display);font-size:19px;font-weight:600}
+.temp{border:1px dashed var(--accent);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.temp code{font-family:var(--f-mono);font-size:22px;letter-spacing:.04em;overflow-wrap:anywhere}
+.tag{align-self:flex-start;font-family:var(--f-mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--accent-soft);color:var(--accent-text)}
+.hint{font-size:14px;color:var(--muted);margin:0}
+.err{color:var(--err);font-weight:500;font-size:14px}
+.politica{background:var(--panel-2);border-radius:10px;padding:14px 16px;font-size:15px;display:flex;flex-direction:column;gap:6px}
+details.mas{border-top:1px solid var(--line);padding-top:12px}
+details.mas summary{cursor:pointer;font-weight:600;font-size:15px;color:var(--accent-text)}
+details.mas[open]{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* Auditoría y alta */
+.aud{font-family:var(--f-mono);font-size:12px;line-height:1.7;max-height:260px;overflow:auto;background:var(--panel-2);border-radius:8px;padding:10px 12px;margin-top:10px}
+.pie summary{cursor:pointer;font-size:14px;color:var(--muted)}
+dialog{border:1px solid var(--line);border-radius:12px;padding:22px;width:min(400px,calc(100vw - 32px))}
+dialog form{display:flex;flex-direction:column;gap:14px}
+dialog label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+dialog strong{font-family:var(--f-display);font-size:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="app">
+    <header class="head">
+      <div class="brand">
+        <img src="img/logo-hrrg.png" alt="HRRG · Hospital Regional Río Grande">
+        <span class="sep"></span>
+        <h1>Gestión de accesos · Prototipo local</h1>
+      </div>
+      <div class="chips">
+        <span class="chip sim" id="chipSim" hidden><span class="n">S</span>MODO SIMULADO</span>
+        <span class="chip" id="userChip" hidden></span>
+      </div>
+    </header>
+
+    <div class="body">
+      <div class="banner" id="sinServidor" hidden role="alert">
+        <b>Esta pantalla necesita el servidor.</b>
+        <span>Abrila desde Flask: http://127.0.0.1:5000/admin.html</span>
+      </div>
+
+      <div class="intro">
+        <div class="note"><span><b>Las contraseñas nunca se muestran.</b> El administrador solo genera claves temporales de un solo uso, desbloquea cuentas y fuerza cambios.</span></div>
+        <button type="button" class="btn primary big" id="nuevo">Nuevo usuario</button>
+      </div>
+
+      <div class="summary">
+        <div><span>Usuarios</span><b id="c-total">–</b></div>
+        <div><span>Contraseña vencida</span><b id="c-venc">–</b></div>
+        <div><span>Cuentas bloqueadas</span><b id="c-bloq" style="color:var(--err)">–</b></div>
+        <div><span>Cambio pendiente</span><b id="c-pend" style="color:var(--accent-text)">–</b></div>
+      </div>
+
+      <div class="cols">
+        <div class="card main">
+          <div class="filters">
+            <label style="flex:2 1 260px">Buscar<input type="search" id="q" placeholder="Nombre o usuario"></label>
+            <label>Rol<select id="f-rol"><option value="">Todos</option></select></label>
+            <label>Estado<select id="f-estado"><option value="">Todos</option><option>Activa</option><option>Vencida</option><option>Bloqueada</option><option>Cambio pendiente</option><option>Desactivada</option></select></label>
+          </div>
+          <div class="tablebox">
+            <table>
+              <thead><tr><th>Usuario</th><th>Rol</th><th>Último cambio</th><th>Estado</th><th style="text-align:right">Acción</th></tr></thead>
+              <tbody id="tabla"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="card side" aria-label="Cuenta seleccionada">
+          <span class="eyebrow">Cuenta seleccionada</span>
+          <p class="hint" id="vacio">Elegí una cuenta de la lista.</p>
+
+          <div id="detalle" hidden style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <h2 id="d-nombre"></h2>
+              <span class="sub" id="d-sub"></span>
+              <span id="d-estado" class="st" style="align-self:flex-start"></span>
+            </div>
+
+            <div class="banner" id="d-bloq" hidden>
+              <b>Cuenta bloqueada</b>
+              <span>Se superaron los 5 intentos fallidos de inicio de sesión.</span>
+              <button type="button" class="btn danger" id="desbloquear">Desbloquear cuenta</button>
+            </div>
+
+            <h3>Restablecer contraseña</h3>
+            <p class="hint">El profesional la cambia en su próximo inicio de sesión.</p>
+            <label class="campo">Vigencia de la clave temporal
+              <select id="horas"><option value="24">24 horas</option><option value="4">4 horas</option><option value="1">1 hora</option></select>
+            </label>
+            <button type="button" class="btn primary big" id="generar">Generar clave temporal</button>
+
+            <div class="temp" id="temp" hidden>
+              <span class="tag">SE MUESTRA UNA SOLA VEZ</span>
+              <code id="t-clave"></code>
+              <span class="hint" id="t-vence"></span>
+              <div class="row">
+                <button type="button" class="btn" id="copiar">Copiar</button>
+                <button type="button" class="btn dark" id="listo">Listo</button>
+              </div>
+            </div>
+
+            <details class="mas" id="d-otras">
+              <summary>Rol y estado de la cuenta</summary>
+              <label class="campo">Rol <select id="d-rol"></select></label>
+              <button type="button" class="btn" id="activar"></button>
+            </details>
+            <p class="hint" id="d-propia" hidden>Es tu propia cuenta: no podés cambiar tu rol ni desactivarla.</p>
+          </div>
+
+          <div class="err" id="msg" role="alert"></div>
+
+          <div class="politica">
+            <b>Política vigente</b>
+            <span>Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo.</span>
+            <span>Vence cada 90 días. No repite las últimas 5.</span>
+            <span>Bloqueo tras 5 intentos fallidos.</span>
+          </div>
+        </aside>
+      </div>
+
+      <details class="pie">
+        <summary>Registro de auditoría</summary>
+        <div class="aud" id="aud">Sin datos.</div>
+      </details>
+    </div>
+  </section>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <form id="f-nuevo" novalidate>
+    <strong id="dlg-t">Nuevo usuario</strong>
+    <label>Nombre del profesional<input name="nombre" required maxlength="80" autocomplete="off"></label>
+    <label>Usuario<input name="usuario" required maxlength="30" autocomplete="off" placeholder="ej. lgomez"></label>
+    <label>Rol<select name="rol" id="n-rol"></select></label>
+    <div class="err" id="dlg-msg" role="alert"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button type="button" class="btn" id="cancelar">Cancelar</button>
+      <button type="submit" class="btn primary">Crear</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="api.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

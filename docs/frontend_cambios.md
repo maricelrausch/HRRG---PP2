@@ -1,7 +1,7 @@
 # Frontend · Qué se hizo y qué falta para conectarlo
 
-**Responsable:** Bárbara (frontend/) · **Fecha:** 12/10/2026 · **Base:** maquetado v34
-**Estado general:** todo funciona en **modo simulado**. Ninguna pantalla habla todavía con el backend ni con MedGemma.
+**Responsable:** Bárbara (frontend/) · **Creado:** 12/10/2026 · **Última actualización:** 21/10/2026 · **Base:** maquetado v34
+**Estado general:** el login (A07), "Extraer datos" (A06) y el **guardado del caso** (episodio, mediciones, correcciones e historial) ya funcionan contra Flask. La extracción usa casos simulados (D01–D05) o MedGemma (`HRRG_MODO_EXTRACCION=ia`); la sugerencia de color, el chat y el dictado siguen **simulados**.
 
 ---
 
@@ -9,7 +9,7 @@
 
 | Tarea | Archivo | Qué cambió |
 |---|---|---|
-| A01 · Montar el flujo | `frontend/formulario.html` | El v34 pasa a ser el formulario del proyecto. El formulario anterior se conserva como `frontend/formulario_original.html` (sigue usando `formulario.js` y `validacion.js`). |
+| A01 · Montar el flujo | `frontend/formulario.html` | El v34 pasa a ser el formulario del proyecto. (El formulario anterior y su `formulario.js` se borraron del repo; quedan en el historial de git, commit `2b07c63`.) |
 | A02 · Login simulado | `frontend/index.html` + `frontend/login.js` | El login salió del maquetado a su propia página. Usuarios de demo: `enfermeria`, `medico`, `auditor` (clave `demo`). Guarda el usuario en `sessionStorage` y pasa a `formulario.html`. Si alguien abre el formulario sin pasar por el login, lo devuelve al login. "Salir" borra la sesión. |
 | A03 · Rotular simulaciones | `frontend/formulario.html` | Cartel amarillo fijo en todas las pantallas ("Datos ficticios · Simulación"). Se sacaron las atribuciones a MedGemma y a la guía del HRRG: ahora dice "Prioridad de ejemplo · simulada", "guía de ejemplo, no oficial", "Modelo: SIMULADO", "IA: simulada". |
 | A04 · Guion de la demo | `docs/guion_demo.md` | Recorrido de 5 a 7 minutos, qué decir en cada pantalla y preguntas probables. |
@@ -98,17 +98,60 @@ Así el audio nunca sale de la computadora del box.
 
 ---
 
-## 4. Pendientes del frontend
+## 4. Validaciones del formulario (`frontend/validacion.js`) · 14/10
+
+Se actualizó según `backend/docs/controles_validacion.md` (C04 de Darío). Ahora usa los **nombres del diccionario V2** y los mismos controles que `backend/src/validacion.py`:
+
+- Números con coma o punto, enteros y rangos de plausibilidad (edad hasta 120; se suman `glucemia` y `tiempo_evolucion_valor`).
+- Opciones cerradas: `sexo` (Femenino / Masculino / No informado), `motivo_categoria`, `tiempo_evolucion_unidad`, `estado_conciencia`.
+- Banderas rojas `br_*` y antecedentes `ant_*` como sí/no.
+- Diastólica menor que sistólica, y PAM calculada.
+- Privacidad con los mismos patrones del backend en todos los textos libres (incluidos `sintomas_asociados`, `dolor_caracteristicas`, `aspecto_general`, `alergias`).
+- Formato de `codigo_paciente` y `codigo_episodio` (ej. `PAC-DEMO-001`).
+- Faltantes **por etapa** (`ingreso` / `medicion`): se informan, no bloquean. Glasgow y los códigos no son obligatorios.
+- Acepta nombres viejos (`tas`, `saturacion`, `sexo: 'F'`, `banderas_rojas: [...]`) y los traduce, igual que el backend.
+
+**Uso:** `TriageDatos.validate(datos, 'ingreso')` → `{ valid, errors, missing, data }`.
+
+**Pruebas:** `node frontend/tests/validacion.test.js` (14 pruebas). Además se comparó contra `validar()` del backend con los 17 casos de `casos_simulados.json`: coinciden 16. La diferencia es el caso E05 (campo desconocido), que por diseño se controla solo en el backend (control 7).
+
+**Hecho (A05, 14/10):** `formulario.html` ya usa este archivo para controlar los campos (se carga antes de `formulario.js`).
+
+## 5. Pendientes del frontend
 
 | # | Pendiente | Depende de | Tarea |
 |---|---|---|---|
-| 1 | Login real (`/api/login`, `/api/sesion`, `/api/logout`) | D04 · Maricel | A07 |
-| 2 | Separar HTML, CSS y JS del formulario | A04 + C01 · Darío | A05 |
-| 3 | "Extraer datos" contra la API (primero con JSON simulado) | D03 · Maricel + contrato D02 | A06 |
-| 4 | Revisión y resumen con datos reales | A06 + C03/C04 + D05/D06 | A08 |
+| 1 | ~~Login real (`/api/login`, `/api/sesion`, `/api/logout`)~~ ✅ Hecho 14/10: `api.js` + `login.js`. Desde Flask (`http://127.0.0.1:5000/index.html`) usa el login real; con doble clic sigue el modo demo | D04 · Maricel | A07 |
+| 2 | ~~Separar HTML, CSS y JS del formulario~~ ✅ Hecho 14/10: `estilos.css` + `formulario.js` + `validacion.js` | A04 + C01 · Darío | A05 |
+| 3 | ~~"Extraer datos" contra la API (primero con JSON simulado)~~ ✅ Hecho 16/10: Maricel conectó `formulario.js` a `/api/extraer`; probado por Bárbara (caso D02 completa la revisión; un texto desconocido avisa y conserva el relato) | D03 · Maricel + contrato D02 | A06 |
+| 4 | ~~Revisión y resumen con datos reales~~ ✅ Hecho 16/10 (con la extracción simulada; con MedGemma cuando cierre D05): cada dato muestra su origen (extraído · corregido · completado · cargado · medido · falta), el relato original queda fijo, los obligatorios salen de `validacion.js` y el registro cuenta extraídos/corregidos/completados/medidos/faltantes | A06 + C03/C04 + D05/D06 | A08 |
 | 5 | Conectar el chat (`CHAT_API`) | `/api/consulta` · Maricel + RAG · Tomás | A11 (nueva) |
 | 6 | Voz real (opción A o B) | Decisión del equipo; opción B: Tomás + Maricel | A11 / A06 |
 | 7 | Tarjeta de sugerencia con datos reales | Guías autorizadas por el HRRG | A09 ⏸ |
-| 8 | Espera y reevaluación persistidas | D10 | A10 ⏸ |
+| 8 | ~~Espera y reevaluación persistidas~~ ✅ Hecho 20/10: al registrar la decisión el episodio pasa a **en espera** en el servidor; la lista "En espera" se lee de `/api/demo/espera` (no se pierde al recargar y la ven todos los usuarios); botón **Finalizar (atendido)** con confirmación; el auditor solo mira. Al reevaluar un episodio de otra sesión se recuperan sus últimos signos vitales. El color de la lista viene de la última decisión guardada (ver punto 13) | Rutas de estado y espera · Maricel | A10 |
+| 9 | ~~Guardar el caso en el servidor~~ ✅ Hecho 18/10: al extraer se crea el episodio (código `EPI-…` del servidor); al pedir sugerencia se registra la **medición**; si después se cambian valores se registra una **corrección** (la original no se pisa); reevaluar desde En espera registra una **medición nueva**. El historial se ve en "Ver datos del caso". Sin servidor (doble clic) no se guarda nada | Rutas de episodios · Maricel | A10 |
+| 10 | ~~Cartel según el modo~~ ✅ Hecho 18/10: el cartel amarillo usa `modo_extraccion` de `/api/sesion` desde el inicio ("Simulación" o "Extracción con IA local") | `/api/sesion` · Maricel | A03 |
+| 12 | ~~Botón imprimir~~ ✅ Hecho 20/10: "Imprimir / PDF" en la pantalla de resultado; imprime solo el resumen (datos, correcciones, historial y registro) con encabezado de datos ficticios. Desde el diálogo se elige "Guardar como PDF". Si Tomi arma un PDF desde el servidor, el botón se puede apuntar a esa ruta | Pedido de Tomi | — |
+| 13 | ~~Guardar la **decisión** en el servidor~~ ✅ Hecho 21/10 (`POST …/decision`): Aceptar → *aceptada*; Modificar → *modificada* + motivo; Rechazar → *modificada* con motivo "Sugerencia rechazada…" (el backend usa *rechazada* solo sin color); Clasificar sin IA → *modificada* "Clasificación manual sin asistencia IA"; Escalar a ROJO → *modificada* ROJO. Se ve en el historial y la lista de espera muestra el color en todas las compus. **Pendiente:** guardar edad/sexo y la extracción | Ruta · Maricel | A10 |
+| 14 | ~~DNI del paciente (pedido del HRRG en la visita)~~ ✅ Hecho 20–21/10: campo opcional en Ingreso (valida 7 u 8 dígitos). Con servidor sigue el circuito de Maricel: `POST /api/demo/pacientes/identificar` → `codigo_paciente` → se crea el episodio con ese código → `GET /api/demo/episodios?codigo_paciente=` para **atenciones anteriores**, que se ven en "Ver datos del caso" con su historial. **El DNI solo viaja a la ruta de identificación: nunca a la IA ni a `/api/extraer`**. Sin DNI se usa un código provisorio | Ruta · Maricel | A10 |
+| 15 | Buscar en **En espera** por código de episodio **o DNI** ✅ 21–22/10. Solo números = búsqueda por DNI (acepta con puntos). Con el DNI completo (7 u 8 dígitos) consulta `POST /api/demo/pacientes/buscar` (Maricel), que **no crea pacientes**, y encuentra los episodios de ese paciente cargados desde **cualquier compu**; también lo puede usar el auditor. El DNI va en el cuerpo del pedido, nunca en la URL ni a la IA. Mensajes: no existe / identificado sin episodios en espera / error. Con DNI parcial solo filtra lo de esta pestaña | ✅ Ruta de Maricel | A10 |
+| 16 | "Por qué" de la sugerencia ✅ 22/10: ahora arranca siempre con el **motivo** (categoría + lo que dijo el paciente + tiempo), p. ej. *Motivo: Cefalea — migraña*. Antes solo se veía la categoría si el dolor era 5–7/10, y un relato como "migraña, vómitos" mostraba solo *Refiere: vómitos*. Sigue siendo la simulación con reglas de ejemplo hasta tener las guías del HRRG (A09) | — | A09 |
+| 17 | Sacar de la pantalla de sugerencia (acuerdo reunión 21/10) ✅ 22/10: la línea de origen ("Color fijado por regla de seguridad…" / "Simulación con reglas de ejemplo"), la **Fuente** con la guía de ejemplo, el texto "IA · Entendió del relato…" y el aviso "4 · Herramienta de apoyo…". Se **ocultaron** (atributo `hidden`), no se borraron: la lógica y el chat siguen igual y se pueden volver a mostrar. La corrección de los datos del relato quedó como **"4 · Corregir datos del relato"** | Reunión 21/10 | A09 |
+| 18 | Carteles del modo IA ✅ 22/10: el chip "IA: simulada" ahora dice **"IA: MedGemma local"** cuando el servidor está en modo IA (antes quedaba fijo hasta la primera extracción). Se sacó "/ Simulación" del encabezado y se corrigió el texto del login real (decía que la extracción seguía simulada). "Datos ficticios" queda siempre: es el aviso de privacidad | — | A10 |
+| 19 | **Escalar a ROJO** desde En espera con **motivo obligatorio** ✅ 22/10: al tocar "Escalar a ROJO" se abre un formulario en la fila (motivo de una lista + detalle opcional, obligatorio si es "Otro"). El motivo se guarda en la decisión (`Escalado manual por deterioro en espera: <motivo>. <detalle>.`), se ve en el historial y en la fila de todas las compus. Antes se registraba siempre el mismo texto fijo. Especificaciones (punto 4 de En espera) actualizadas el 23/10 | Pedido de Barby | A10 |
+| 20 | Aviso del chat "Consultar a la IA" ✅ 22/10: con servidor decía "Simulación. Respuestas de ejemplo, no de MedGemma" aunque el chat ya consulta a MedGemma local (`js/chat_ia.js` → `/api/ia/consulta`). Ahora dice "MedGemma local…". Sin servidor (doble clic) sigue el aviso de simulación | — | A10 |
+| 21 | Textos de la pantalla de Ingreso (pedido 22/10) ✅ 23/10: el campo pasa a llamarse **"DNI"** (sin "opcional · para vincular…"), se sacó la explicación de abajo del DNI y la línea "3 · Si algo falla…". El aviso "Caso ficticio" quedó corto, al lado de "Descripción del evento". La lógica no cambia: el DNI sigue sin ir a la IA y el control de datos personales en el relato sigue activo | Pedido del grupo | A10 |
+| 22 | **Organización del código** (A09/A10, con OK de Darío) ✅ 23/10: `formulario.js` se separó en tres archivos sin cambiar lo que se ve: `formulario.js` (lo común: datos, navegación, Ingreso, Medición, guardado, resumen, sesión, imprimir, DNI), **`sugerencia.js`** (tarjeta de color simulado, Por qué, decisión y su guardado, chat) y **`espera.js`** (lista, búsqueda, reevaluar, escalar, finalizar). Orden de carga: formulario → sugerencia → espera → dictado → chat_ia. La sesión arranca en `DOMContentLoaded`, cuando ya están los tres | Darío OK | A09 · A10 |
+| 23 | **Sin respaldo del color en la pestaña** (A10) ✅ 23/10: se sacó el `sessionStorage` (`hrrg_espera_colores`). El color de En espera sale solo de la decisión guardada en el servidor. Si no se pudo guardar, la fila lo avisa y al recargar queda "Sin color" (antes podía mostrar un color que el servidor no tenía). El motivo/categoría de filas que vienen del servidor se ve "—" hasta que Maricel guarde la extracción | — | A10 |
+| 24 | **Backend: datos de ingreso y DNI en espera** (parte de Maricel, hecha por Barby mientras ella está de viaje; a revisar) ✅ 23/10: ruta nueva `POST …/datos-ingreso` (edad, sexo y lo extraído del relato, validado con los esquemas; nunca el relato ni el DNI) y `GET /api/demo/espera` devuelve `motivo_categoria` y, solo a enfermería y médicos, el `dni`. Frontend: guarda los datos al confirmar la medición; la lista muestra motivo y DNI después de recargar y en otras compus; reevaluar desde otra compu trae edad, sexo y motivo; el historial muestra "Datos de ingreso registrados". Detalle en `contrato_api.md` §14 | Revisar · Maricel | A10 · D10 |
+| 25 | **Auditor: DNI e historial completo** (acordado en el grupo 23/10) ✅ 23/10: el auditor ve el DNI en En espera; cada fila tiene **"Ver historial"** (solo lectura: datos de ingreso, mediciones, correcciones, decisiones con motivo, escalados, cambios de estado y otras atenciones del paciente); buscando un DNI completo ve **todas las atenciones del paciente, incluidas las finalizadas**, cada una con su historial. Sin botones de escritura. El historial se arma igual en todas las pantallas (`htmlEventos`). Backend: el auditor se suma a los roles que reciben `dni` en `/api/demo/espera` | Grupo | A10 |
+| 26 | **Explicación clínica y discriminadores** (preguntas de Darío, 23/10) ✅: (1) el "Por qué" agrupa las reglas en frases que dicen qué indican: respiratorio (SpO₂ + FR + disnea → "posible compromiso respiratorio"), circulatorio (sangrado/hipotensión/FC → "posible shock"), neurológico (convulsión, Glasgow, conciencia). Mismos umbrales y niveles: solo cambia la explicación. (2) Los Sí/No de "Pasaría a…" ahora se guardan en la decisión del servidor ("Discriminadores confirmados: … Descartados: …"), se ven en el historial y los ve el auditor. Antes quedaban solo en el registro de la pantalla | Darío | A09 |
+| 27 | **Historial de casos** para el auditor (minuta 21/10) ✅ 23/10: botón "Historial de casos" en En espera (solo auditor): todos los episodios, del más nuevo al más viejo, de a 50 ("Ver más"), con fecha, episodio, DNI, motivo, estado, color final y profesional; filtro por estado (en espera / finalizados / en ingreso) y "ver historial" de cada uno. Backend: `GET /api/demo/episodios` suma `estado`, `color_final`, `motivo_categoria` y `dni` | Minuta 21/10 | A10 |
+| 28 | **AZUL fuera de la simulación** (minuta 21/10) ✅ 23/10: la simulación ya no sugiere AZUL por dolor leve (en el HRRG el Azul es para casos como presos o policiales). Dolor 0–2 sin fiebre ahora sugiere VERDE. AZUL queda solo como elección manual del profesional, rotulado "criterio del HRRG a confirmar" | Confirmar criterio con el HRRG | A09 |
+| 29 | **AZUL no es "menor gravedad"** ✅ 23/10: al elegir AZUL en Modificar/Rechazar, la confirmación ya no dice "prioridad menor… discrepancia" sino "categoría especial del HRRG (p. ej. caso policial o judicial)". Se agregó el motivo "Caso policial o judicial (categoría AZUL)", que se completa solo. No se registra como discrepancia. Criterio a confirmar con el hospital | Prueba de Barby | A09 |
+| 30 | **Exportar (auditor, sin DNI)** ✅ 23/10: en "Historial de casos" botón **"Exportar"**: se elige **Excel o PDF** y se **vuelve a pedir la contraseña** del auditor (3 intentos; después se bloquea hasta volver a entrar). Exporta todos los episodios del estado y fechas elegidos, no solo los cargados en pantalla. El archivo baja a la carpeta **Descargas** del navegador. Sin DNI (el paciente va con su código). Queda en el log quién exportó y los intentos fallidos. Responde la pregunta abierta de la minuta ("¿el auditor puede descargar información?") | Minuta 21/10 | A10 |
+| 31 | **Buscar por fecha en el historial de casos** ✅ 23/10: campos Desde / Hasta y atajos "Hoy", "Últimos 7 días" y "Quitar fechas". El filtro lo hace el servidor (cuenta y "Ver más" respetan el rango) y la **exportación a Excel usa el mismo rango y estado** | Pedido de Barby | A10 |
+| 32 | **Indicador de carga** (pedido 24/10) ✅: toda consulta al backend (`/api/…`, incluidos chat y dictado) muestra una barra arriba y el cartel "Consultando al servidor…"; si pasa de 6 s dice "Sigue procesando… (MedGemma puede tardar uno o dos minutos)". Aparece recién a los 250 ms para no parpadear en consultas rápidas. Está en `api.js`, así que vale para todas las pantallas (login, formulario, admin, cambio de contraseña). Accesible (`role=status`, `aria-busy`) y sin animación si el sistema pide movimiento reducido | Pedido de Barby | A10 |
+| 11 | Que un error de IA **no vuelva solo a la simulación** (revisar `frontend/js/medgemma.js` y `dictado.js` de Darío antes de activarlos: hoy no están cargados) | Acordar con Darío | A08 |
 
 **Reglas que se mantienen:** solo casos ficticios; nada se atribuye a MedGemma ni al HRRG mientras sea simulación; la decisión final es siempre del profesional.
