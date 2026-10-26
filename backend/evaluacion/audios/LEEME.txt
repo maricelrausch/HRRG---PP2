@@ -1,0 +1,2 @@
+Poné acá cada audio (wav, mp3, webm) con un .txt del mismo nombre que tenga lo que se dijo, palabra por palabra.
+Ejemplo: relato01.wav + relato01.txt
