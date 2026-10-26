@@ -188,9 +188,9 @@
       <!-- 4 · EN ESPERA -->
       <div class="body" id="s-espera" hidden>
         <div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span>
+          <div><b style="font-family:var(--f-display);font-size:18px" id="wTitulo">Pacientes en espera</b> <span class="hint" id="wCount"></span>
             <button type="button" class="btn sm" id="verCasos" hidden>Historial de casos</button></div>
-          <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio o DNI</span><input id="epSearch" placeholder="EPI-… o 30.123.456" autocomplete="off"></label>
+          <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio o DNI</span><input id="epSearch" placeholder="EPI-… o 30.123.456" autocomplete="off" list="epSug"><datalist id="epSug"></datalist></label>
         </div>
         <div class="werr" id="wErr" hidden></div>
         <div class="casos note hist" id="casosBox" hidden></div>
@@ -204,6 +204,7 @@
 </div>
 
 <script src="api.js"></script>
+<script src="js/mostrar_clave.js"></script>
 <script src="validacion.js"></script>
 <script src="formulario.js"></script>
 <script src="sugerencia.js"></script>

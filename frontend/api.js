@@ -193,8 +193,10 @@ function aUsuario(datos) {
     if (rango && rango.hasta) q += '&hasta=' + encodeURIComponent(rango.hasta);
     return q;
   }
-  function listarCasos(limite, desplazamiento, rango) {
-    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango), { method: 'GET', cache: 'no-store' });
+  /* codigoPaciente (opcional): solo las atenciones de ese paciente (búsqueda por DNI en el historial). */
+  function listarCasos(limite, desplazamiento, rango, codigoPaciente) {
+    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango) +
+      (codigoPaciente ? '&codigo_paciente=' + encodeURIComponent(codigoPaciente) : ''), { method: 'GET', cache: 'no-store' });
   }
   /* Exportación del historial de casos (auditor): Excel (.xlsx) o PDF. Devuelve el archivo como Blob. */
   /* Pide de nuevo la contraseña del auditor (va en el cuerpo, nunca en la URL). formato: 'excel' | 'pdf'. */
