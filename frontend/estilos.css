@@ -282,7 +282,8 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .wt{color:var(--muted);font-size:13px;min-width:96px}
 .wf{display:flex;gap:6px;flex-wrap:wrap}
 .wa{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
-.casos{margin:10px 0 14px}.expform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.expform input[type=password]{font-size:13px;padding:4px 6px;margin-left:4px}
+.casos{margin:10px 0 14px}.expform input#expDni{font-size:13px;padding:4px 6px;margin-left:4px;width:130px}
+.expform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.expform input[type=password]{font-size:13px;padding:4px 6px;margin-left:4px}
 .casos-fechas{gap:8px;align-items:center;margin:6px 0}.casos-fechas input{font-size:13px;padding:3px 6px}.casos select{font-size:13px;padding:4px 6px}.casos li{margin:6px 0}.casos .chipc{font-size:11px;padding:1px 6px;border-radius:4px}
 .histpanel{flex-basis:100%;margin:6px 0 0;font-size:13px}
 .histpanel .prev{margin-top:8px}
