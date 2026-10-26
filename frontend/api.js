@@ -193,21 +193,25 @@ function aUsuario(datos) {
     if (rango && rango.hasta) q += '&hasta=' + encodeURIComponent(rango.hasta);
     return q;
   }
-  function listarCasos(limite, desplazamiento, rango) {
-    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango), { method: 'GET', cache: 'no-store' });
+  /* codigoPaciente (opcional): solo las atenciones de ese paciente (búsqueda por DNI en el historial). */
+  function listarCasos(limite, desplazamiento, rango, codigoPaciente) {
+    return pedir('/api/demo/episodios?limite=' + (limite || 50) + '&desplazamiento=' + (desplazamiento || 0) + paramsRango(rango) +
+      (codigoPaciente ? '&codigo_paciente=' + encodeURIComponent(codigoPaciente) : ''), { method: 'GET', cache: 'no-store' });
   }
-  /* Exportación del historial de casos (auditor): CSV para Excel, sin DNI. Devuelve el archivo como Blob. */
+  /* Exportación del historial de casos (auditor): Excel (.xlsx) o PDF. Devuelve el archivo como Blob. */
   /* Pide de nuevo la contraseña del auditor (va en el cuerpo, nunca en la URL). formato: 'excel' | 'pdf'. */
-  async function exportarCasos(estado, rango, formato, password) {
+  /* extra = { dni }: un solo paciente (opcional). El archivo queda protegido con la misma contraseña. */
+  async function exportarCasos(estado, rango, formato, password, extra) {
     try {
       const cuerpo = { password: password, formato: formato };
+      if (extra && extra.dni) cuerpo.dni = extra.dni;
       if (estado) cuerpo.estado = estado;
       if (rango && rango.desde) cuerpo.desde = rango.desde;
       if (rango && rango.hasta) cuerpo.hasta = rango.hasta;
       const r = await fetch('/api/demo/episodios/exportar', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
       if (!r.ok) { let m = 'error ' + r.status, c = null; try { const j = await r.json(); m = j.mensaje || m; c = j.codigo || null; } catch (e) {} return { ok: false, estado: r.status, codigo: c, mensaje: m }; }
-      const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || ('casos_triage.' + (formato === 'pdf' ? 'pdf' : 'csv'));
+      const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || ('casos_triage.' + (formato === 'pdf' ? 'pdf' : 'xlsx'));
       return { ok: true, blob: await r.blob(), nombre: nombre };
     } catch (e) { return { ok: false, estado: 0, mensaje: 'No se pudo conectar con el servidor.' }; }
   }

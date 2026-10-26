@@ -282,7 +282,8 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .wt{color:var(--muted);font-size:13px;min-width:96px}
 .wf{display:flex;gap:6px;flex-wrap:wrap}
 .wa{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
-.casos{margin:10px 0 14px}.expform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.expform input[type=password]{font-size:13px;padding:4px 6px;margin-left:4px}
+.casos{margin:10px 0 14px}.expform input#expDni{font-size:13px;padding:4px 6px;margin-left:4px;width:130px}
+.expform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.expform #expPass{font-size:13px;padding:4px 6px;margin-left:4px}
 .casos-fechas{gap:8px;align-items:center;margin:6px 0}.casos-fechas input{font-size:13px;padding:3px 6px}.casos select{font-size:13px;padding:4px 6px}.casos li{margin:6px 0}.casos .chipc{font-size:11px;padding:1px 6px;border-radius:4px}
 .histpanel{flex-basis:100%;margin:6px 0 0;font-size:13px}
 .histpanel .prev{margin-top:8px}
@@ -430,3 +431,11 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 html.cargando,html.cargando *{cursor:progress}
 @keyframes carga-mov{from{background-position:-40% 0}to{background-position:140% 0}}
 @media (prefers-reduced-motion:reduce){.carga-global .carga-barra{animation:none;background:var(--accent,#6b5bd2)}}
+
+/* [Propuesta Barby 26/10] Mostrar / Ocultar contraseña */
+.clave{display:flex;align-items:center;gap:6px}
+.clave>input{flex:1;min-width:0}
+.expform .clave{display:inline-flex;margin-left:4px}.expform .clave>#expPass{margin-left:0}
+.ver-clave{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.ver-clave:hover{background:var(--panel)}
+.ver-clave[aria-pressed=true]{border-color:var(--ink)}
