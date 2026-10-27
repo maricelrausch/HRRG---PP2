@@ -201,6 +201,10 @@ from src.sala_espera import bp as sala_bp
 app.config["BASE_REGISTRO_DEMO"] = BASE_REGISTRO_DEMO
 app.register_blueprint(sala_bp)   # /api/sala/espera
 
+# Web service para el sistema del hospital (Darío): solo lectura, con token (HRRG_API_HOSPITAL_TOKEN).
+from src.api_hospital import bp as api_hospital_bp
+app.register_blueprint(api_hospital_bp)   # /api/cola-espera, /api/episodios/<codigo>/mediciones
+
 
 #--------------------------------------------
 # Ruta para iniciar sesión desde el frontend.
