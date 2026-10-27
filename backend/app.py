@@ -196,6 +196,11 @@ migrar_usuarios(BASE_USUARIOS)
 app.config["BASE_USUARIOS"] = BASE_USUARIOS
 app.register_blueprint(admin_usuarios_bp)
 
+# Lista de espera para la sala y celulares (Darío): pública, solo lectura y sin datos personales.
+from src.sala_espera import bp as sala_bp
+app.config["BASE_REGISTRO_DEMO"] = BASE_REGISTRO_DEMO
+app.register_blueprint(sala_bp)   # /api/sala/espera
+
 
 #--------------------------------------------
 # Ruta para iniciar sesión desde el frontend.
