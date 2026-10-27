@@ -327,6 +327,10 @@ function actualizarSugerencias(){
 $('#epSearch').addEventListener('input',()=>{actualizarSugerencias();if(CASOS.abierto)return buscarEnCasos();for(const k in DNI_BUSQ)if(DNI_BUSQ[k]!=='buscando')delete DNI_BUSQ[k];renderWait()});
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
 setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera'&&!escPending)renderWait()},1000);
+/* [Dario 27/10] Reloj en tiempo real: sin esto los minutos y el aviso de vencido quedaban congelados
+   hasta tocar algo. Cada 30 s recarga del servidor y redibuja; no interrumpe un escalado o finalizar en curso. */
+setInterval(()=>{if(st.fast||st.screen!=='espera'||escPending||finPending||CASOS.abierto)return;
+  if(TriageAPI.MODO_REAL)cargarEspera().then(renderWait);else renderWait()},30000);
 $('#wList').addEventListener('click',e=>{
   /* Auditor: "Exportar este paciente" abre el recuadro de exportar con ese DNI ya cargado. */
   const xd=e.target.closest('[data-expdni]');
