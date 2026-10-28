@@ -19,9 +19,10 @@ from flask import Blueprint, jsonify, request
 MODELO_WHISPER = os.environ.get("WHISPER_MODELO", "small")   # tiny | base | small | medium
 # cpu (por defecto, siempre funciona) | cuda (placa NVIDIA: requiere instalar las librerías CUDA/cuDNN) | auto
 DISPOSITIVO = os.environ.get("WHISPER_DISPOSITIVO", "cpu")
-# Hilos de CPU para Whisper. Por defecto la mitad de los núcleos lógicos: deja el resto
-# libre para Ollama/MedGemma y Flask. Se cambia con WHISPER_HILOS=6, por ejemplo.
-HILOS = int(os.environ.get("WHISPER_HILOS") or max(2, (os.cpu_count() or 4) // 2))
+# Hilos de CPU para Whisper: la mitad de los núcleos lógicos, con un máximo de 4.
+# Medido con scripts/probar_whisper.py (26/10): con 4 hilos es más rápido que con 6, 8 u 11;
+# más hilos caen en los núcleos de eficiencia y frenan al resto. Se cambia con WHISPER_HILOS.
+HILOS = int(os.environ.get("WHISPER_HILOS") or min(4, max(2, (os.cpu_count() or 4) // 2)))
 MAX_BYTES = 25 * 1024 * 1024
 # Whisper imita el estilo y el vocabulario de este texto: conviene que sean frases
 # como las que se dictan en guardia, no una lista de palabras sueltas.

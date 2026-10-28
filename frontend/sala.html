@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B2030">
+<title>Lista de espera · Guardia HRRG</title>
+<!-- frontend/sala.html · Lista de espera para la sala y cualquier celular (Darío).
+     sala.html             → pública: últimos 4 caracteres del episodio, color y espera. Sin DNI ni motivo.
+                             Datos: /api/sala/espera (no pide sesión).
+     sala.html?personal=1  → personal con sesión iniciada: código completo, DNI enmascarado y motivo.
+                             Datos: /api/demo/espera (mismos permisos que la pantalla En espera).
+     Solo lectura: reevaluar, escalar y finalizar se siguen haciendo en la app. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilos.css">
+<style>
+  body{min-height:100vh}
+  .top{display:block;position:sticky;top:0;z-index:2;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 16px 10px}
+  .top h1{font-size:1.15rem;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+  .top h1 img{height:26px}
+  .modo{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);font-weight:500;flex-basis:100%}
+  .modo:empty{display:none}
+  .resumen{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:8px}
+  .cc{font-family:var(--f-mono);font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .meta{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);margin-top:6px}
+  .resumen button.cc{border:0;cursor:pointer;font:inherit;font-family:var(--f-mono);font-size:.66rem;font-weight:600;padding:6px 1px;min-height:44px;line-height:1.15;min-width:0;width:100%;border-radius:10px;justify-content:center;flex-direction:column}
+  .resumen button.cc b{display:block;font-size:1rem}
+  .resumen.filtrando button.cc{opacity:.35}
+  .resumen button.cc.activo{opacity:1;outline:3px solid var(--ink);outline-offset:2px}
+  main{padding:12px 16px 24px;max-width:720px;margin:auto}
+  .card{display:grid;grid-template-columns:2rem 1fr auto;gap:2px 10px;align-items:center;
+        background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:12px;margin-bottom:10px}
+  .pos{grid-row:span 2;font-family:var(--f-mono);font-weight:600;font-size:1.2rem;text-align:center;color:var(--muted)}
+  .cod{font-family:var(--f-mono);font-weight:600;font-size:.9rem;word-break:break-all}
+  .card > .cc{justify-self:end}
+  .publico .cod{font-size:1.7rem;letter-spacing:.06em}
+  .cod small{font-family:var(--f-body);font-weight:400;font-size:.8rem;color:var(--muted)}
+  .esp{font-size:.9rem;color:var(--muted)} .esp b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .obj{justify-self:end;font-size:.78rem;color:var(--muted);text-align:right}
+  .det{grid-column:2 / -1;font-size:.85rem;color:var(--muted)}
+  .vencido .esp b{color:var(--err)} .vencido .esp b::after{content:" ⚠"}
+  .vencido{box-shadow:inset 0 0 0 1px var(--err)}
+  .aviso{background:var(--err-soft);color:var(--err);border-radius:10px;padding:12px;margin-bottom:12px}
+  .aviso a{color:inherit;font-weight:600}
+  .vacio{text-align:center;color:var(--muted);padding:40px 0}
+  /* Detalle del paciente (solo vista del personal): se toca la tarjeta y se despliega */
+  .personal .card{cursor:pointer}
+  .ver{grid-column:2 / -1;font-size:.78rem;color:var(--accent-text);font-weight:600}
+  .detalle{grid-column:1 / -1;margin-top:8px;padding-top:10px;border-top:1px dashed var(--line);cursor:default}
+  .vit{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .vit div{background:var(--panel-2);border-radius:8px;padding:6px 8px;white-space:nowrap;overflow:hidden}
+  .vit small{display:block;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .vit b{font-size:.98rem;font-variant-numeric:tabular-nums} .vit i{font-style:normal;font-size:.68rem;color:var(--muted)}
+  .br{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .br span{background:var(--err-soft);color:var(--err);border-radius:999px;padding:3px 10px;font-size:.78rem;font-weight:600}
+  .dmeta{font-size:.75rem;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1><img src="img/logo-hrrg.png" alt="" onerror="this.remove()">Lista de espera · Guardia <span class="modo" id="modo"></span></h1>
+  <div class="resumen" id="resumen"></div>
+  <div class="meta" id="meta"></div>
+</header>
+<main id="main"><div class="vacio">Cargando…</div></main>
+<script>
+const PERSONAL = new URLSearchParams(location.search).get('personal') === '1';
+document.body.classList.add(PERSONAL ? 'personal' : 'publico');
+document.getElementById('modo').textContent = PERSONAL ? 'PERSONAL · SOLO LECTURA' : '';
+
+/* Mismos colores y tiempos que la pantalla En espera (formulario.js / espera.js). */
+const COLORES = {
+  ROJO:     {v:'--m-rojo',     t:'#FFFFFF', obj:0},
+  NARANJA:  {v:'--m-naranja',  t:'#1A1D26', obj:10},
+  AMARILLO: {v:'--m-amarillo', t:'#1A1D26', obj:60},
+  VERDE:    {v:'--m-verde',    t:'#FFFFFF', obj:120},
+};
+const ORDEN = ['ROJO','NARANJA','AMARILLO','VERDE'];   // sin AZUL
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtMin = m => m < 60 ? m + ' min' : Math.floor(m/60) + ' h' + (m%60 ? ' ' + m%60 + ' min' : '');
+const dniOculto = d => d ? 'DNI ***.' + String(d).slice(-3) : '';
+
+let lista = [], recibido = 0, error = null;
+/* Filtro por color: se toca un chip y quedan solo los de ese color; se toca de nuevo y vuelven todos.
+   Los episodios sin color no se muestran: todavía no pasaron por el triage. */
+let filtro = null;
+/* Detalle desplegado (vista del personal): un paciente a la vez. Usa /api/demo/episodios/<código>,
+   la misma ruta y los mismos permisos de la app (sesión de enfermería, médico o auditor). */
+let abierto = null; const DETALLE = {};
+const BANDERAS = {br_sangrado:'Sangrado', br_convulsion:'Convulsión', br_disnea:'Dificultad para respirar', br_trauma:'Trauma'};
+const VITALES = [
+  ['TA', v => v.ta_sistolica!=null && v.ta_diastolica!=null ? v.ta_sistolica+'/'+v.ta_diastolica : null, 'mmHg'],
+  ['FC', v => v.frecuencia_cardiaca, 'lpm'], ['FR', v => v.frecuencia_respiratoria, 'rpm'],
+  ['SpO₂', v => v.saturacion_o2, '%'], ['Temp.', v => v.temperatura, '°C'], ['PAM', v => v.pam, 'mmHg'],
+  ['Glucemia', v => v.glucemia, 'mg/dL'], ['Glasgow', v => v.glasgow, '/15'], ['Dolor', v => v.dolor_intensidad, '/10'],
+  ['Conciencia', v => v.estado_conciencia, ''],
+];
+/* Arma el resumen a partir del historial: última medición (con correcciones aplicadas) y datos de ingreso. */
+function resumirEpisodio(ep) {
+  const med = {}, raiz = {}; let ingreso = null;
+  for (const e of ep.eventos || []) {
+    const d = e.datos || {};
+    if (e.tipo === 'MEDICION_REGISTRADA') { raiz[e.id] = e.id; med[e.id] = {fecha: d.medido_en, quien: e.profesional_usuario, v: d.valores || {}}; }
+    else if (e.tipo === 'MEDICION_CORREGIDA' && raiz[d.evento_corregido_id]) { raiz[e.id] = raiz[d.evento_corregido_id]; med[raiz[e.id]].v = d.valores || {}; med[raiz[e.id]].corregida = true; }
+    else if (e.tipo === 'DATOS_INGRESO_REGISTRADOS') ingreso = d.valores || {};
+  }
+  const lista = Object.values(med).sort((a, b) => Date.parse(a.fecha) - Date.parse(b.fecha));
+  return {ultima: lista[lista.length - 1] || null, cantidad: lista.length, ingreso};
+}
+async function cargarDetalle(codigo) {
+  try {
+    const r = await fetch('/api/demo/episodios/' + encodeURIComponent(codigo), {cache:'no-store', credentials:'same-origin'});
+    DETALLE[codigo] = r.ok ? resumirEpisodio((await r.json()).episodio) : {error: r.status === 401 ? 'Iniciá sesión de nuevo.' : 'No se pudo leer el detalle.'};
+  } catch (e) { DETALLE[codigo] = {error: 'Sin conexión con el servidor.'}; }
+  pintar();
+}
+function htmlDetalle(codigo) {
+  const d = DETALLE[codigo];
+  if (!d) return '<div class="detalle"><span class="dmeta">Cargando…</span></div>';
+  if (d.error) return '<div class="detalle"><span class="dmeta">'+esc(d.error)+'</span></div>';
+  const v = d.ultima ? d.ultima.v : {};
+  const celdas = VITALES.map(([n, f, u]) => [n, f(v), u]).filter(x => x[1] != null && x[1] !== '');
+  const ing = d.ingreso || {};
+  const banderas = Object.entries(BANDERAS).filter(([k]) => ing[k]).map(([, t]) => '<span>⚑ '+t+'</span>').join('');
+  const datos = [ing.edad != null ? ing.edad + ' años' : '', ing.sexo || '',
+                 ing.tiempo_evolucion_valor != null ? 'desde hace ' + ing.tiempo_evolucion_valor + ' ' + (ing.tiempo_evolucion_unidad || '') : ''].filter(Boolean);
+  const hace = d.ultima ? Math.max(0, Math.round((Date.now() - Date.parse(d.ultima.fecha)) / 60000)) : null;
+  return '<div class="detalle" data-no-toggle>'
+    + (ing.motivo_consulta ? '<div style="margin-bottom:8px">'+esc(ing.motivo_consulta)+(datos.length ? ' <span class="dmeta">· '+esc(datos.join(' · '))+'</span>' : '')+'</div>' : '')
+    + (celdas.length ? '<div class="vit">' + celdas.map(([n, x, u]) => '<div><small>'+n+'</small><b>'+esc(x)+'</b> <i>'+u+'</i></div>').join('') + '</div>'
+                     : '<div class="dmeta">Todavía no tiene signos vitales cargados.</div>')
+    + (banderas ? '<div class="br">'+banderas+'</div>' : '')
+    + (d.ultima ? '<div class="dmeta">Última medición: hace '+fmtMin(hace)+' · '+esc(d.ultima.quien)+(d.ultima.corregida ? ' · corregida' : '')+(d.cantidad > 1 ? ' · '+d.cantidad+' mediciones' : '')+'</div>' : '')
+    + '</div>';
+}
+document.getElementById('main').addEventListener('click', e => {
+  if (!PERSONAL || e.target.closest('[data-no-toggle]')) return;
+  const c = e.target.closest('.card[data-cod]'); if (!c) return;
+  const cod = c.dataset.cod;
+  abierto = abierto === cod ? null : cod;
+  if (abierto) { delete DETALLE[cod]; cargarDetalle(cod); }
+  pintar();
+});
+document.getElementById('resumen').addEventListener('click', e => {
+  const b = e.target.closest('button[data-c]'); if (!b) return;
+  filtro = (b.dataset.c === 'TODOS' || filtro === b.dataset.c) ? null : b.dataset.c;
+  pintar(); window.scrollTo({top:0});
+});
+
+/* Normaliza las dos fuentes al mismo formato: {codigo, color, seg, motivo, dni}. */
+async function cargar() {
+  try {
+    const r = await fetch(PERSONAL ? '/api/demo/espera?limite=100' : '/api/sala/espera',
+                          {cache:'no-store', credentials:'same-origin'});
+    if (PERSONAL && r.status === 401) { error = 'sesion'; return pintar(); }
+    if (PERSONAL && r.status === 403) { error = 'permiso'; return pintar(); }
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    /* El reloj del servidor manda: el del celular puede estar corrido. */
+    const ahoraSrv = Date.parse(r.headers.get('Date')) || Date.now();
+    lista = PERSONAL
+      ? d.episodios.filter(e => COLORES[e.color_final]).map(e => ({
+          codigo: e.codigo_episodio, color: e.color_final,
+          seg: Math.max(0, (ahoraSrv - Date.parse(e.en_espera_desde)) / 1000),
+          motivo: e.motivo_categoria, dni: e.dni }))
+          .sort((a,b) => (ORDEN.indexOf(a.color)+1||9) - (ORDEN.indexOf(b.color)+1||9) || b.seg - a.seg)
+      : d.episodios.filter(e => COLORES[e.color]).map(e => ({codigo: e.codigo, color: e.color, seg: e.espera_seg}));
+    recibido = Date.now(); error = null;
+    if (abierto && !lista.some(p => p.codigo === abierto)) abierto = null;   // ya no está en espera
+    if (abierto) cargarDetalle(abierto);
+  } catch (e) { error = 'red'; }
+  pintar();
+}
+
+function pintar() {
+  const main = document.getElementById('main');
+  const hora = new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('meta').textContent = 'Actualizado ' + hora + (filtro ? ' · solo ' + filtro : ' · tocá un color para filtrar');
+
+  if (error === 'sesion') { main.innerHTML = '<div class="aviso">Para ver los datos completos <a href="index.html">iniciá sesión</a> y volvé a abrir esta página.</div>'; return; }
+  if (error === 'permiso') { main.innerHTML = '<div class="aviso">Tu perfil no tiene acceso a la lista de espera.</div>'; return; }
+
+  const extra = recibido ? (Date.now() - recibido) / 1000 : 0;
+  const cuenta = {}; lista.forEach(p => cuenta[p.color] = (cuenta[p.color]||0) + 1);
+  if (filtro && !cuenta[filtro]) filtro = null;   // si ya no quedan de ese color, se vuelve a mostrar todo
+  const res = document.getElementById('resumen');
+  res.classList.toggle('filtrando', !!filtro);
+  const boton = (k, estilo, texto) => { const on = k === 'TODOS' ? !filtro : filtro === k;
+    return '<button type="button" class="cc'+(on?' activo':'')+'" data-c="'+k+'" aria-pressed="'+on+'" style="'+estilo+'">'+texto+'</button>'; };
+  /* Siempre los 4 colores, aunque estén en 0, para que no se muevan. */
+  res.innerHTML = boton('TODOS', 'background:var(--tab);color:var(--bg)', 'TODOS<b>'+lista.length+'</b>')
+    + ORDEN.map(c => boton(c, 'background:var('+COLORES[c].v+');color:'+COLORES[c].t, c+'<b>'+(cuenta[c]||0)+'</b>')).join('');
+
+  const avisoRed = error === 'red' ? '<div class="aviso">Sin conexión con el servidor. Se muestran los últimos datos.</div>' : '';
+  if (!lista.length) { main.innerHTML = avisoRed + '<div class="vacio">No hay pacientes en espera</div>'; return; }
+
+  main.innerHTML = avisoRed + lista.map((p, i) => [p, i]).filter(([p]) => !filtro || p.color === filtro).map(([p, i]) => {
+    const C = COLORES[p.color], min = Math.floor((p.seg + extra) / 60);
+    const vencido = p.color !== 'ROJO' && min > C.obj;
+    const chip = '<span class="cc" style="background:var('+C.v+');color:'+C.t+'">'+p.color+'</span>';
+    const obj = p.color === 'ROJO' ? 'atención inmediata' : 'máx. ' + fmtMin(C.obj);
+    const det = PERSONAL ? [dniOculto(p.dni), p.motivo].filter(Boolean).map(esc).join(' · ') : '';
+    const esAbierto = PERSONAL && abierto === p.codigo;
+    return '<div class="card'+(vencido?' vencido':'')+'" style="--c:var('+C.v+')"'+(PERSONAL ? ' data-cod="'+esc(p.codigo)+'"' : '')+'>'
+      + '<span class="pos">'+(i+1)+'</span>'
+      + '<span class="cod">'+(PERSONAL ? esc(p.codigo) : '…'+esc(p.codigo))+'</span>'
+      + chip
+      + '<span class="esp">Espera: <b>'+fmtMin(min)+'</b></span>'
+      + '<span class="obj">'+obj+'</span>'
+      + (det ? '<span class="det">'+det+'</span>' : '')
+      + (PERSONAL ? (esAbierto ? htmlDetalle(p.codigo) : '<span class="ver">▸ Ver signos vitales</span>') : '')
+      + '</div>';
+  }).join('');
+}
+
+cargar();
+setInterval(cargar, 15000);   // datos cada 15 s
+setInterval(pintar, 30000);   // minutos de espera entre recargas
+</script>
+</body>
+</html>

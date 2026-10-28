@@ -22,7 +22,10 @@ from src.registro import (
     registrar_datos_ingreso_demo,
     exportar_episodios_demo,
 )
-from src.exportacion import generar_csv, generar_pdf
+from src.exportacion import (
+    generar_csv, generar_pdf, generar_xlsx,
+    enmascarar_dni, proteger_xlsx, proteger_pdf,
+)
 from src.registro import (
     registrar_decision_demo,
     ConflictoDecisionError,
@@ -192,6 +195,15 @@ inicializar_usuarios()
 migrar_usuarios(BASE_USUARIOS)
 app.config["BASE_USUARIOS"] = BASE_USUARIOS
 app.register_blueprint(admin_usuarios_bp)
+
+# Lista de espera para la sala y celulares (Darío): pública, solo lectura y sin datos personales.
+from src.sala_espera import bp as sala_bp
+app.config["BASE_REGISTRO_DEMO"] = BASE_REGISTRO_DEMO
+app.register_blueprint(sala_bp)   # /api/sala/espera
+
+# Web service para el sistema del hospital (Darío): solo lectura, con token (HRRG_API_HOSPITAL_TOKEN).
+from src.api_hospital import bp as api_hospital_bp
+app.register_blueprint(api_hospital_bp)   # /api/cola-espera, /api/episodios/<codigo>/mediciones
 
 
 #--------------------------------------------
@@ -1599,7 +1611,7 @@ def exportar_episodios_demo_archivo():
     entrada = request.get_json(silent=True)
     if (
         not isinstance(entrada, dict)
-        or set(entrada) - {"password", "formato", "estado", "desde", "hasta"}
+        or set(entrada) - {"password", "formato", "estado", "desde", "hasta", "dni"}
         or not isinstance(entrada.get("password"), str)
         or entrada.get("formato") not in ("excel", "pdf")
     ):
@@ -1608,6 +1620,7 @@ def exportar_episodios_demo_archivo():
             400,
             "PARAMETROS_INVALIDOS"
         )
+
 
     usuario = g.profesional["usuario"]
     if not iniciar_sesion(BASE_USUARIOS, usuario, entrada["password"]):
@@ -1628,12 +1641,39 @@ def exportar_episodios_demo_archivo():
         )
     session.pop("exportar_fallos", None)
 
+    # [Propuesta Barby 26/10] El archivo se protege con la MISMA contraseña del auditor
+    # (decisión: el auditor no comparte los archivos exportados). No se guarda en ningún lado.
+    clave_archivo = entrada["password"]
+
+    # [Propuesta Barby 26/10] Exportar un solo paciente: se busca su código por DNI
+    # (sin crear pacientes). En ese caso se exportan todas sus atenciones, sin filtrar
+    # por estado ni fechas. El DNI no se escribe en el log.
+    codigo_paciente = None
+    if entrada.get("dni"):
+        try:
+            paciente = buscar_paciente_por_dni(BASE_REGISTRO_DEMO, str(entrada["dni"]))
+        except ValueError as error:
+            return respuesta_error(str(error), 422, "IDENTIFICACION_INVALIDA")
+        except ErrorCifradoIdentificacion:
+            logger_sistema.error("ERROR_CIFRADO_EXPORTAR_PACIENTE")
+            return respuesta_error(
+                "El servicio de identificación no está disponible.", 503,
+                "IDENTIFICACION_NO_DISPONIBLE"
+            )
+        if paciente is None:
+            return respuesta_error(
+                "No hay ningún paciente identificado con ese DNI.", 404,
+                "PACIENTE_NO_ENCONTRADO"
+            )
+        codigo_paciente = paciente["codigo_paciente"]
+
     try:
         filas = exportar_episodios_demo(
             BASE_REGISTRO_DEMO,
-            estado=entrada.get("estado") or None,
-            desde=entrada.get("desde"),
-            hasta=entrada.get("hasta")
+            estado=None if codigo_paciente else (entrada.get("estado") or None),
+            desde=None if codigo_paciente else entrada.get("desde"),
+            hasta=None if codigo_paciente else entrada.get("hasta"),
+            codigo_paciente=codigo_paciente
         )
     except ValueError as error:
         return respuesta_error(str(error), 422, "FILTRO_INVALIDO")
@@ -1652,8 +1692,9 @@ def exportar_episodios_demo_archivo():
             [fila["codigo_paciente"] for fila in filas]
         )
 
+        # [Propuesta Barby 26/10] En el archivo el DNI sale enmascarado (solo los últimos 3 números).
         for fila in filas:
-            fila["dni"] = dnis.get(fila["codigo_paciente"])
+            fila["dni"] = enmascarar_dni(dnis.get(fila["codigo_paciente"]))
 
     # Si falla el descifrado, evita entregar un informe identificado incompleto.
     except ErrorCifradoIdentificacion:
@@ -1675,33 +1716,65 @@ def exportar_episodios_demo_archivo():
     from datetime import datetime as _dt
     marca = _dt.now().strftime("%Y%m%d_%H%M")
 
+    # Texto de los filtros para el encabezado del PDF y la hoja "Info" del Excel (en UTC-03:00).
+    from datetime import timedelta as _td, timezone as _tz
+    nombres = {"en_ingreso": "en ingreso", "en_espera": "en espera", "finalizado": "finalizados"}
+    filtros = ["Estado: " + nombres.get(entrada.get("estado") or "", "todos")]
+    if codigo_paciente:
+        filtros = ["Un solo paciente: DNI " + (enmascarar_dni(str(entrada["dni"])) or "") + " (todas sus atenciones)"]
+    elif entrada.get("desde") or entrada.get("hasta"):
+        def fmt(v):
+            return _dt.fromisoformat(v.replace("Z", "+00:00")).astimezone(_tz(_td(hours=-3))).strftime("%d/%m/%Y %H:%M")
+        filtros.append(
+            "Fechas: "
+            + (("desde " + fmt(entrada["desde"])) if entrada.get("desde") else "")
+            + ((" hasta " + fmt(entrada["hasta"])) if entrada.get("hasta") else "")
+        )
+    filtros_texto = " · ".join(filtros)
+
     if entrada["formato"] == "pdf":
-        nombres = {"en_ingreso": "en ingreso", "en_espera": "en espera", "finalizado": "finalizados"}
-        filtros = ["Estado: " + nombres.get(entrada.get("estado") or "", "todos")]
-        if entrada.get("desde") or entrada.get("hasta"):
-            def fmt(v):
-                return _dt.fromisoformat(v.replace("Z", "+00:00")).astimezone().strftime("%d/%m/%Y %H:%M")
-            filtros.append(
-                "Fechas: "
-                + (("desde " + fmt(entrada["desde"])) if entrada.get("desde") else "")
-                + ((" hasta " + fmt(entrada["hasta"])) if entrada.get("hasta") else "")
-            )
         try:
-            contenido = generar_pdf(filas, " · ".join(filtros), usuario)
+            contenido = generar_pdf(filas, filtros_texto, usuario)
         except ImportError:
             return respuesta_error(
                 "Falta instalar la librería del PDF: python -m pip install reportlab",
                 503,
                 "PDF_NO_DISPONIBLE"
             )
+        try:
+            contenido = proteger_pdf(contenido, clave_archivo)
+        except ImportError:
+            return respuesta_error(
+                "Falta instalar la librería para proteger el PDF: python -m pip install pikepdf",
+                503,
+                "PROTECCION_NO_DISPONIBLE"
+            )
         mime, nombre = "application/pdf", f"casos_triage_{marca}.pdf"
-    else:
-        contenido = generar_csv(filas)
-        mime, nombre = "text/csv; charset=utf-8", f"casos_triage_{marca}.csv"
+    elif entrada["formato"] == "excel":
+        # [Propuesta Barby 26/10] Excel real (.xlsx): hojas Resumen, Eventos e Info.
+        try:
+            contenido = generar_xlsx(filas, filtros_texto, usuario)
+        except ImportError:
+            return respuesta_error(
+                "Falta instalar la librería de Excel: python -m pip install openpyxl",
+                503,
+                "EXCEL_NO_DISPONIBLE"
+            )
+        try:
+            contenido = proteger_xlsx(contenido, clave_archivo)
+        except ImportError:
+            return respuesta_error(
+                "Falta instalar la librería para proteger el Excel: python -m pip install msoffcrypto-tool",
+                503,
+                "PROTECCION_NO_DISPONIBLE"
+            )
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        nombre = f"casos_triage_{marca}.xlsx"
 
     logger_sistema.info(
-        "EXPORTAR_CASOS | %s | %s | %d filas",
-        usuario, entrada["formato"], len(filas)
+        "EXPORTAR_CASOS | %s | %s | %d filas | %s | archivo con clave",
+        usuario, entrada["formato"], len(filas),
+        ("paciente " + codigo_paciente) if codigo_paciente else "todos los filtrados"
     )
 
     respuesta = app.response_class(contenido, mimetype=mime)

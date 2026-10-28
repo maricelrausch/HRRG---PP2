@@ -1,275 +1,281 @@
-# 🏥 Equipo 1 - HRRG - PP2 2C 2026
+<h1 align="center">🏥 IngenIA Salud – Triage</h1>
 
-### Módulo de Triage Asistido por IA (MedGemma + Guías de Manchester) – Guardia Central, Hospital Regional Río Grande
+<p align="center">
+  <img src="docs/img/portada-triage.svg" alt="Ilustración de la entrada de la guardia con la pantalla de triage asistido" width="100%">
+</p>
 
-> Proyecto de **Prácticas Profesionalizantes II** – Tecnicatura Superior en Ciencia de Datos e Inteligencia Artificial – Centro Politécnico Superior Malvinas Argentinas. Proyecto IngenIA Salud TDF.
-> ** Estado:** Sprint 1 – Planificación y análisis inicial (28/09/2026 – 04/10/2026)
+<p align="center">
+  <b>Módulo de Triage Asistido por Inteligencia Artificial</b><br>
+  Guardia Central · Hospital Regional Río Grande · Proyecto IngenIA Salud TDF
+</p>
 
-## 👥 Equipo de trabajo
+<p align="center">
+  <img src="https://img.shields.io/badge/estado-Sprint%203-7B1FA2" alt="Sprint 3">
+  <img src="https://img.shields.io/badge/actualizado-25%2F10%2F2026-lightgrey" alt="25/10/2026">
+  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white" alt="Flask 3.0">
+  <img src="https://img.shields.io/badge/IA-Ollama%20local-2E7D32" alt="Ollama local">
+  <img src="https://img.shields.io/badge/Windows-instalador%20offline-0078D6?logo=windows&logoColor=white" alt="Instalador offline para Windows">
+</p>
 
-- Darío Martínez
-- Maricel Rausch
-- Tomás Alderete
-- Bárbara Rigoni
-  
----
-  
-## 📌 Descripción
+Prototipo académico de **Prácticas Profesionalizantes II** (Tecnicatura Superior en Ciencia de Datos e Inteligencia Artificial – Centro Politécnico Superior Malvinas Argentinas). Es un copiloto para el box de triage: ordena el relato del paciente, controla que los datos estén completos y sugiere un color con su justificación. **El sistema propone y el profesional decide.**
 
-En el triage de la Guardia Central, el personal de salud evalúa a cada paciente en pocos minutos y bajo alta presión. Esto genera demoras, omisión de antecedentes y variabilidad al priorizar la urgencia.
-
-El proyecto desarrolla un **copiloto digital de triage** que:
-- valida los datos ingresados (signos vitales, nivel de conciencia, dolor, banderas rojas, antecedentes);
-- sugiere una categoría de las **Guías de Manchester** (Rojo, Naranja, Amarillo, Verde, Azul) con una justificación breve;
-- resalta banderas rojas y avisa si faltan datos clave.
-
-El sistema **propone, no decide**: el profesional acepta o modifica la sugerencia (con justificación obligatoria), y si la IA no está disponible el triage sigue de forma tradicional.
+> [!IMPORTANT]
+> Prototipo en evaluación. Funciona **solo con casos ficticios**, todo el procesamiento ocurre en la propia PC y las reglas de color son provisorias hasta contar con las guías oficiales y la aprobación del HRRG.
 
 ---
 
-## Fuente de datos
+## 📑 Contenido
 
-- **Fuente:** casos clínicos **sintéticos o seudonimizados** y versiones oficiales de las Guías de Manchester y protocolos de la Guardia Central del HRRG. Solo se usan con autorización.
-- **Tipo de datos:** motivo de consulta, signos vitales, nivel de conciencia, dolor, banderas rojas y antecedentes. Sin nombre, DNI ni datos administrativos.
-- **Modelo base:** [MedGemma](https://developers.google.com/health-ai-developer-foundations/medgemma) – Google Health AI Developer Foundations.
-- ⚠️ El repositorio **no contiene datos reales de pacientes** ni los pesos del modelo.
-
----
-
-## 🔎 Objetivo del análisis
-
-**Objetivo general** *(Protocolo de Investigación HRRG, 5.1)*: 
-
-Desarrollar y validar un módulo de Triage Asistido por Inteligencia Artificial con MedGemma, integrado al Sistema Manchester utilizado en la Guardia Central del HRRG, evaluando su seguridad, concordancia, explicabilidad, factibilidad técnica y potencial utilidad como herramienta de apoyo al equipo de salud.
-
-**Objetivos específicos** *(Protocolo de Investigación HRRG, 5.2)*:
-
-1. Caracterizar la estructura y calidad de los datos disponibles en los registros de Triage de la Guardia Central.
-2. Definir un conjunto mínimo de variables clínicas necesarias para el procesamiento por IA bajo el principio de minimización de datos.
-3. Desarrollar una arquitectura híbrida que combine reglas clínicas explícitas, Sistema Manchester, MedGemma y validación humana.
-4. Comparar retrospectivamente la prioridad sugerida por el sistema con la prioridad Manchester asignada por el profesional.
-5. Cuantificar concordancia, subtriage, sobretriage, sensibilidad para categorías críticas y estabilidad del sistema.
-6. Analizar errores, sesgos, discrepancias y posibles causas de falla.
-7. Evaluar la calidad de la explicación generada por la IA y su capacidad para señalar datos faltantes o inconsistentes.
-8. Definir criterios de avance hacia una fase de Shadow Mode y criterios de interrupción por seguridad.
-9. Generar un marco institucional de gestión de datos, auditoría y gobernanza para futuras fases.
+1. [🩺 El problema](#-el-problema)
+2. [⚙️ Cómo funciona](#️-cómo-funciona)
+3. [✅ Qué incluye el prototipo](#-qué-incluye-el-prototipo)
+4. [👥 Roles de usuario](#-roles-de-usuario)
+5. [💻 Instalación](#-instalación)
+6. [🧱 Arquitectura y tecnologías](#-arquitectura-y-tecnologías)
+7. [🗂️ Estructura del repositorio](#️-estructura-del-repositorio)
+8. [🔒 Datos y seguridad](#-datos-y-seguridad)
+9. [📆 Avance por sprint](#-avance-por-sprint)
+10. [🚧 Limitaciones y trabajo futuro](#-limitaciones-y-trabajo-futuro)
+11. [📚 Documentación](#-documentación)
+12. [🤝 Equipo](#-equipo)
 
 ---
 
-## Herramientas utilizadas
+## 🩺 El problema
 
-- Python · Google Colab / Jupyter
-- MedGemma · Hugging Face Transformers / Ollama / vLLM
-- Google Drive · Trello · GitHub · Google Meet
+En el box de triage de la Guardia Central, enfermería escucha el motivo de consulta, registra seis signos vitales (temperatura, frecuencia cardíaca, saturación, tensión arterial sistólica y diastólica, y frecuencia respiratoria) y asigna un color según reglas internas y su experiencia. Todo ocurre en pocos minutos y bajo presión, lo que genera demoras, datos incompletos y diferencias de criterio entre turnos. En la visita del 19/10/2026 el hospital pidió un triage **más intuitivo** y con **trazabilidad de las reevaluaciones**.
 
 ---
 
-## Proceso de Análisis
-
-1. **Sprint 1:** organización del equipo, relevamiento del problema y definición del ámbito de desarrollo.
-2. **Sprint 2:** 
-3. **Sprint 3:** 
-
----
-
-## Resultados principales
-
-_Se completará al finalizar los Sprints 2 y 3._
-- Hallazgo 1
-- Hallazgo 2
-- Hallazgo 3
-
----
-
-## Visualizaciones
-_Se incorporarán capturas del prototipo y del dashboard de métricas._
-<!-- ![Dashboard](reports/img/dashboard.png) -->
-
----
-
-## Conclusiones
-_Se completará al cierre del proyecto: qué se descubrió, implicancias para el hospital y líneas futuras._
-
----
-
-
-## Estructura del proyecto
+## ⚙️ Cómo funciona
 
 ```text
-HRRG---PP2/
-├── backend/
-│   ├── app.py
-│   ├── requirements.txt
-│   ├── src/
-│   │   ├── auth.py
-│   │   ├── modelo.py
-│   │   ├── rag.py
-│   │   ├── registro.py
-│   │   ├── reglas.py
-│   │   ├── reporte.py
-│   │   ├── salida.py
-│   │   └── validacion.py
-│   ├── datos/
-│   │   ├── casos_simulados.json
-│   │   ├── guias_ejemplo.json
-│   │   └── umbrales.json
-│   └── evaluacion/
-│       ├── metricas.py
-│       └── prueba_sin_guia.py
-├── frontend/
-│   ├── maquetado_extraccion_v33.html
-│   ├── formulario.html
-│   ├── estilos.css
-│   ├── formulario.js      # lógica común (ingreso, medición, resumen, sesión)
-│   ├── sugerencia.js      # tarjeta de sugerencia y decisión (A09)
-│   ├── espera.js          # En espera y reevaluación (A10)
-│   ├── validacion.js
-│   └── img/
-│       └── logo-hrrg.png
-├── docs/
-│   └── contrato_api.md
-├── .gitignore
-└── README.md
+ Relato del paciente        Signos vitales           Sugerencia               Decisión
+ (dictado o escrito)  ──►   (los carga          ──►  color + motivos     ──►  del profesional
+        │                   enfermería)              + datos faltantes        aceptar / modificar /
+        ▼                                                  ▲                  rechazar (con motivo)
+ MedGemma local ordena      Reglas de seguridad ───────────┘                        │
+ el relato en campos        (fijan un color mínimo)                                 ▼
+                                                                            Registro y En espera
+                                                                            (reevaluación con reloj)
 ```
 
-| Ubicación | Propósito |
+- **La IA no decide el color.** MedGemma solo estructura el relato (motivo, localización, duración, síntomas). Los signos vitales, el dolor y las banderas rojas los carga enfermería.
+- **Las reglas fijan un piso.** Si un valor es crítico, el sistema nunca sugiere un color menor.
+- **El profesional confirma.** Si modifica o rechaza la sugerencia, el motivo es obligatorio y queda registrado.
+- **Si la IA no responde**, el triage sigue de forma manual.
+
+---
+
+## ✅ Qué incluye el prototipo
+
+| Área | Funcionalidad |
 |---|---|
-| `backend/app.py` | Aplicación Flask, rutas y conexión con servicios. |
-| `backend/src/` | Módulos de autenticación, registro, IA, reglas y salidas. |
-| `backend/datos/` | Archivos destinados a casos ficticios y configuraciones de prueba. |
-| `backend/evaluacion/` | Scripts de evaluación y métricas. |
-| `frontend/` | Pantallas, estilos, JavaScript e imágenes. |
-| `docs/` | Documentación técnica compartida. |
+| 🔐 Acceso | Inicio de sesión con roles, bloqueo por intentos fallidos, clave temporal y cambio obligatorio de contraseña |
+| 🎙️ Ingreso | Relato escrito o **dictado por voz** con Whisper local, y extracción de datos con MedGemma |
+| 🩺 Evaluación | Carga de signos vitales con avisos de valores fuera de rango y controles de datos faltantes |
+| 🎨 Sugerencia | Tarjeta con color, motivos, fuente y qué datos harían subir la prioridad |
+| 🔁 En espera | Lista de pacientes, búsqueda por código de episodio o DNI, reevaluación con reloj por color |
+| 💬 Consulta | Chat con MedGemma sobre el caso, sin diagnósticos ni indicaciones de tratamiento |
+| 📜 Auditoría | Historial completo por episodio, filtros por fecha y estado, exportación a Excel o PDF sin DNI |
+| 🛠️ Administración | Alta de cuentas, roles, desbloqueo y claves temporales, con registro de cada acción |
+| 📦 Distribución | Instalador de Windows **sin internet** que incluye la app, Ollama y los modelos |
 
-Algunos módulos y archivos están vacíos o en desarrollo. Su presencia
-indica su ubicación prevista, no que la funcionalidad esté terminada.
+---
 
-## Ejecución local
+## 👥 Roles de usuario
 
-Requisitos: Python y pip. El entorno de desarrollo utilizado es Python 3.12.7.
+| Rol | Puede | No puede |
+|---|---|---|
+| **Enfermería** | Cargar casos, ver sugerencias, decidir y reevaluar | Gestionar cuentas |
+| **Médico** | Lo mismo que enfermería | Gestionar cuentas |
+| **Auditor** | Consultar historial, DNI y exportar (pide su contraseña) | Modificar datos |
+| **Administrador** | Gestionar cuentas y contraseñas | Atender pacientes |
+
+---
+
+## 💻 Instalación
+
+### A · Usuario final: instalador offline
+
+El instalador `Instalador_IngenIA_Salud_Triage_0.1.0.exe` (unos 6 GB, junto con sus archivos `.bin`) instala todo con doble clic, **sin Python, sin Ollama previo y sin internet**. Crea un acceso directo en el escritorio y, en el primer inicio, pide crear la cuenta de administrador.
+
+📘 Paso a paso para personal no técnico: **Manual de instalación** (carpeta del proyecto en Drive).
+🔧 Cómo se construye el instalador: [`empaquetado/LEEME.md`](empaquetado/LEEME.md).
+
+### B · Desarrollo
+
+<details>
+<summary><b>Requisitos</b></summary>
+
+<br>
+
+| Necesario | Detalle |
+|---|---|
+| 🪟 Windows 10/11 o Linux | Probado en Windows con PowerShell |
+| 🐍 Python | 3.11 o superior |
+| 🦙 Ollama | Con los modelos `medgemma:4b`, `embeddinggemma` y `qwen2.5:0.5b` |
+| 🌐 Navegador | Chrome o Edge actualizados (el dictado necesita micrófono) |
+
+```powershell
+ollama pull medgemma:4b
+ollama pull embeddinggemma
+ollama pull qwen2.5:0.5b
+```
+
+</details>
 
 Desde la raíz del repositorio:
 
 ```powershell
 cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+
+# Claves de cifrado del DNI (solo la primera vez)
+python scripts/preparar_identificacion.py
+
+# Primera cuenta y rol administrador (solo la primera vez)
+python -m flask --app app crear-profesional
+python -m flask --app app asignar-rol --rol admin
+
+# Iniciar con la extracción real de MedGemma
+$env:HRRG_MODO_EXTRACCION = "ia"
 python app.py
 ```
 
-Abrir en el navegador:
+Abrir **http://127.0.0.1:5000/** y detener con <kbd>Ctrl</kbd> + <kbd>C</kbd>.
 
-http://127.0.0.1:5000/
+> [!NOTE]
+> Sin la variable `HRRG_MODO_EXTRACCION=ia`, la app usa casos simulados: sirve para probar el flujo sin Ollama.
 
-Para detener el servidor, presionar `Ctrl + C`.
+<details>
+<summary><b>Variables de entorno opcionales</b></summary>
 
-Flask sirve la maqueta `frontend/maquetado_extraccion_v33.html`
-como página principal. El formulario anterior se conserva.
+<br>
 
-La visualización de la maqueta no implica que sus botones y pantallas
-estén conectados a las API del backend.
-
-El servidor de desarrollo de Flask se utiliza para pruebas locales.
-La integración con modelos requiere, además del cliente Python,
-el servicio Ollama y los modelos correspondientes.
-
-## Administración de profesionales
-
-Las cuentas son creadas por el ingeniero o administrador autorizado
-desde la terminal. No hay registro público de usuarios.
-
-Desde la carpeta `backend`:
-
-```powershell
-python -m flask --app app crear-profesional
-```
-
-Para cambiar una contraseña:
-
-```powershell
-python -m flask --app app cambiar-password
-```
-
-Las contraseñas se almacenan como hashes. No se pueden recuperar
-en texto original; se puede establecer una nueva contraseña.
-
-## Estado del backend
-
-Implementado:
-
-- Autenticación de profesionales con cuentas en SQLite.
-- Inicio de sesión, consulta de sesión y cierre de sesión.
-- Control de acceso en las rutas protegidas y comprobación de cuentas activas.
-- Formato común de errores para las API adaptadas.
-- Registro técnico con rotación de archivos.
-- Creación y consulta de episodios ficticios.
-- Registro del evento de apertura de cada episodio.
-- Asociación del episodio con el código interno del paciente y el profesional.
-- Rechazo de códigos de episodio duplicados.
-- Separación de carpetas de backend y frontend.
-
-### Endpoints disponibles
-
-| Método | Ruta | Función |
+| Variable | Para qué | Valor por defecto |
 |---|---|---|
-| POST | `/api/login` | Iniciar sesión. |
-| GET | `/api/sesion` | Consultar la sesión autenticada. |
-| POST | `/api/logout` | Cerrar la sesión. |
-| POST | `/api/demo/episodios` | Crear un episodio ficticio. |
-| GET | `/api/demo/episodios/<codigo_episodio>` | Consultar un episodio del profesional autenticado. |
+| `HRRG_MODO_EXTRACCION` | `ia` usa MedGemma; `simulado` usa casos de prueba | `simulado` |
+| `MEDGEMMA_MODELO` | Modelo de Ollama | `medgemma:4b` |
+| `OLLAMA_HOST` | Dirección del servidor de Ollama | `http://localhost:11434` |
+| `WHISPER_MODELO` | Tamaño del modelo de voz (`tiny`, `base`, `small`, `medium`) | `small` |
+| `WHISPER_HILOS` / `MEDGEMMA_HILOS` | Reparto de la CPU entre voz e IA en PCs sin GPU | automático |
 
-El borrador del contrato se encuentra en `docs/contrato_api.md`.
+</details>
 
-## Almacenamiento local
+<details>
+<summary><b>Pruebas automáticas</b></summary>
 
-Las cuentas, los episodios de demostración, la clave de sesión y los
-registros técnicos se guardan fuera del repositorio, en:
+<br>
 
-```text
-~/.hrrg_pp2/
+```powershell
+cd backend
+python -m pytest -q tests
 ```
 
-Esta carpeta contiene:
-
-- `usuarios.db`: cuentas de profesionales.
-- `triage_demo.db`: episodios ficticios y sus eventos.
-- `session.key`: clave de firma de las sesiones.
-- `sistema.log`: registro técnico, con archivos rotados.
-
-Estos archivos no deben subirse a GitHub.
-
-El registro de episodios demo todavía no almacena el proceso completo
-de triage. El guardado heredado del formulario en `pacientes.jsonl`
-sigue pendiente de revisión e integración con el registro de episodios.
-
-## Próximas integraciones
-
-- Conectar la maqueta con la autenticación y las API.
-- Incorporar los esquemas y validaciones entregados por Darío.
-- Integrar la extracción con MedGemma entregada por Tomás.
-- Completar la trazabilidad del proceso de triage y sus correcciones.
-- Incorporar la descarga opcional del informe en PDF.
-- Definir e integrar el motor de reglas con fuentes y criterios aprobados.
-- Completar las pruebas automáticas y la documentación de ejecución.
-
-El prototipo se prueba con casos ficticios. Las clasificaciones
-ilustrativas de la maqueta no representan un motor Manchester validado.
-
-
-> Las bases de datos locales, claves de sesión y registros generados
-no se incluyen en el repositorio.
-> Los archivos pesados y la documentación oficial se encuentran en Google Drive.
+</details>
 
 ---
 
-## Contactos
+## 🧱 Arquitectura y tecnologías
 
-Darío Martínez – dario1979.dm@gmail.com
+| Capa | Tecnología | Función |
+|---|---|---|
+| Interfaz | HTML, CSS y JavaScript | Pantallas de ingreso, sugerencia, En espera, auditoría y administración |
+| Servidor | Flask 3 (waitress en el instalador) | API, sesiones, roles y validaciones |
+| Datos | Pydantic y SQLite | Esquema único de campos, episodios, eventos y cuentas |
+| IA | MedGemma 4B en Ollama | Extracción del relato y chat sobre el caso |
+| Voz | faster-whisper (local) | Dictado por voz sin enviar audio fuera de la PC |
+| Búsqueda documental | ChromaDB + embeddinggemma | Base para el RAG con guías (pendiente de guías oficiales) |
+| Seguridad | Hash de contraseñas, Fernet | Cuentas y DNI cifrado |
+| Distribución | PyInstaller + Inno Setup | Instalador offline para Windows |
 
-Maricel Rausch – maricelmrausch@gmail.com
+---
 
-Tomás Alderete – alderetetomas26@gmail.com
+## 🗂️ Estructura del repositorio
 
-Bárbara Rigoni – barbyjrigoni@gmail.com
+```text
+HRRG---PP2/
+├── backend/
+│   ├── app.py              # aplicación Flask y rutas
+│   ├── ia/                 # MedGemma, chat, dictado (Whisper) y trazabilidad
+│   ├── src/                # esquemas, validación, reglas, auth, admin, registro, cifrado, exportación
+│   ├── datos/              # casos simulados y esquemas JSON
+│   ├── evaluacion/         # métricas de extracción
+│   ├── scripts/            # preparación de claves y pruebas de IA y voz
+│   ├── tests/              # pruebas automáticas (pytest)
+│   └── docs/               # diccionario de datos, controles y guion de demo
+├── frontend/               # pantallas, estilos y JavaScript
+├── empaquetado/            # instalador offline (PyInstaller + Inno Setup)
+├── docs/                   # contrato de API, políticas y portada
+└── README.md
+```
 
+---
 
-La documentación y la estructura del repositorio serán actualizadas a medida que avance el desarrollo.
+## 🔒 Datos y seguridad
+
+- **Sin datos reales.** El prototipo se prueba con casos ficticios; el repositorio no contiene datos de pacientes ni pesos de modelos.
+- **Todo local.** El relato, el audio y la IA se procesan en la PC, sin servicios en la nube (Leyes 25.326 y 26.529).
+- **DNI cifrado** y búsqueda por huella, con claves guardadas fuera del repositorio (`~/.hrrg_pp2_claves/`).
+- **Archivos locales** (no se suben a GitHub): cuentas, episodios, clave de sesión y registros en `~/.hrrg_pp2/`.
+- **Trazabilidad.** Cada extracción, corrección, decisión y exportación queda registrada con usuario y hora.
+
+---
+
+## 📆 Avance por sprint
+
+| Sprint | Período | Resultado |
+|---|---|---|
+| **1 · Planificación** | 28/09 – 04/10 | Equipo, roles, ámbito de desarrollo, carta de presentación y análisis del problema |
+| **2 · Desarrollo** | 05/10 – 25/10 | Prototipo funcional de punta a punta, visita a la guardia e instalador offline (31 de 39 tareas) |
+| **3 · Cierre** | 26/10 – 01/11 | Manuales, documento de escalabilidad, informe final, presentación y entrega |
+
+---
+
+## 🚧 Limitaciones y trabajo futuro
+
+- **Guías oficiales:** las reglas de color son provisorias. El RAG y el motor clínico se activan cuando el HRRG entregue y autorice las guías y sus reglas internas.
+- **Validación clínica:** no se reportan métricas clínicas (concordancia, subtriage) hasta evaluar con referentes del hospital.
+- **Escala:** hoy corre en una PC. Para varios puestos se instala en un servidor de la red interna (ver documento de escalabilidad).
+- **Integraciones:** la conexión con la historia clínica y la mesa de entrada queda para una próxima versión.
+
+---
+
+## 📚 Documentación
+
+| Documento | Ubicación |
+|---|---|
+| Contrato de API | [`docs/contrato_api.md`](docs/contrato_api.md) |
+| Diccionario de datos V2 | [`backend/docs/diccionario_datos_v2.md`](backend/docs/diccionario_datos_v2.md) |
+| Controles de validación | [`backend/docs/controles_validacion.md`](backend/docs/controles_validacion.md) |
+| Configuración de la IA | [`backend/docs/configuracion_ia.md`](backend/docs/configuracion_ia.md) |
+| Identificación cifrada | [`docs/identificacion_cifrada.md`](docs/identificacion_cifrada.md) |
+| Política de registros | [`docs/politica_registros.md`](docs/politica_registros.md) |
+| Guion de la demo | [`docs/guion_demo.md`](docs/guion_demo.md) |
+| Empaquetado | [`empaquetado/LEEME.md`](empaquetado/LEEME.md) |
+| Manual de instalación, minutas y retrospectivas | Carpeta del proyecto en Google Drive |
+
+---
+
+## 🤝 Equipo
+
+**Equipo N1 – HRRG – PP2 2C 2026**
+
+| Integrante | Área en el Sprint 2 |
+|---|---|
+| Darío Martínez | Datos y calidad: diccionario, esquemas, casos de prueba y métricas |
+| Maricel Rausch | Backend e integración |
+| Tomás Alderete | Inteligencia artificial: MedGemma y RAG |
+| Bárbara Rigoni | Frontend e interfaz |
+
+Referente del HRRG: Esp. Bioing. Juan Francisco Navoni.
+
+---
+
+<p align="center">
+  <sub>Equipo N1 · Prácticas Profesionalizantes II · Centro Politécnico Superior Malvinas Argentinas · Proyecto IngenIA Salud TDF · 2026</sub>
+</p>

@@ -277,7 +277,7 @@ def generar_pdf(filas, filtros_texto, usuario):
         Paragraph("Historial de casos · Triage asistido HRRG", estilos["Title"]),
         Paragraph(
             f"Exportado por <b>{usuario}</b> el {ahora} · {filtros_texto} · {len(filas)} episodios · "
-                        "<b>Informe identificado por DNI</b> · Datos ficticios del prototipo.",
+                        "<b>DNI enmascarado</b> (solo los últimos 3 números) · Archivo protegido con la contraseña de quien exportó · Datos ficticios del prototipo.",
             chico,
         ),
         Spacer(1, 0.3 * cm),
@@ -358,3 +358,189 @@ def generar_pdf(filas, filtros_texto, usuario):
 
     doc.build(partes, onFirstPage=pie, onLaterPages=pie)
     return archivo.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# [Propuesta Barby 26/10 · a revisar por Maricel]
+# Excel de verdad (.xlsx) con tres hojas:
+#   "Resumen" → una fila por episodio (para filtrar, contar y hacer tablas dinámicas).
+#   "Eventos" → una fila por evento (el detalle completo, con fecha y profesional).
+#   "Info"    → quién exportó, cuándo, con qué filtros y avisos.
+# Números y fechas quedan como números y fechas de Excel (no como texto).
+# La columna DNI aparece solo si la ruta la agregó a las filas (así, si el grupo decide
+# exportar sin DNI, alcanza con no agregarla en app.py).
+# ---------------------------------------------------------------------------
+def _fecha_excel(valor):
+    """ISO con zona → datetime sin zona, en UTC-03:00 (Excel no guarda zonas)."""
+    if not valor:
+        return None
+    try:
+        fecha = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    except ValueError:
+        return str(valor)
+    if fecha.utcoffset() is None:
+        return fecha
+    return fecha.astimezone(ZONA_INFORME).replace(tzinfo=None)
+
+
+def generar_xlsx(filas, filtros_texto, usuario):
+    # Import diferido: si falta openpyxl, solo falla el Excel (el PDF sigue andando).
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    con_dni = any("dni" in fila for fila in filas)
+    libro = Workbook()
+    negrita = Font(bold=True)
+    fondo_titulo = PatternFill("solid", fgColor="E8EAF0")
+    arriba = Alignment(vertical="top", wrap_text=True)
+
+    def escribir(hoja, fila, columna, valor, formato=None):
+        celda = hoja.cell(row=fila, column=columna, value=valor)
+        # Un texto que empieza con "=" no debe ejecutarse como fórmula en Excel.
+        if isinstance(valor, str) and valor[:1] in ("=", "+", "-", "@"):
+            celda.data_type = "s"
+        if formato:
+            celda.number_format = formato
+        return celda
+
+    def encabezado(hoja, titulos, anchos):
+        for col, titulo in enumerate(titulos, start=1):
+            c = hoja.cell(row=1, column=col, value=titulo)
+            c.font, c.fill = negrita, fondo_titulo
+            c.alignment = Alignment(vertical="center", wrap_text=True)
+            hoja.column_dimensions[get_column_letter(col)].width = anchos[col - 1]
+        hoja.freeze_panes = "A2"
+        hoja.auto_filter.ref = f"A1:{get_column_letter(len(titulos))}1"
+
+    # ---------- Hoja 1: Resumen (una fila por episodio) ----------
+    resumen = libro.active
+    resumen.title = "Resumen"
+    columnas = ([("dni", "DNI del paciente")] if con_dni else []) + list(COLUMNAS_EXPORTACION)
+    anchos = []
+    for campo, titulo in columnas:
+        if campo.startswith("fecha_"):
+            anchos.append(17)
+        elif campo in ("motivo_consulta", "motivo_decision", "antecedentes", "banderas_rojas"):
+            anchos.append(34)
+        elif campo in ("codigo_episodio", "codigo_paciente"):
+            anchos.append(26)
+        else:
+            anchos.append(max(10, min(20, len(titulo) + 2)))
+    encabezado(resumen, [t for _, t in columnas], anchos)
+    resumen.row_dimensions[1].height = 30
+
+    col_color = [c for c, _ in columnas].index("color_final") + 1
+    for i, fila in enumerate(filas, start=2):
+        for j, (campo, _) in enumerate(columnas, start=1):
+            valor = fila.get(campo)
+            if campo.startswith("fecha_"):
+                escribir(resumen, i, j, _fecha_excel(valor), "dd/mm/yyyy hh:mm")
+            elif campo == "dni":
+                escribir(resumen, i, j, valor or "No registrado")
+            else:
+                escribir(resumen, i, j, valor)
+        fondo, tinta = COLORES.get(fila.get("color_final") or "", (None, None))
+        if fondo:
+            c = resumen.cell(row=i, column=col_color)
+            c.fill = PatternFill("solid", fgColor=fondo.lstrip("#"))
+            c.font = Font(bold=True, color=tinta.lstrip("#"))
+
+    # ---------- Hoja 2: Eventos (una fila por evento) ----------
+    eventos = libro.create_sheet("Eventos")
+    titulos_ev = (
+        ["Episodio"] + (["DNI del paciente"] if con_dni else []) + ["Código de paciente",
+         "Registro N.º", "Tipo de evento", "Fecha de registro", "Profesional",
+         "Fecha de la toma", "Corrige el registro N.º", "Detalle"]
+    )
+    anchos_ev = [26] + ([16] if con_dni else []) + [26, 11, 24, 17, 16, 17, 12, 70]
+    encabezado(eventos, titulos_ev, anchos_ev)
+    n = 2
+    for fila in filas:
+        for evento in fila.get("historial") or []:
+            detalle = evento.get("detalle") or {}
+            valores = (
+                [fila.get("codigo_episodio")]
+                + ([fila.get("dni") or "No registrado"] if con_dni else [])
+                + [
+                    fila.get("codigo_paciente"),
+                    evento.get("evento_id"),
+                    TIPOS_EVENTO.get(evento.get("tipo"), evento.get("tipo")),
+                    _fecha_excel(evento.get("registrado_en")),
+                    evento.get("profesional_usuario"),
+                    _fecha_excel(detalle.get("medido_en")),
+                    detalle.get("evento_corregido_id"),
+                    "\n".join(_detalle_legible(evento)),
+                ]
+            )
+            for j, valor in enumerate(valores, start=1):
+                formato = "dd/mm/yyyy hh:mm:ss" if hasattr(valor, "year") else None
+                escribir(eventos, n, j, valor, formato).alignment = arriba
+            n += 1
+
+    # ---------- Hoja 3: Info ----------
+    info = libro.create_sheet("Info")
+    ahora = datetime.now(ZONA_INFORME).strftime("%d/%m/%Y %H:%M") + " (UTC-03:00)"
+    renglones = [
+        ("Historial de casos · Triage asistido HRRG", None),
+        ("Exportado por", usuario),
+        ("Fecha de exportación", ahora),
+        ("Filtros", filtros_texto),
+        ("Episodios", len(filas)),
+        ("Eventos", n - 2),
+        ("Horas", "Todas las fechas están en UTC-03:00 (hora de Argentina)."),
+        ("Identificación", "DNI enmascarado: solo se ven los últimos 3 números. El archivo se abre con la contraseña de quien exportó."
+                           if con_dni else "Sin DNI: el paciente figura con su código interno."),
+        ("Datos", "Datos ficticios del prototipo (no son pacientes reales)."),
+    ]
+    for i, (clave, valor) in enumerate(renglones, start=1):
+        c = info.cell(row=i, column=1, value=clave)
+        c.font = Font(bold=True, size=14 if i == 1 else 11)
+        if valor is not None:
+            escribir(info, i, 2, valor)
+    info.column_dimensions["A"].width = 22
+    info.column_dimensions["B"].width = 80
+
+    salida = io.BytesIO()
+    libro.save(salida)
+    return salida.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# [Propuesta Barby 26/10 · a revisar por Maricel]
+# Protección del archivo exportado:
+#   - El DNI sale enmascarado: solo se ven los últimos 3 números (••.•••.222).
+#   - El archivo se cifra con la contraseña del auditor que exporta
+#     (Excel: cifrado nativo de Office con msoffcrypto; PDF: AES-256 con pikepdf).
+#     Sin esa contraseña no se puede abrir. No se guarda en ningún lado.
+# ---------------------------------------------------------------------------
+def enmascarar_dni(dni):
+    if not dni:
+        return None
+    digitos = "".join(c for c in str(dni) if c.isdigit())
+    if len(digitos) < 4:
+        return "•" * len(digitos)
+    oculto = "•" * (len(digitos) - 3) + digitos[-3:]
+    # Mismo formato de puntos que el DNI: 8 dígitos → ••.•••.222 · 7 dígitos → •.•••.222
+    partes = []
+    while oculto:
+        partes.insert(0, oculto[-3:])
+        oculto = oculto[:-3]
+    return ".".join(partes)
+
+
+def proteger_xlsx(contenido, clave):
+    # Import diferido: si falta msoffcrypto-tool, solo falla la protección del Excel.
+    from msoffcrypto.format.ooxml import OOXMLFile
+    entrada, salida = io.BytesIO(contenido), io.BytesIO()
+    archivo = OOXMLFile(entrada)
+    archivo.encrypt(clave, salida)
+    return salida.getvalue()
+
+
+def proteger_pdf(contenido, clave):
+    import pikepdf  # import diferido: si falta, solo falla la protección del PDF
+    salida = io.BytesIO()
+    with pikepdf.open(io.BytesIO(contenido)) as pdf:
+        pdf.save(salida, encryption=pikepdf.Encryption(user=clave, owner=clave, R=6))
+    return salida.getvalue()

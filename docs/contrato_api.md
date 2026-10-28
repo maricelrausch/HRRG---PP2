@@ -839,3 +839,20 @@ Lo usa la pantalla "Historial de casos" del auditor (todos los episodios, de a 5
 
 `GET /api/demo/episodios` y la exportación aceptan `desde` (inclusive) y `hasta` (exclusivo), en ISO 8601 **con zona horaria** (por ejemplo `2026-10-23T00:00:00-03:00`). Se comparan en UTC con la fecha de creación del episodio. Fechas sin zona o `desde >= hasta` → `422`.
 El frontend manda el día elegido desde las 00:00 hasta las 00:00 del día siguiente, en la hora de la compu.
+
+### Exportación en Excel real (.xlsx) — propuesta Barby 26/10
+
+`formato: "excel"` devuelve ahora un `.xlsx` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) con tres hojas: **Resumen** (una fila por episodio, fechas y números como valores de Excel, filtro y color pintado), **Eventos** (una fila por evento con tipo, fecha de registro, profesional, fecha de la toma, registro corregido y detalle legible) e **Info** (usuario, fecha, filtros, avisos). Horas en UTC-03:00. Requiere `openpyxl` (si falta → `503 EXCEL_NO_DISPONIBLE`). `formato: "csv"` sigue disponible (una fila por evento). La columna DNI aparece solo si la ruta la agrega (decisión del grupo pendiente).
+
+### Exportar un solo DNI · DNI enmascarado · archivo con la contraseña del auditor — propuesta Barby 26/10
+
+El cuerpo de `POST /api/demo/episodios/exportar` suma un campo:
+
+| Campo | Qué hace |
+|---|---|
+| `dni` (opcional) | Exporta **un solo paciente**: se busca su código con el índice cifrado (sin crear pacientes) y se exportan **todas sus atenciones**, sin aplicar `estado` ni fechas. DNI desconocido → `404 PACIENTE_NO_ENCONTRADO`. El DNI no se escribe en el log (se registra el código `PAC-…`). |
+| — | El archivo se protege con la **misma `password` del auditor** (decisión 26/10: el auditor no comparte los archivos exportados). Excel: cifrado nativo de Office (`msoffcrypto-tool`), Excel la pide al abrir. PDF: AES-256 (`pikepdf`), el lector la pide al abrir. No se guarda en ningún lado. |
+
+- En ambos formatos el **DNI sale enmascarado**: solo los últimos 3 números (`••.•••.222`).
+- `formato` acepta `"excel"` o `"pdf"` (el CSV quedó fuera porque no se puede proteger con clave).
+- Si falta una librería → `503 PROTECCION_NO_DISPONIBLE` con el comando para instalarla. Nuevas dependencias en `requirements.txt`: `msoffcrypto-tool`, `pikepdf`.

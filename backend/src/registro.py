@@ -1388,7 +1388,8 @@ def _ultima_medicion_exportable(eventos):
     )
     return mediciones[ultima_id]["valores"]
 
-def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, hasta=None):
+def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, hasta=None,
+                            codigo_paciente=None):
     if estado not in (None, "en_ingreso", "en_espera", "finalizado"):
         raise ValueError("El estado no es válido.")
     desde, hasta = normalizar_rango(desde, hasta)
@@ -1409,6 +1410,10 @@ def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, has
             if hasta:
                 condiciones.append("e.creado_en < ?")
                 parametros.append(hasta)
+            # [Propuesta Barby 26/10] Exportar un solo paciente (por su código interno).
+            if codigo_paciente:
+                condiciones.append("e.codigo_paciente = ?")
+                parametros.append(codigo_paciente)
             filtro = (" WHERE " + " AND ".join(condiciones)) if condiciones else ""
 
             episodios = conexion.execute(
