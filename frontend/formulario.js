@@ -11,13 +11,15 @@ const SPECS={
   login:{t:'Pantalla 0 · Acceso',items:[
     ['1','Usuario individual por profesional: cada sugerencia y decisión queda registrada con su usuario (auditoría, Cuestionario §6).'],
     ['2','Roles: Enfermería y Médico/a usan el triage; Auditoría solo consulta En espera y el registro.'],
-    ['3','Credenciales locales y cifradas, sin nube (Ley 25.326). A futuro: credenciales del hospital.']],src:'Cuestionario HRRG §6 Trazabilidad · Clase docentes'},
+    ['3','Credenciales locales y cifradas, sin nube (Ley 25.326). A futuro: credenciales del hospital.'],
+    ['⏱','La sesión se cierra sola tras 15 minutos sin uso (aviso 1 minuto antes).']],src:'Cuestionario HRRG §6 Trazabilidad · Clase docentes'},
   ingreso:{t:'Pantalla 1 · Ingreso',items:[
     ['1','Relato del paciente o acompañante, en sus palabras. Caso ficticio.'],
     ['P','Si detecta un DNI o teléfono en el relato, avisa y no lo envía a la IA (§4).'],
     ['M','Dictado por voz: transcribe al cuadro y se puede editar.'],
     ['2','No envía texto vacío. Mientras procesa, botón bloqueado.'],
-    ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
+    ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.'],
+    ['✕','Cancelar caso: descarta lo cargado o, si ya se guardó, lo deja anulado con motivo. Después de pasar a la espera no se puede cancelar.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
   revision:{t:'Pantalla 2 · Medición',items:[
     ['1','Solo lo que se mide en el box. Nombre completo, unidad y referencia en cada campo. Enter pasa al siguiente.'],
     ['A','Aviso inmediato: fuera de lo normal (borde oscuro), crítico por regla de seguridad o valor imposible (rojo).'],
@@ -29,7 +31,7 @@ const SPECS={
     ['2','Por qué: explicación clínica comprensible. Agrupa las variables que van juntas y dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso respiratorio"), marcadas REGLA, GUÍA o IA. Las reglas fijan un piso: la IA no puede sugerir menos (no downgrade).'],
     ['3','Aceptar con un toque. Modificar o Rechazar piden motivo.'],
     ['4','Corregir datos del relato: lo que extrajo la IA se puede corregir acá. La decisión final es del profesional.'],
-    ['5','Reglas provisorias de ejemplo: los umbrales los aprueban Guardia y Enfermería.'],
+    ['5','Reglas del hospital (HRRG): las carga y activa la Jefatura de Guardia; intervienen desde el próximo paciente y fijan un piso. Las reglas de ejemplo del equipo se pueden apagar.'],
     ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No, recalculan al instante y quedan guardados en la decisión del servidor (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
   espera:{t:'Pantalla 4 · En espera',items:[
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],
@@ -101,6 +103,10 @@ function go(s){
   if(st.user.rol==='auditor'&&s!=='espera')s='espera';
   st.screen=s;
   ['ingreso','revision','resumen','espera'].forEach(x=>$('#s-'+x).hidden=x!==s);
+  /* Cancelar caso: solo en Ingreso y Medición; en una reevaluación cancela la reevaluación. */
+  if(s!=='ingreso'&&s!=='revision')cerrarCancelar();else if(cancelForm)pintarCancelar();
+  if(s!=='ingreso')$('#cancelOk').hidden=true;
+  document.querySelectorAll('[data-cancelar]').forEach(b=>b.textContent=st.prev?'Cancelar reevaluación':'Cancelar caso');
   document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-current',b.dataset.go===s?'page':'false'));
   document.querySelectorAll('#stepper span').forEach(sp=>sp.classList.toggle('on',sp.dataset.s===s));
   $('#stepper').hidden=s==='espera';
@@ -391,7 +397,7 @@ $('#rvForm').addEventListener('input',e=>{
   updField(f);updControl();
 });
 $('#rvForm').addEventListener('click',e=>{const k=e.target.dataset.restore;if(!k)return;e.preventDefault();const f=byK(k);st.rev[k]=base(f);renderForm()});
-$('#confirmar').addEventListener('click',async()=>{await guardarMediciones();st.manual=false;st.insuf=CORE.filter(k=>!st.rev[k]).length>=3;go('resumen')});
+$('#confirmar').addEventListener('click',async()=>{await guardarMediciones();await cargarReglasHospital();st.manual=false;st.insuf=CORE.filter(k=>!st.rev[k]).length>=3;go('resumen')});
 $('#sinIA').addEventListener('click',async()=>{await guardarMediciones();st.manual=true;st.insuf=false;go('resumen')});
 
 /* ===== Guardado en el servidor (episodio, mediciones, correcciones, historial) =====
@@ -477,8 +483,8 @@ async function guardarMediciones(){
   if(!r.ok){st.srv.aviso='No se pudo guardar la medición: '+(r.datos.mensaje||'error del servidor')+' El triage sigue; los datos quedan en pantalla.';return}
   st.srv.medicion={id:r.datos.evento.id,valores:v};st.srv.nuevaToma=false;
 }
-const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada',DATOS_INGRESO_REGISTRADOS:'Datos de ingreso registrados'};
-const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)'};
+const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada',DATOS_INGRESO_REGISTRADOS:'Datos de ingreso registrados',EPISODIO_ANULADO:'Caso anulado'};
+const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)',anulado:'anulado (cargado por error)'};
 /* Atenciones anteriores del mismo paciente (mismo DNI). Cada una se puede abrir para ver su historial. */
 function htmlAnteriores(){
   const a=st.srv.anteriores;
@@ -493,7 +499,7 @@ const horaCorta=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeSty
 function htmlEvento(e){
   const d=e.datos||{},val=d.valores?Object.entries(d.valores).filter(([k,x])=>x!==false).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+(x===true?'Sí':x)).join(' · '):'';
   return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(horaCorta(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
-    (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>';
+    (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(e.tipo==='EPISODIO_ANULADO'&&d.motivo?' · motivo: '+esc(d.motivo):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>';
 }
 const htmlEventos=evs=>'<ul>'+(evs||[]).map(htmlEvento).join('')+'</ul>';
 async function verAnterior(ep,btn){
@@ -602,16 +608,75 @@ function refreshSummary(){
 }
 function renderReg(){
   const d=st.decision,l=st.level!=null?LEVELS[st.level][0]:null;
-  const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
+  const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.H.length?' · reglas HRRG: '+c.H.map(x=>x.codigo+' v'+x.version).join(', '):'')+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
   const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+LEVELS[SUG][0]:d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
   $('#reg').textContent='Episodio:  '+st.ep+'\nPaciente:  '+(st.dni?'DNI '+fmtDni(st.dni):'sin identificar')+'\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
 }
 
-$('#nuevo').addEventListener('click',()=>{
+$('#nuevo').addEventListener('click',()=>nuevoCaso());
+function nuevoCaso(){
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
+  cerrarCancelar();$('#cancelOk').hidden=true;
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
   st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');
-  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
+  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')}
+/* ===== Cancelar caso (pedido 28/10) =====
+   En Ingreso y Medición, antes de que el caso pase a la lista de espera:
+   - Si todavía no se guardó nada en el servidor: se descarta lo cargado y se empieza de cero.
+   - Si el episodio ya existe en el servidor: se pide el motivo y queda ANULADO (no se borra:
+     queda registrado quién lo canceló y por qué; no aparece en En espera ni en la sala).
+   - En una reevaluación: se descartan los cambios y el paciente sigue en espera con su color.
+   Una vez en la lista de espera no se puede cancelar (lo controla también el servidor). */
+const MOTIVOS_ANULAR=['Datos cargados por error','Paciente equivocado (DNI o persona)','El paciente se retiró antes del triage','Caso duplicado','Otro'];
+var cancelForm=null;
+function cerrarCancelar(){cancelForm=null;$('#cancelBox').hidden=true;$('#cancelBox').innerHTML=''}
+function abrirCancelar(){
+  cancelForm={mot:'',det:'',error:null,enviando:false};
+  $('#cancelOk').hidden=true;pintarCancelar();
+  const b=$('#cancelBox');b.scrollIntoView({behavior:'smooth',block:'nearest'});
+  const f=b.querySelector('select,button');if(f)f.focus();
+}
+function pintarCancelar(){
+  const b=$('#cancelBox');if(!cancelForm){b.hidden=true;return}
+  const enSrv=TriageAPI.MODO_REAL&&st.srv&&st.srv.ep;
+  let h;
+  if(st.prev){
+    h='<b id="cancelTit">¿Cancelar la reevaluación de '+esc(st.ep)+'?</b><span>Se descartan los cambios de esta pantalla y el paciente sigue en espera con su color '+esc(LEVELS[st.prev.lv][0])+'.</span>'+
+      '<div class="row"><button type="button" class="btn danger" data-cx="reeval">Descartar cambios</button><button type="button" class="btn" data-cx="no">Volver</button></div>';
+  }else if(!enSrv){
+    h='<b id="cancelTit">¿Descartar todo lo cargado?</b><span>Se borran el DNI, el relato y los datos de la medición. Todavía no se guardó nada en el servidor.</span>'+
+      '<div class="row"><button type="button" class="btn danger" data-cx="descartar">Sí, descartar y empezar de cero</button><button type="button" class="btn" data-cx="no">Volver</button></div>';
+  }else{
+    const ok=!!cancelForm.mot&&(cancelForm.mot!=='Otro'||!!cancelForm.det.trim());
+    h='<b id="cancelTit">Cancelar el caso '+esc(st.ep)+'</b><span>El caso queda <b>anulado</b>: no pasa a la lista de espera y queda registrado quién lo canceló y por qué (no se borra del historial).</span>'+
+      '<div class="row"><label>Motivo (obligatorio) <select id="cxMot"><option value="">Seleccionar…</option>'+MOTIVOS_ANULAR.map(o=>'<option'+(o===cancelForm.mot?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></label>'+
+      '<label class="cx-det">Detalle'+(cancelForm.mot==='Otro'?' (obligatorio)':' (opcional)')+' <input id="cxDet" maxlength="300" value="'+esc(cancelForm.det)+'" placeholder="Qué pasó"></label></div>'+
+      (cancelForm.error?'<div class="werr">'+esc(cancelForm.error)+'</div>':'')+
+      '<div class="row"><button type="button" class="btn danger" data-cx="anular"'+(ok&&!cancelForm.enviando?'':' disabled')+'>'+(cancelForm.enviando?'Anulando…':'Anular caso')+'</button><button type="button" class="btn" data-cx="no">Volver</button></div>';
+  }
+  b.innerHTML=h;b.hidden=false;
+}
+async function anularCaso(){
+  const ep=st.srv.ep,motivo=[cancelForm.mot,cancelForm.det.trim()].filter(Boolean).join('. ');
+  cancelForm.enviando=true;cancelForm.error=null;pintarCancelar();
+  const e=await TriageAPI.consultarEstado(ep);
+  if(e.estado===401){location.href='index.html';return}
+  const r=e.ok?await TriageAPI.anularEpisodio(ep,motivo,e.datos.estado.version):e;
+  if(r.estado===401){location.href='index.html';return}
+  if(!r.ok){cancelForm.enviando=false;cancelForm.error='No se pudo anular: '+((r.datos&&r.datos.mensaje)||'error del servidor')+'.';pintarCancelar();return}
+  const w=WAIT.find(x=>x.ep===ep);if(w)WAIT.splice(WAIT.indexOf(w),1);
+  nuevoCaso();
+  $('#cancelOk').innerHTML='<b>Caso '+esc(ep)+' anulado.</b> Motivo: '+esc(motivo)+'. Podés cargar el próximo paciente.';$('#cancelOk').hidden=false;
+}
+document.addEventListener('click',e=>{if(e.target.closest('[data-cancelar]')){abrirCancelar();return}
+  const b=e.target.closest('#cancelBox [data-cx]');if(!b)return;const a=b.dataset.cx;
+  if(a==='no'){cerrarCancelar();return}
+  if(a==='descartar'){nuevoCaso();$('#cancelOk').innerHTML='<b>Se descartó lo cargado.</b> Podés empezar de nuevo.';$('#cancelOk').hidden=false;return}
+  if(a==='reeval'){nuevoCaso();go('espera');return}
+  if(a==='anular')anularCaso();});
+$('#cancelBox').addEventListener('change',e=>{if(e.target.id==='cxMot'&&cancelForm){cancelForm.mot=e.target.value;pintarCancelar();const i=$('#cxDet');if(i&&cancelForm.mot==='Otro')i.focus()}});
+$('#cancelBox').addEventListener('input',e=>{if(e.target.id==='cxDet'&&cancelForm){cancelForm.det=e.target.value;
+  const ok=!!cancelForm.mot&&(cancelForm.mot!=='Otro'||!!cancelForm.det.trim()),btn=$('#cancelBox [data-cx="anular"]');if(btn)btn.disabled=!ok}});
 /* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
 /* Sesión (A07): la consulta api.js. Modo real = Flask (/api/sesion); modo demo = login simulado. */
 async function salir() {
@@ -634,9 +699,10 @@ document.addEventListener('DOMContentLoaded',async function iniciarSesion(){
   if(!st.user){location.href='index.html';return}
   if(st.user.debeCambiar){location.href='cambiar_password.html';return}
   if(st.user.rol==='admin'){location.href='admin.html';return}
+  if(st.user.rol==='jefatura'){location.href='reglas.html';return}
   if(st.user.modoExtraccion){st.modoServidor=st.user.modoExtraccion;renderSimbar()}
   const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
-  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+' <button type="button" class="linkbtn" id="logout">Salir</button>';
+  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+(st.user.rol==='auditor'&&st.user.modo==='real'?' · <a href="reglas.html">Reglas del hospital</a>':'')+' <button type="button" class="linkbtn" id="logout">Salir</button>';
   $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});
   go(st.user.rol==='auditor'?'espera':'ingreso');
 });

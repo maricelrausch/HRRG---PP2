@@ -82,7 +82,7 @@ function renderCasos(){
   /* El título de arriba y la lista de espera cambian según lo que se está mirando. */
   $('#wList').hidden=CASOS.abierto;$('#wTitulo').textContent=CASOS.abierto?'Historial de casos':'Pacientes en espera';
   if(!CASOS.abierto){$('#wCount').textContent=WAIT.length+' pacientes';return}
-  const est={'':'Todos los estados',en_espera:'En espera',finalizado:'Finalizados',en_ingreso:'En ingreso'};
+  const est={'':'Todos los estados',en_espera:'En espera',finalizado:'Finalizados',en_ingreso:'En ingreso',anulado:'Anulados'};
   const {q,qDni}=textoBusqueda(),porPac=CASOS.pac&&CASOS.pac.estado==='ok';
   const vis=CASOS.lista.filter(c=>(!CASOS.filtro||c.estado===CASOS.filtro)&&
     (porPac||!q||(qDni?(c.dni||'').startsWith(qDni):(c.codigo_episodio||'').includes(q))));
@@ -330,7 +330,8 @@ setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(
 /* [Dario 27/10] Reloj en tiempo real: sin esto los minutos y el aviso de vencido quedaban congelados
    hasta tocar algo. Cada 30 s recarga del servidor y redibuja; no interrumpe un escalado o finalizar en curso. */
 setInterval(()=>{if(st.fast||st.screen!=='espera'||escPending||finPending||CASOS.abierto)return;
-  if(TriageAPI.MODO_REAL)cargarEspera().then(renderWait);else renderWait()},30000);
+  /* [Barby 28/10] En segundo plano: esta recarga automática no cuenta como actividad (cierre por inactividad). */
+  if(TriageAPI.MODO_REAL)TriageAPI.enSegundoPlano(()=>cargarEspera()).then(renderWait);else renderWait()},30000);
 $('#wList').addEventListener('click',e=>{
   /* Auditor: "Exportar este paciente" abre el recuadro de exportar con ese DNI ya cargado. */
   const xd=e.target.closest('[data-expdni]');

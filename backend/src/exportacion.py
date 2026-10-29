@@ -37,12 +37,14 @@ TIPOS_EVENTO = {
     "MEDICION_CORREGIDA": "Corrección de medición",
     "ESTADO_CAMBIADO": "Cambio de estado",
     "DECISION_REGISTRADA": "Decisión profesional",
+    "EPISODIO_ANULADO": "Caso anulado (cargado por error)",
 }
 
 ESTADOS = {
     "en_ingreso": "En ingreso",
     "en_espera": "En espera",
     "finalizado": "Finalizado",
+    "anulado": "Anulado",
 }
 
 # Traduce los nombres internos y agrega las unidades de las mediciones.
@@ -154,6 +156,13 @@ def _detalle_legible(evento):
         lineas.append(
             f"{ESTADOS.get(antes, antes or 'Sin estado previo')} → "
             f"{ESTADOS.get(despues, despues or 'Sin informar')}"
+        )
+
+    elif tipo == "EPISODIO_ANULADO":
+        antes = detalle.get("estado_anterior")
+        lineas.append(
+            f"{ESTADOS.get(antes, antes or 'Sin estado previo')} → Anulado. "
+            "El caso no pasó a la lista de espera."
         )
 
     elif tipo == "DECISION_REGISTRADA":

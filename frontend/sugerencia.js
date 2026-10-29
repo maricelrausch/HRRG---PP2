@@ -81,14 +81,28 @@ function medgemma(){
   if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
   return {lv,why};
 }
+/* ===== Reglas del hospital (propuesta Barby 28/10) =====
+   Las carga la Jefatura de Guardia en reglas.html. Se piden al servidor cada vez que se pide una
+   sugerencia, así una regla recién activada interviene en el próximo paciente sin recargar nada.
+   Fijan un piso (no se puede sugerir menos) y aparecen en el "Por qué" con la marca HRRG.
+   Si la Jefatura apaga las "reglas de ejemplo", quedan solo las del hospital (más la IA). */
+const REGLAS_HRRG={lista:[],usarEjemplo:true,error:null};
+async function cargarReglasHospital(){
+  if(!TriageAPI.MODO_REAL)return;
+  const r=await TriageAPI.reglasActivas();
+  if(r.estado===401){location.href='index.html';return}
+  if(r.ok){REGLAS_HRRG.lista=r.datos.reglas||[];REGLAS_HRRG.usarEjemplo=r.datos.usar_ejemplo!==false;REGLAS_HRRG.error=null}
+  else REGLAS_HRRG.error='No se pudieron leer las reglas del hospital: se usan las últimas conocidas.';
+}
 function calcSug(){
-  const R=reglas(),M=medgemma(),rl=R.length?Math.min(...R.map(x=>x.lv)):9;
+  const H=window.MotorReglas?MotorReglas.evaluar(REGLAS_HRRG.lista,st.rev):[],hl=H.length?H[0].lv:9;
+  const R=REGLAS_HRRG.usarEjemplo?reglas():[],M=medgemma(),rl=R.length?Math.min(...R.map(x=>x.lv)):9;
   const C=Object.entries(st.disc).filter(([k,v])=>v==='si').map(([k])=>{const [lv,t]=k.split('|');return {lv:+lv,t}});
   const cl=C.length?Math.min(...C.map(x=>x.lv)):9;
   /* Reevaluación: el color anterior (aceptado o modificado por el profesional) es un piso, como las reglas.
      Para bajar la prioridad hay que usar Modificar con motivo. */
-  const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl);
-  return {R,M,C,rl,cl,pl,fin};
+  const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl,hl);
+  return {R,M,C,H,rl,cl,pl,hl,fin};
 }
 function renderCard(){
   const c=calcSug();SUG=c.fin;const L=LEVELS[SUG];
@@ -97,9 +111,11 @@ function renderCard(){
   $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[SUG]+' [tiempo de ejemplo]';
   $('#tcOrigin').innerHTML=c.rl<c.M.lv?'<b>Color fijado por regla de seguridad.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'; la regla no permite bajar.</span><span class="prov">Reglas provisorias</span>'
     :(c.R.length?'<b>Simulación con reglas de ejemplo.</b><span class="old">Coincide o supera las reglas de seguridad.</span>':'<b>Simulación con reglas de ejemplo.</b><span class="old">Reglas de seguridad: sin alertas.</span>');
+  if(!REGLAS_HRRG.usarEjemplo&&c.rl===9&&!(c.hl<c.M.lv))$('#tcOrigin').innerHTML='<b>Simulación con las reglas del hospital.</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+' Las reglas de ejemplo están desactivadas.</span>';
   if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
-  if(c.pl<Math.min(c.rl,c.M.lv,c.cl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
-  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
+  if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. La cargó la Jefatura de Guardia.</span>';
+  if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
+  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h" title="Regla del hospital '+esc(x.codigo)+' v'+x.version+'">HRRG</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
   renderFuente();renderSubir();pintarDecision();
 }
 /* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
@@ -198,8 +214,13 @@ function textoDiscriminadores(){
   Object.entries(st.disc).forEach(([k,v])=>{const t=k.split('|')[1];if(v==='si')si.push(t);else if(v==='no')no.push(t)});
   return [si.length?'Discriminadores confirmados: '+si.join(', ')+'.':'',no.length?'Descartados: '+no.join(', ')+'.':''].filter(Boolean).join(' ');
 }
+/* Reglas del hospital que intervinieron (código y versión): quedan en la decisión guardada. */
+function textoReglasHospital(){
+  const H=window.MotorReglas?MotorReglas.evaluar(REGLAS_HRRG.lista,st.rev):[];
+  return H.length?'Reglas HRRG aplicadas: '+H.map(x=>x.codigo+' v'+x.version+' ('+x.color+')').join(', ')+'.':'';
+}
 function decisionActual(lv){
-  const d=decisionBase(lv),disc=st.manual?'':textoDiscriminadores();
+  const d=decisionBase(lv),disc=st.manual?'':[textoDiscriminadores(),textoReglasHospital()].filter(Boolean).join(' ');
   if(disc)d.motivo=(d.motivo?d.motivo.replace(/\.?$/,'. '):'')+disc;
   d.motivo=d.motivo.slice(0,1000);
   return d;
@@ -250,7 +271,7 @@ function respuestaSimulada(q){
   if(/tiempo|esper|cu[aá]nto|minutos/.test(t))
     return 'Para '+L+' el tiempo de ejemplo es: '+DESC[SUG]+'.\nLos tiempos reales salen de la guía del hospital.';
   if(/por ?qu[eé]|motivo|raz[oó]n|color|prioridad/.test(t)){
-    const r=[...c.R.map(x=>'• Regla: '+x.t),...c.C.map(x=>'• Confirmado: '+x.t),...c.M.why.map(x=>'• Del relato: '+x)];
+    const r=[...c.H.map(x=>'• Regla del hospital '+x.codigo+': '+x.texto),...c.R.map(x=>'• Regla: '+x.t),...c.C.map(x=>'• Confirmado: '+x.t),...c.M.why.map(x=>'• Del relato: '+x)];
     return 'Sugiero '+L+' por:\n'+r.join('\n')+(c.rl<c.M.lv?'\nUna regla de seguridad no deja bajar el color.':'');}
   return 'Puedo explicarte por qué se sugirió '+L+', qué datos faltan, qué lo haría subir o de qué guía sale. Probá con alguna de esas preguntas.';
 }

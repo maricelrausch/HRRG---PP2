@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reglas del hospital · Triage asistido</title>
+<!-- frontend/reglas.html · Reglas del hospital para el motor de sugerencia (propuesta Barby 28/10).
+     Perfil "jefatura" (Jefatura de Guardia): crea, edita, activa y desactiva reglas.
+     Perfil "auditor": las ve en solo lectura, con su historial.
+     Las reglas activas intervienen en la sugerencia desde el próximo paciente (js/motor_reglas.js). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<div class="wrap">
+  <section class="app reglas-app">
+    <div class="app-head">
+      <div class="brand"><img class="logo" src="img/logo-hrrg.png" alt="HRRG · Hospital Regional Río Grande"><span class="sep"></span><h2>Reglas del hospital · Motor de sugerencia</h2></div>
+      <div class="chips"><span class="chip" id="userChip" hidden></span></div>
+    </div>
+    <div class="body">
+      <div class="banner" id="rgErr" hidden role="alert"><b></b></div>
+      <div class="rg-intro">
+        <div class="note">
+          <div><b>Cómo funcionan.</b> Cada regla dice: <i>si se cumplen estas condiciones, la sugerencia no puede ser de un color menor que este</i>.
+          Se crean como <b>borrador</b>, se prueban y, al <b>activarlas</b>, intervienen en la sugerencia <b>desde el próximo paciente</b>.
+          Un dato que no se midió nunca cumple una condición. La decisión final sigue siendo del profesional.</div>
+        </div>
+        <button type="button" class="btn primary big" id="rgNueva" hidden>Nueva regla</button>
+      </div>
+
+      <div class="rg-resumen" id="rgResumen"></div>
+
+      <div class="rg-ejemplo" id="rgEjemplo"></div>
+
+      <div class="rg-editor" id="rgEditor" hidden></div>
+
+      <div class="rg-lista" id="rgLista"><div class="hint">Cargando…</div></div>
+    </div>
+  </section>
+</div>
+<script src="api.js"></script>
+<script src="js/mostrar_clave.js"></script>
+<script src="js/motor_reglas.js"></script>
+<script src="js/reglas.js"></script>
+</body>
+</html>
