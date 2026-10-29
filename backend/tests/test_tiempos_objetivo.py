@@ -93,3 +93,16 @@ def test_api_y_sala_usan_los_tiempos_configurados(cliente_api, tmp_path):  # noq
     sala = cliente_api.get("/api/sala/espera").get_json()
     assert sala["tiempos"]["AMARILLO"] == 90
     assert {e["objetivo_min"] for e in sala["episodios"] if e["color"] == "AMARILLO"} == {90}
+
+
+def test_cola_informa_ingreso_triage_restante_y_proximos(cliente_api):  # noqa: F811
+    """D5 (mail de Navoni, punto 4): hora de ingreso, hora del triage, tiempo restante y próximos a vencer."""
+    pacientes = {p["codigo_episodio"]: p for p in
+                 cliente_api.get("/api/cola-espera", headers=AUTH).get_json()["pacientes"]}
+    amarillo_vencido, amarillo = pacientes["EPI-AMARI01"], pacientes["EPI-AMARI02"]   # 75 y 20 min, máx. 60
+    assert amarillo_vencido["tiempo_restante_min"] < 0 and amarillo_vencido["vencido"]
+    assert not amarillo_vencido["proximo_a_vencer"]
+    assert amarillo["tiempo_restante_min"] in (39, 40) and not amarillo["proximo_a_vencer"]
+    for p in pacientes.values():
+        assert p["ingreso_en"] and p["triage_en"]
+    assert pacientes["EPI-ROJO001"]["proximo_a_vencer"] is False

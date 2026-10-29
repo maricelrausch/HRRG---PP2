@@ -137,6 +137,13 @@ def cola_espera():
             "espera_min": espera,
             "tiempo_maximo_min": objetivo[color],
             "vencido": color != "ROJO" and espera > objetivo[color],
+            # [Dario 29/10 · D5] Mail de Navoni, punto 4: hora de ingreso, hora del triage,
+            # tiempo restante (negativo = ya lo superó) y pacientes próximos a vencer (último 25 %).
+            "ingreso_en": ep.get("creado_en"),
+            "triage_en": (ep.get("decision_actual") or {}).get("ocurrido_en"),
+            "tiempo_restante_min": objetivo[color] - espera,
+            "proximo_a_vencer": (color != "ROJO" and 0 <= objetivo[color] - espera
+                                 and objetivo[color] - espera <= objetivo[color] * 0.25),
             "motivo_categoria": ep.get("motivo_categoria"),
             "condicion_especial": ep.get("condicion_especial"),   # [D4] aparte del color clínico
         })
