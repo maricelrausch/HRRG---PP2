@@ -4,7 +4,7 @@
   'use strict';
   const api = window.TriageAPI;
   const $ = (id) => document.getElementById(id);
-  const ETIQUETAS = { enfermeria: 'Enfermería (triage)', medico: 'Médico/a de guardia', auditor: 'Auditoría (solo lectura)', admin: 'Administrador' };
+  const ETIQUETAS = { enfermeria: 'Enfermería (triage)', medico: 'Médico/a de guardia', auditor: 'Auditoría (solo lectura)', jefatura: 'Jefatura de Guardia (reglas)', admin: 'Administrador' };
   const CLASE_ESTADO = { 'Activa': '', 'Vencida': 'venc', 'Bloqueada': 'bloq', 'Cambio pendiente': 'fix', 'Desactivada': 'off' };
   let usuarios = [];
   let roles = [];

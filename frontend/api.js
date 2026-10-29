@@ -48,17 +48,107 @@
     document.documentElement.classList.remove('cargando');
     if (document.body) document.body.removeAttribute('aria-busy');
   }
+  /* [Propuesta Barby 28/10] Consultas automáticas (listas que se actualizan solas): llevan el
+     encabezado X-HRRG-Auto: 1, no muestran el indicador de carga y NO cuentan como actividad para
+     el cierre de sesión por inactividad. Se usan con TriageAPI.enSegundoPlano(() => …). */
+  let enAuto = 0;
+  function enSegundoPlano(fn) {
+    enAuto++;
+    try { return fn(); } finally { enAuto--; }
+  }
   if (MODO_REAL && root.fetch && !root.fetch.__hrrgCarga) {
     const fetchOriginal = root.fetch.bind(root);
     const conIndicador = function (recurso, opciones) {
       const url = typeof recurso === 'string' ? recurso : (recurso && recurso.url) || '';
       const propio = /^\/(api|upload|chat)\b/.test(url) || url.indexOf(location.origin + '/api') === 0;
       if (!propio) return fetchOriginal(recurso, opciones);
+      if (enAuto > 0) {
+        opciones = Object.assign({}, opciones);
+        const h = new Headers(opciones.headers || {});
+        h.set('X-HRRG-Auto', '1');
+        opciones.headers = h;
+        return fetchOriginal(recurso, opciones).then(revisarVencida);
+      }
       empezarCarga();
-      return fetchOriginal(recurso, opciones).finally(terminarCarga);
+      return fetchOriginal(recurso, opciones).then(revisarVencida).finally(terminarCarga);
     };
     conIndicador.__hrrgCarga = true;
     root.fetch = conIndicador;
+  }
+
+  /* Si el servidor cerró la sesión por inactividad, se recuerda para avisarlo en el ingreso. */
+  function revisarVencida(r) {
+    if (r.status === 401) {
+      r.clone().json().then(function (j) {
+        if (j && j.codigo === 'SESION_VENCIDA') { try { sessionStorage.setItem('hrrg_sesion_vencida', '1'); } catch (e) {} }
+      }).catch(function () {});
+    }
+    return r;
+  }
+
+  /* ===== Cierre de sesión por inactividad (pedido 28/10) =====
+     El servidor cierra la sesión si pasan N minutos (15 por defecto) sin uso. Acá se cuenta la
+     actividad real de la persona (teclado, mouse, toques) en TODAS las pestañas abiertas del sistema:
+     - con actividad, cada 30 s como máximo se avisa al servidor (GET /api/sesion);
+     - 1 minuto antes del cierre aparece un aviso con cuenta regresiva y el botón "Seguir conectado";
+     - al vencer, se cierra la sesión y se vuelve al ingreso con el aviso.
+     Las listas que se actualizan solas no cuentan como actividad (ver enSegundoPlano). */
+  const CLAVE_ACT = 'hrrg_ultima_actividad';
+  let vigilando = false;
+  function vigilarInactividad(minutos) {
+    if (vigilando || !MODO_REAL || !minutos) return;
+    vigilando = true;
+    const limite = minutos * 60000 - 45000;      // un margen para cerrar antes que el servidor
+    const avisoDesde = limite - 60000;
+    let ultimoPing = Date.now(), barra = null, cerrando = false;
+    const leer = () => { let v = 0; try { v = +localStorage.getItem(CLAVE_ACT) || 0; } catch (e) {} return v; };
+    const guardar = t => { try { localStorage.setItem(CLAVE_ACT, String(t)); } catch (e) {} };
+    let local = Date.now(); guardar(local);
+    function actividad() {
+      if (cerrando) return;
+      const ahora = Date.now();
+      if (ahora - local < 1000) return;          // los movimientos del mouse llegan de a cientos
+      local = ahora; guardar(ahora);
+      if (ahora - ultimoPing > 30000) { ultimoPing = ahora; pedir('/api/sesion', { method: 'GET', cache: 'no-store' }); }
+      revisar();
+    }
+    function mostrarAviso(seg) {
+      if (!barra) {
+        barra = document.createElement('div');
+        barra.className = 'aviso-inactividad';
+        barra.setAttribute('role', 'alertdialog');
+        barra.setAttribute('aria-live', 'assertive');
+        /* Estilos en línea: funciona también en pantallas sin estilos.css (administración). */
+        barra.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9999;' +
+          'display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;max-width:calc(100% - 32px);' +
+          'background:#1B2030;color:#fff;border-radius:12px;padding:14px 18px;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:15px';
+        barra.innerHTML = '<span class="ai-txt"></span><button type="button" style="min-height:44px;padding:0 18px;border-radius:8px;' +
+          'border:0;background:#fff;color:#1B2030;font:inherit;font-weight:600;cursor:pointer">Seguir conectado</button>';
+        barra.querySelector('button').addEventListener('click', function () { ultimoPing = 0; local = 0; actividad(); });
+        document.body.appendChild(barra);
+      }
+      barra.querySelector('.ai-txt').innerHTML = '<b>¿Seguís ahí?</b> Por seguridad, la sesión se cierra en <b>' + seg + ' s</b> si no hay actividad.';
+      barra.hidden = false;
+    }
+    async function cerrar() {
+      cerrando = true;
+      try { sessionStorage.setItem('hrrg_sesion_vencida', '1'); } catch (e) {}
+      try { await pedir('/api/logout', { method: 'POST', body: '{}' }); } catch (e) {}
+      location.href = 'index.html';
+    }
+    function revisar() {
+      if (cerrando) return;
+      const quieto = Date.now() - Math.max(local, leer());
+      if (quieto >= limite) return cerrar();
+      if (quieto >= avisoDesde) mostrarAviso(Math.max(1, Math.ceil((limite - quieto) / 1000)));
+      else if (barra) barra.hidden = true;
+    }
+    ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove', 'input'].forEach(function (ev) {
+      document.addEventListener(ev, actividad, { passive: true, capture: true });
+    });
+    /* Otra pestaña del sistema registró actividad: se oculta el aviso acá también. */
+    window.addEventListener('storage', function (e) { if (e.key === CLAVE_ACT) revisar(); });
+    setInterval(revisar, 1000);
   }
 
   const CLAVE_DEMO = 'hrrg_demo_user';
@@ -119,7 +209,10 @@ return { ok: true, usuario: profesional };
     cache: 'no-store'
   });
 
-  return r.ok ? aUsuario(r.datos) : null;
+  if (!r.ok) return null;
+  /* Todas las pantallas con sesión (menos el ingreso) vigilan la inactividad. */
+  if (!/(^|\/)(index\.html)?$/.test(location.pathname)) vigilarInactividad(r.datos.inactividad_min || 15);
+  return aUsuario(r.datos);
 }
 
   /* Cierra sesión (en el servidor y en el navegador). */
@@ -234,7 +327,16 @@ function aUsuario(datos) {
     return pedir('/api/cuenta/password', { method: 'POST', body: JSON.stringify({ actual: actual, nueva: nueva }) });
   }
 
-  root.TriageAPI = { MODO_REAL: MODO_REAL, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
+  /* [Propuesta Barby 28/10] Cancelar un caso cargado por error (antes de la espera): queda ANULADO. */
+  function anularEpisodio(episodio, motivo, versionEsperada) {
+    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/anular', { method: 'POST',
+      body: JSON.stringify({ motivo: motivo, version_esperada: versionEsperada }) });
+  }
+  /* [Propuesta Barby 28/10] Reglas del hospital activas (las carga la Jefatura de Guardia). */
+  function reglasActivas() {
+    return pedir('/api/reglas/activas', { method: 'GET', cache: 'no-store' });
+  }
+  root.TriageAPI = { MODO_REAL: MODO_REAL, enSegundoPlano: enSegundoPlano, anularEpisodio: anularEpisodio, reglasActivas: reglasActivas, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, registrarDatosIngreso: registrarDatosIngreso, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
     identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, listarCasos: listarCasos, exportarCasos: exportarCasos, registrarDecision: registrarDecision };

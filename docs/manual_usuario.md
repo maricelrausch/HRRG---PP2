@@ -1,7 +1,7 @@
 # Manual de usuario · Triage asistido por IA
 
 **Hospital Regional Río Grande (HRRG) · Equipo 1 · Prácticas Profesionalizantes II**
-**Versión:** prototipo local · **Actualizado:** 28/10/2026
+**Versión:** prototipo local · **Actualizado:** 29/10/2026
 
 > **Importante.** Es un **prototipo**. Usá solo **datos ficticios**: nada de nombres, domicilios, teléfonos ni casos reales.
 > El color que propone el sistema es una **sugerencia de ejemplo**, no la guía Manchester oficial del hospital.
@@ -18,9 +18,10 @@
 5. [Pacientes en espera](#5-pacientes-en-espera)
 6. [Lista de espera en la sala y en el celular](#6-lista-de-espera-en-la-sala-y-en-el-celular)
 7. [Auditoría](#7-auditoría)
-8. [Administración de usuarios](#8-administración-de-usuarios)
-9. [Colores y tiempos de referencia](#9-colores-y-tiempos-de-referencia)
-10. [Problemas frecuentes](#10-problemas-frecuentes)
+8. [Reglas del hospital (Jefatura de Guardia)](#8-reglas-del-hospital-jefatura-de-guardia)
+9. [Administración de usuarios](#9-administración-de-usuarios)
+10. [Colores y tiempos de referencia](#10-colores-y-tiempos-de-referencia)
+11. [Problemas frecuentes](#11-problemas-frecuentes)
 
 ---
 
@@ -51,7 +52,8 @@ Ayuda a ordenar la atención en la guardia:
 |---|---|---|
 | **Enfermería** | Cargar casos, pedir la sugerencia, decidir el color, reevaluar, escalar a ROJO, finalizar | Exportar ni administrar usuarios |
 | **Médico/a** | Lo mismo que Enfermería | Exportar ni administrar usuarios |
-| **Auditoría** | Ver En espera, el historial completo de cada caso y el DNI; buscar por DNI; ver todos los casos (incluidos los finalizados); **exportar** a Excel o PDF | Cargar, modificar ni decidir nada (**solo lectura**) |
+| **Auditoría** | Ver En espera, el historial completo de cada caso y el DNI; buscar por DNI; ver todos los casos (incluidos los finalizados y los anulados); **exportar** a Excel o PDF; ver las reglas del hospital | Cargar, modificar ni decidir nada (**solo lectura**) |
+| **Jefatura de Guardia** | Cargar, probar, activar, desactivar y editar las **reglas del hospital** | Atender pacientes ni ver casos |
 | **Administración** | Crear usuarios, asignar perfiles, desbloquear cuentas, generar claves temporales | Ver casos de pacientes |
 
 ---
@@ -75,6 +77,15 @@ Ayuda a ordenar la atención en la guardia:
 - Enfermería y Médico/a empiezan en **1 · Ingreso**.
 - Auditoría empieza en **En espera**.
 - Administración entra a **Gestión de accesos**.
+- Jefatura de Guardia entra a **Reglas del hospital**.
+
+**Cierre de sesión por inactividad:**
+- Si pasan **15 minutos sin usar el sistema**, la sesión se cierra sola. Es para que nadie use tu usuario si te alejás de la computadora.
+- **1 minuto antes** aparece un aviso abajo, con una cuenta regresiva. Para seguir, tocá **Seguir conectado** o simplemente mové el mouse o escribí algo.
+- Las listas que se actualizan solas (En espera, la pantalla del celular) **no** cuentan como uso.
+- Si se cerró, el ingreso muestra *"La sesión se cerró por inactividad"*. Volvé a entrar.
+
+![Aviso antes del cierre por inactividad](img/manual/18_aviso_inactividad.png)
 
 ---
 
@@ -96,7 +107,8 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
    - Mientras procesa, el botón queda bloqueado y arriba aparece **"Consultando al servidor…"**.
    - Con MedGemma, la primera vez puede tardar **1 o 2 minutos**.
    - Si algo falla, **el texto no se pierde**.
-4. **Borrar texto** limpia el cuadro.
+4. **Borrar texto** limpia solo el cuadro del relato.
+5. **Cancelar caso:** para empezar de cero si te equivocaste (ver [Cancelar un caso](#cancelar-un-caso)).
 
 ### Paso 2 · Medición
 
@@ -125,14 +137,33 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
    - **Pedir sugerencia** (④): pasa al paso 3.
    - **Clasificar sin IA**: elegís el color a mano. Está siempre disponible, por si la IA no anda.
    - **Volver al relato**: vuelve al paso 1.
+   - **Cancelar caso**: descarta todo (ver abajo).
+
+### Cancelar un caso
+
+Si te equivocaste en algún dato y querés empezar de cero, tocá **Cancelar caso** en el paso 1 o en el paso 2.
+
+- **Si todavía no tocaste "Extraer datos":** no se guardó nada. El sistema pregunta *"¿Descartar todo lo cargado?"* y, con **Sí, descartar y empezar de cero**, borra el DNI, el relato y la medición.
+- **Si ya se guardó en el servidor:** hay que elegir un **motivo (obligatorio)**: datos cargados por error, paciente equivocado, el paciente se retiró antes del triage, caso duplicado u otro. Con **Anular caso**:
+  - el caso queda **anulado**: no pasa a la lista de espera ni aparece en la sala;
+  - **no se borra**: queda registrado quién lo canceló, cuándo y por qué, y Auditoría lo ve con el filtro **Anulados**.
+- **En una reevaluación** el botón dice **Cancelar reevaluación**: descarta los cambios y el paciente sigue en espera con su color.
+- **Una vez que el paciente pasó a la lista de espera, el caso no se puede cancelar.** Si ya lo atendieron, se usa **Finalizar (atendido)**.
+
+![Cancelar un caso](img/manual/17_cancelar.png)
 
 ### Paso 3 · Sugerencia y decisión
 
 ![Paso 3: sugerencia de color](img/manual/04_sugerencia.png)
 
 1. **Color sugerido** (①), con su tiempo de referencia.
-2. **Por qué** (②): la explicación en palabras clínicas. Cada línea dice si sale de una **REGLA**, de la **GUÍA** o de la **IA**.
-   - Las reglas fijan un piso: la IA no puede sugerir un color más bajo.
+2. **Por qué** (②): la explicación en palabras clínicas. Cada línea dice de dónde sale:
+   - **HRRG**: una regla del hospital que cargó la Jefatura de Guardia (con su código, por ejemplo R-001).
+   - **REGLA**: una regla de seguridad de ejemplo del prototipo.
+   - **GUÍA**: una pregunta de la guía que confirmaste.
+   - **IA**: lo que interpretó la IA del relato.
+
+   Las reglas fijan un piso: la IA no puede sugerir un color más bajo. Las reglas del hospital que intervinieron quedan guardadas junto con tu decisión.
 3. **Pasaría a [color siguiente] si se cumple alguno:** son las preguntas de la guía que podrían subir la prioridad.
    - Respondé **Sí** o **No**. El color se recalcula al instante y la respuesta queda registrada.
    - Las que dicen *"se evalúa con lo medido"* salen solas de los signos vitales.
@@ -265,12 +296,51 @@ Tocá **Historial de casos**. El título cambia y la lista de espera se oculta. 
 
 ---
 
-## 8. Administración de usuarios
+## 8. Reglas del hospital (Jefatura de Guardia)
+
+El sistema está pensado para usar **las reglas del propio hospital**. Las carga la **Jefatura de Guardia** (perfil *Jefatura de Guardia*) en la pantalla **Reglas del hospital**. Auditoría las puede ver, en solo lectura, desde el enlace *Reglas del hospital* del encabezado.
+
+![Reglas del hospital](img/manual/15_reglas.png)
+
+**Cómo funciona una regla:**
+- Dice: *si se cumplen estas condiciones, la sugerencia no puede ser de un color menor que este*. Por ejemplo: *si SpO₂ < 94 % y tiene antecedente respiratorio → como mínimo NARANJA*.
+- Un dato que **no se midió nunca cumple** una condición: la regla no adivina.
+- Las reglas activas intervienen **desde el próximo paciente**, sin reiniciar nada.
+- La decisión final sigue siendo del profesional, que puede modificar el color con un motivo.
+
+**Crear una regla:**
+1. Tocá **Nueva regla**.
+2. Escribí un **nombre corto** y elegí el **color mínimo**.
+3. Agregá las **condiciones** (hasta 8): el dato (signos vitales, conciencia, dolor, edad, sexo, categoría del motivo, banderas rojas o antecedentes), la comparación y el valor.
+   - Con más de una condición, elegí si se tienen que cumplir **todas** o alcanza con **alguna**.
+4. Escribí la **explicación para el profesional**: es lo que va a leer en el «Por qué».
+5. Debajo se lee la regla en una frase. En **Probar con un caso de ejemplo** cargá valores y fijate si la regla se cumple.
+6. Tocá **Guardar como borrador**. Un borrador **todavía no interviene**.
+
+![Crear o editar una regla](img/manual/16_regla_editor.png)
+
+**Estados de una regla:**
+
+| Estado | Qué significa | Qué se puede hacer |
+|---|---|---|
+| **Borrador** | Está guardada pero no interviene | Editar, **Activar**, Eliminar (si nunca estuvo activa) |
+| **Activa** | Interviene en la sugerencia | Editar (vuelve a borrador), **Desactivar** |
+| **Inactiva** | Ya no interviene; se conserva para el registro | Editar, **Activar** |
+
+- **Activar**, **Desactivar** y **Eliminar** piden un segundo toque para confirmar.
+- **Editar una regla activa la vuelve a borrador** y sube su versión (v1, v2…). Hay que activarla de nuevo.
+- **Ver historial** muestra quién la creó, editó, activó o desactivó, y cuándo.
+
+**Reglas de ejemplo del prototipo:** el equipo dejó unas reglas de seguridad de ejemplo (no son del HRRG). Cuando las reglas del hospital estén completas, la Jefatura las puede apagar con **Desactivar reglas de ejemplo**. Así la sugerencia usa solo las reglas del hospital y la IA.
+
+---
+
+## 9. Administración de usuarios
 
 ![Gestión de accesos](img/manual/12_admin.png)
 
 - **Contadores de arriba:** usuarios, contraseñas vencidas, cuentas bloqueadas y cambios pendientes.
-- **Nuevo usuario:** nombre del profesional, usuario y perfil.
+- **Nuevo usuario:** nombre del profesional, usuario y perfil. Los perfiles son Enfermería, Médico/a, Auditoría, **Jefatura de Guardia** (administra las reglas del hospital) y Administración.
 - **Buscar, Rol y Estado:** filtran la lista de cuentas.
 - **Gestionar** una cuenta:
   - **Desbloquear cuenta**, si se pasó de los 5 intentos.
@@ -282,7 +352,7 @@ Tocá **Historial de casos**. El título cambia y la lista de espera se oculta. 
 
 ---
 
-## 9. Colores y tiempos de referencia
+## 10. Colores y tiempos de referencia
 
 > Son **tiempos de ejemplo**: no son los oficiales del HRRG.
 
@@ -296,7 +366,7 @@ Tocá **Historial de casos**. El título cambia y la lista de espera se oculta. 
 
 ---
 
-## 10. Problemas frecuentes
+## 11. Problemas frecuentes
 
 | Qué pasa | Qué hacer |
 |---|---|
@@ -310,7 +380,9 @@ Tocá **Historial de casos**. El título cambia y la lista de espera se oculta. 
 | El celular no abre `sala.html` | La PC y el celular tienen que estar en la misma red Wi-Fi, y la red tiene que permitir que los equipos se vean entre sí. Las redes de invitados suelen bloquearlo: consultá con informática. |
 | La pantalla de la sala dice "Sin conexión con el servidor" | Se cortó la red o se cerró el servidor. Mientras tanto se muestran los últimos datos; cuando vuelve la conexión, se actualiza sola. |
 | La pantalla se ve vieja o rara | Apretá **Ctrl+F5** en el navegador. |
-| Me sacó al inicio de sesión | La sesión venció. Volvé a ingresar. |
+| Me sacó al inicio de sesión | Si dice *"La sesión se cerró por inactividad"*, pasaron 15 minutos sin uso. Volvé a ingresar. |
+| No me deja cancelar un caso | El caso ya pasó a la lista de espera o ya tiene una decisión registrada. Desde ahí no se puede anular. |
+| Activé una regla y no cambió la sugerencia | La regla se aplica desde el **próximo** "Pedir sugerencia". Revisá que esté **Activa** (no en borrador) y que el caso tenga cargados todos los datos de sus condiciones. |
 
 ---
 

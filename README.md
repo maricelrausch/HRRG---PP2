@@ -91,6 +91,7 @@ En el box de triage de la Guardia Central, enfermería escucha el motivo de cons
 | **Enfermería** | Cargar casos, ver sugerencias, decidir y reevaluar | Gestionar cuentas |
 | **Médico** | Lo mismo que enfermería | Gestionar cuentas |
 | **Auditor** | Consultar historial, DNI y exportar (pide su contraseña) | Modificar datos |
+| **Jefatura de Guardia** | Cargar, probar, activar y desactivar las reglas del hospital (`reglas.html`) | Atender pacientes |
 | **Administrador** | Gestionar cuentas y contraseñas | Atender pacientes |
 
 ---

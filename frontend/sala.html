@@ -150,8 +150,10 @@ document.getElementById('resumen').addEventListener('click', e => {
 /* Normaliza las dos fuentes al mismo formato: {codigo, color, seg, motivo, dni}. */
 async function cargar() {
   try {
+    /* [Barby 28/10] X-HRRG-Auto: la recarga automática no cuenta como actividad, así la sesión del
+       personal se cierra igual tras 15 min sin uso (después pide volver a iniciar sesión). */
     const r = await fetch(PERSONAL ? '/api/demo/espera?limite=100' : '/api/sala/espera',
-                          {cache:'no-store', credentials:'same-origin'});
+                          {cache:'no-store', credentials:'same-origin', headers:{'X-HRRG-Auto':'1'}});
     if (PERSONAL && r.status === 401) { error = 'sesion'; return pintar(); }
     if (PERSONAL && r.status === 403) { error = 'permiso'; return pintar(); }
     if (!r.ok) throw new Error(r.status);

@@ -12,7 +12,7 @@
     $('pwErr').hidden = false;
   }
 
-  const destino = (u) => (u.rol === 'admin' ? 'admin.html' : 'formulario.html');
+  const destino = (u) => (u.rol === 'admin' ? 'admin.html' : u.rol === 'jefatura' ? 'reglas.html' : 'formulario.html');
 
   (async function iniciar() {
     if (!api.MODO_REAL) { location.href = 'index.html'; return; }
