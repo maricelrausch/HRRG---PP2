@@ -174,7 +174,7 @@ async function cargar() {
       ? d.episodios.filter(e => COLORES[e.color_final]).map(e => ({
           codigo: e.codigo_episodio, color: e.color_final,
           seg: Math.max(0, (ahoraSrv - Date.parse(e.en_espera_desde)) / 1000),
-          motivo: e.motivo_categoria, dni: e.dni }))
+          motivo: e.motivo_categoria, dni: e.dni, cond: e.condicion_especial }))   // [D4] solo personal
           .sort((a,b) => (ORDEN.indexOf(a.color)+1||9) - (ORDEN.indexOf(b.color)+1||9) || b.seg - a.seg)
       : d.episodios.filter(e => COLORES[e.color]).map(e => ({codigo: e.codigo, color: e.color, seg: e.espera_seg}));
     recibido = Date.now(); error = null;
@@ -211,7 +211,7 @@ function pintar() {
     const vencido = p.color !== 'ROJO' && min > C.obj;
     const chip = '<span class="cc" style="background:var('+C.v+');color:'+C.t+'">'+p.color+'</span>';
     const obj = p.color === 'ROJO' ? 'atención inmediata' : 'máx. ' + fmtMin(C.obj);
-    const det = PERSONAL ? [dniOculto(p.dni), p.motivo].filter(Boolean).map(esc).join(' · ') : '';
+    const det = PERSONAL ? [dniOculto(p.dni), p.motivo, p.cond && 'Condición: ' + p.cond].filter(Boolean).map(esc).join(' · ') : '';
     const esAbierto = PERSONAL && abierto === p.codigo;
     return '<div class="card'+(vencido?' vencido':'')+'" style="--c:var('+C.v+')"'+(PERSONAL ? ' data-cod="'+esc(p.codigo)+'"' : '')+'>'
       + '<span class="pos">'+(i+1)+'</span>'

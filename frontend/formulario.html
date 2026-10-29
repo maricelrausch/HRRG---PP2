@@ -54,6 +54,9 @@
         <div class="ident-pac">
           <label class="label" for="dni">DNI</label>
           <input id="dni" inputmode="numeric" autocomplete="off" placeholder="Ej. 30.123.456" maxlength="11">
+          <!-- [Dario 29/10 · D4] Condición especial del episodio (mail de Navoni, punto 5): aparte del color clínico. -->
+          <label class="label" for="condEsp">Condición especial <span class="opt">Policial, judicial, custodia… No cambia el color y no se envía a la IA.</span></label>
+          <select id="condEsp"><option value="">Ninguna</option></select>
         </div>
         <!-- Textos del ingreso simplificados (pedido 22/10): el aviso de caso ficticio va al lado del título. -->
         <label class="label" for="caso">Descripción del evento. <span class="n">1</span> <span class="opt">Caso ficticio: sin nombre, DNI, domicilio ni teléfono en el relato.</span></label>

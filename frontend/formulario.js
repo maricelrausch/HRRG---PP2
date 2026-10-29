@@ -450,8 +450,15 @@ function valoresMedidos(){
 const CAMPOS_INGRESO=['edad','sexo','motivo_categoria','tiempo_evolucion_valor','tiempo_evolucion_unidad','motivo_consulta',
   'dolor_localizacion','sintomas_asociados','dolor_caracteristicas','br_sangrado','br_convulsion','br_disnea','br_trauma',
   'ant_diabetes','ant_cardio','ant_resp','ant_anticoag','ant_inmuno','ant_embarazo','ant_medicacion','alergias','antecedentes_otros'];
+/* [Dario 29/10 · D4] Condición especial del episodio. Vive en st.condicion (NO en st.rev): así no va a la IA,
+   ni a las reglas, ni cambia el color. Se guarda con los datos de ingreso y se ve en En espera y en la API. */
+const CONDICIONES=['Policial','Judicial','Custodia policial','Violencia','Accidente laboral','Salud mental','Otra'];
+st.condicion=null;
+CONDICIONES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;$('#condEsp').appendChild(o)});
+$('#condEsp').addEventListener('change',e=>{st.condicion=e.target.value||null});
 function datosIngreso(){
   const d={};
+  if(st.condicion)d.condicion_especial=st.condicion;
   CAMPOS_INGRESO.forEach(k=>{const f=byK(k);if(!f)return;const v=st.rev[k];
     if(f.t==='chk'){d[k]=v===true;return}
     if(v==null||String(v).trim()==='')return;
@@ -545,6 +552,7 @@ function summaryRows(){
   return [
     ['Episodio',st.ep,''],
     ['Paciente (DNI)',st.dni?fmtDni(st.dni):'Sin identificar',''],
+    ['Condición especial',st.condicion||'Ninguna',''],
     ['Edad / sexo',[v('edad')?r.edad+' años':null,v('sexo')].filter(Boolean).join(' · ')||null,fx('edad','sexo')],
     ['Motivo',(v('motivo_categoria')||'')+(v('motivo_consulta')?' · '+r.motivo_consulta:''),fx('motivo_categoria','motivo_consulta')],
     ['Síntomas referidos',v('sintomas_asociados')||'No refiere',fx('sintomas_asociados')],
@@ -625,7 +633,7 @@ function nuevoCaso(){
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
   cerrarCancelar();$('#cancelOk').hidden=true;
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
-  st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');
+  st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');st.condicion=null;$('#condEsp').value='';
   F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')}
 /* ===== Cancelar caso (pedido 28/10) =====
    En Ingreso y Medición, antes de que el caso pase a la lista de espera:

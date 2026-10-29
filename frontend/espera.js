@@ -201,8 +201,8 @@ if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
   if(lv==null)return;
   let w=WAIT.find(x=>x.ep===st.ep);
-  if(w){w.dni=st.dni;w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
-  else WAIT.push({ep:st.ep,dni:st.dni,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
+  if(w){w.dni=st.dni;w.cond=st.condicion;w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
+  else WAIT.push({ep:st.ep,dni:st.dni,cond:st.condicion,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
   w=WAIT.find(x=>x.ep===st.ep);w.base=Date.now();w.extra=0;
   ponerEnEspera(w);guardarDecision(w,decisionActual(lv));
   st.cerrado=true;document.querySelectorAll('#s-resumen [data-go="revision"]').forEach(b=>b.hidden=true); /* [Dario 29/10] decisión registrada: el caso ya no se edita desde Ingreso/Medición */
@@ -248,6 +248,7 @@ async function cargarEspera(){
     w.desde=s.en_espera_desde;w.version=s.version;w.quien=s.profesional_estado;
     /* Desde 23/10 el servidor devuelve el motivo del último ingreso y, a enfermería y médicos, el DNI. */
     if(s.motivo_categoria&&(w.remoto||!w.mot||w.mot==='—'))w.mot=s.motivo_categoria;
+    if('condicion_especial' in s)w.cond=s.condicion_especial||null;   /* [D4] aparte del color */
     if(s.dni&&!w.dni){w.dni=s.dni;DNI_PAC[s.dni]=s.codigo_paciente}
     /* El color guardado en el servidor manda (lo ven todas las compus). */
     if(s.color_final){const i=LEVELS.findIndex(L=>L[0]===s.color_final);if(i>-1)w.lv=i;
@@ -310,7 +311,7 @@ function renderWait(){
   $('#verCasos').hidden=!(ro&&TriageAPI.MODO_REAL);
   $('#wList').innerHTML=(rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual'+(w.escMot?': '+esc(w.escMot):' · deterioro en espera')+'</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>'+(TriageAPI.MODO_REAL&&w.srv&&w.srv.ep?'<button type="button" class="btn sm" data-hist="'+esc(w.ep)+'">'+(HIST_ABIERTO.has(w.ep)?'Ocultar historial':'Ver historial')+'</button>':''):(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button>'+(escPending===w.ep?'':'<button type="button" class="btn sm esc" data-esc="'+esc(w.ep)+'">Escalar a ROJO</button>'):'<span class="hint">Atención inmediata</span>')+fin)+'</span>'+(!ro&&escPending===w.ep?htmlEscForm(w):'')+(ro&&HIST_ABIERTO.has(w.ep)?'<div class="histpanel note hist">'+(HIST_HTML[w.ep]||'Cargando el historial…')+'</div>':'')+'</div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.cond?'<span class="st cond" title="Condición especial (no es prioridad clínica)">'+esc(w.cond)+'</span>':'')+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual'+(w.escMot?': '+esc(w.escMot):' · deterioro en espera')+'</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>'+(TriageAPI.MODO_REAL&&w.srv&&w.srv.ep?'<button type="button" class="btn sm" data-hist="'+esc(w.ep)+'">'+(HIST_ABIERTO.has(w.ep)?'Ocultar historial':'Ver historial')+'</button>':''):(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button>'+(escPending===w.ep?'':'<button type="button" class="btn sm esc" data-esc="'+esc(w.ep)+'">Escalar a ROJO</button>'):'<span class="hint">Atención inmediata</span>')+fin)+'</span>'+(!ro&&escPending===w.ep?htmlEscForm(w):'')+(ro&&HIST_ABIERTO.has(w.ep)?'<div class="histpanel note hist">'+(HIST_HTML[w.ep]||'Cargando el historial…')+'</div>':'')+'</div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
     :!TriageAPI.MODO_REAL?'No hay pacientes en espera con ese DNI.'
     :!/^\d{7,8}$/.test(qDni)?'Escribí el DNI completo (7 u 8 dígitos) para buscarlo en el servidor.'
     :DNI_BUSQ[qDni]==='buscando'?'Buscando el DNI en el servidor…'
@@ -356,7 +357,7 @@ $('#wList').addEventListener('click',e=>{
     renderWait();return}
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]'),fi=e.target.closest('[data-fin]');
   if(fi){const ep=fi.dataset.fin;if(finPending===ep){finPending=null;const w=WAIT.find(x=>x.ep===ep);if(w)finalizar(w)}else{finPending=ep;renderWait()}return}
-  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.cerrado=false;st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
+  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.cerrado=false;st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.condicion=w.cond||null;$('#condEsp').value=st.condicion||'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
   if(es){escPending=es.dataset.esc;escForm={mot:'',det:''};renderWait();const sel=$('[data-escmot]');if(sel)sel.focus();return}

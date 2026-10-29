@@ -138,6 +138,7 @@ def cola_espera():
             "tiempo_maximo_min": objetivo[color],
             "vencido": color != "ROJO" and espera > objetivo[color],
             "motivo_categoria": ep.get("motivo_categoria"),
+            "condicion_especial": ep.get("condicion_especial"),   # [D4] aparte del color clínico
         })
 
     cola.sort(key=lambda p: (p["prioridad"], -p["espera_min"]))
@@ -194,6 +195,7 @@ def mediciones_episodio(codigo_episodio):
                 "edad": v.get("edad"), "sexo": v.get("sexo"),
                 "motivo_categoria": v.get("motivo_categoria"),
                 "motivo_consulta": v.get("motivo_consulta"),
+                "condicion_especial": v.get("condicion_especial"),   # [D4] aparte del color clínico
                 "tiempo_evolucion": ({"valor": v["tiempo_evolucion_valor"],
                                       "unidad": v.get("tiempo_evolucion_unidad")}
                                      if v.get("tiempo_evolucion_valor") is not None else None),

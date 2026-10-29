@@ -86,6 +86,9 @@ td input.bad{border:2px solid var(--err)}
 .st.none{border-style:dashed;color:var(--muted)}
 .st.fix{background:var(--accent-soft);color:var(--accent-text);border-color:transparent}
 .st.bad{color:var(--err);border-color:var(--err)}
+/* [Dario 29/10 · D4] Condición especial del episodio (no es prioridad clínica) */
+.st.cond{background:var(--panel-2);border-style:dashed}
+.ident-pac select{display:block;margin-top:4px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-size:15px}
 .restore{display:block;margin-top:4px;font-size:12px;background:none;border:0;padding:0;color:var(--accent-text);text-decoration:underline;cursor:pointer}
 .miss{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
 .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;overflow:hidden}

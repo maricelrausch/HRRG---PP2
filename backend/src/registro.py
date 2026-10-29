@@ -1,7 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime, timezone
-from src.esquemas import Mediciones, ExtraccionIA, Identificacion
+from src.esquemas import Mediciones, ExtraccionIA, Identificacion, ContextoEpisodio
 
 def conectar_registro(ruta_base):
     conexion = sqlite3.connect(ruta_base)
@@ -367,7 +367,8 @@ def registrar_extraccion_demo(
 # Datos de ingreso revisados por el profesional: edad, sexo y lo extraído del relato
 # (categoría, motivo, tiempo, localización, síntomas, banderas rojas, antecedentes).
 # NO guarda el relato completo. Se valida con los esquemas de Darío (Identificacion + ExtraccionIA).
-class _DatosIngreso(ExtraccionIA, Identificacion):
+class _DatosIngreso(ExtraccionIA, Identificacion, ContextoEpisodio):
+    # [Dario 29/10 · D4] + condición especial del episodio (policial, judicial…), aparte del color.
     pass
 
 
@@ -1145,10 +1146,10 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
 
                 # [Propuesta Barby] Motivo del último ingreso revisado (para la columna de la lista).
                 ingreso = episodio.pop("ingreso_json")
-                episodio["motivo_categoria"] = (
-                    json.loads(ingreso)["valores"].get("motivo_categoria")
-                    if ingreso else None
-                )
+                valores_ingreso = json.loads(ingreso)["valores"] if ingreso else {}
+                episodio["motivo_categoria"] = valores_ingreso.get("motivo_categoria")
+                # [D4] Condición especial (policial, judicial…): se informa aparte del color.
+                episodio["condicion_especial"] = valores_ingreso.get("condicion_especial")
 
                 # Sin decisión previa, informa ausencia de color.
                 # No inventa una clasificación ni reutiliza otra atención.
@@ -1354,6 +1355,7 @@ COLUMNAS_EXPORTACION = [
     ("sexo", "Sexo"),
     ("motivo_categoria", "Categoría"),
     ("motivo_consulta", "Motivo de consulta"),
+    ("condicion_especial", "Condición especial"),
     ("tiempo_evolucion", "Tiempo de evolución"),
     ("banderas_rojas", "Banderas rojas"),
     ("antecedentes", "Antecedentes"),
@@ -1511,6 +1513,7 @@ def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, has
                         v = datos.get("valores", {})
                         for campo in ("edad", "sexo", "motivo_categoria", "motivo_consulta"):
                             fila[campo] = v.get(campo)
+                        fila["condicion_especial"] = v.get("condicion_especial") or "Ninguna"
                         if v.get("tiempo_evolucion_valor") is not None:
                             fila["tiempo_evolucion"] = f'{v["tiempo_evolucion_valor"]:g} {v.get("tiempo_evolucion_unidad") or ""}'.strip()
                         fila["banderas_rojas"] = ", ".join(t for k, t in _BANDERAS.items() if v.get(k)) or "Ninguna"
