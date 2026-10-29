@@ -38,4 +38,14 @@ t('ordena de la más urgente a la menos urgente', () => {
 t('describir', () => {
   assert.strictEqual(M.describir({ campo: 'saturacion_o2', operador: '<=', valor: 92.5 }, { saturacion_o2: { etiqueta: 'SpO₂', unidad: '%' } }), 'SpO₂ ≤ 92,5 %');
 });
+t('origen y validación pasan al resultado sin cambiar el cálculo (Dario 29/10)', () => {
+  const base = { saturacion_o2: '85' };
+  const r = (origen, validada_por) => Object.assign(R('NARANJA', 'todas', [{ campo: 'saturacion_o2', operador: '<', valor: 90 }]), { origen, validada_por });
+  const m = M.evaluar([r('manchester', 'Enfermería')], base)[0];
+  assert.strictEqual(m.origen, 'manchester'); assert.strictEqual(m.validada_por, 'Enfermería'); assert.strictEqual(m.lv, 1);
+  // Una regla provisoria también fija piso (decisión del equipo: nos equivocamos hacia lo más urgente).
+  assert.strictEqual(M.evaluar([r('provisoria', '')], base)[0].lv, 1);
+  // Sin origen (reglas anteriores) se toma como provisoria.
+  assert.strictEqual(M.evaluar([R('NARANJA', 'todas', [{ campo: 'saturacion_o2', operador: '<', valor: 90 }])], base)[0].origen, 'provisoria');
+});
 console.log('motor_reglas: ' + n + ' pruebas OK');

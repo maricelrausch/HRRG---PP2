@@ -8,6 +8,8 @@
 (function (root) {
   'use strict';
   const NIVEL = { ROJO: 0, NARANJA: 1, AMARILLO: 2, VERDE: 3 };
+  /* [Dario 29/10] Origen de la regla (pedido de Francisco Navoni). No cambia el cálculo: las tres fijan piso. */
+  const ORIGEN = { manchester: 'Manchester', local: 'Adaptación HRRG', provisoria: 'Provisoria' };
   const OPS_NUM = {
     '<': (a, b) => a < b, '<=': (a, b) => a <= b, '>': (a, b) => a > b,
     '>=': (a, b) => a >= b, '=': (a, b) => a === b, '!=': (a, b) => a !== b
@@ -60,9 +62,10 @@
       const ok = r.combinacion === 'alguna' ? conds.some(c => cumple(c, datos)) : conds.every(c => cumple(c, datos));
       if (ok) out.push({ codigo: r.codigo, nombre: r.nombre, version: r.version, color: r.color,
         lv: NIVEL[r.color], texto: r.explicacion,
+        origen: r.origen in ORIGEN ? r.origen : 'provisoria', validada_por: r.validada_por || '',
         cumplidas: conds.filter(c => cumple(c, datos)) });
     });
     return out.sort((a, b) => a.lv - b.lv);
   }
-  root.MotorReglas = { evaluar: evaluar, cumple: cumple, describir: describir, NIVEL: NIVEL };
+  root.MotorReglas = { evaluar: evaluar, cumple: cumple, describir: describir, NIVEL: NIVEL, ORIGEN: ORIGEN };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

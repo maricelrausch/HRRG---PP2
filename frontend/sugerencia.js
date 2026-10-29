@@ -115,7 +115,7 @@ function renderCard(){
   if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
   if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. La cargó la Jefatura de Guardia.</span>';
   if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
-  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h" title="Regla del hospital '+esc(x.codigo)+' v'+x.version+'">HRRG</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
+  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h" title="Regla del hospital '+esc(x.codigo)+' v'+x.version+'">HRRG</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+' · '+esc(MotorReglas.ORIGEN[x.origen]||x.origen)+' · '+(x.validada_por?'validada por '+esc(x.validada_por):'sin validar')+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
   renderFuente();renderSubir();pintarDecision();
 }
 /* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
@@ -217,7 +217,7 @@ function textoDiscriminadores(){
 /* Reglas del hospital que intervinieron (código y versión): quedan en la decisión guardada. */
 function textoReglasHospital(){
   const H=window.MotorReglas?MotorReglas.evaluar(REGLAS_HRRG.lista,st.rev):[];
-  return H.length?'Reglas HRRG aplicadas: '+H.map(x=>x.codigo+' v'+x.version+' ('+x.color+')').join(', ')+'.':'';
+  return H.length?'Reglas HRRG aplicadas: '+H.map(x=>x.codigo+' v'+x.version+' ('+x.color+', '+x.origen+')').join(', ')+'.':'';
 }
 function decisionActual(lv){
   const d=decisionBase(lv),disc=st.manual?'':[textoDiscriminadores(),textoReglasHospital()].filter(Boolean).join(' ');

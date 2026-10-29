@@ -18,6 +18,9 @@
   ];
 
   let yo = null, soloLectura = true, CAT = {}, OPS = {}, MAX = 8;
+  /* [Dario 29/10] Origen de la regla (lo manda el servidor en /api/reglas/campos). */
+  let ORIG = [['manchester', 'Sistema Manchester'], ['local', 'Adaptación local HRRG'], ['provisoria', 'Provisoria / en revisión']];
+  const textoOrigen = (o) => (ORIG.find((x) => x[0] === o) || [o, o])[1];
   let reglas = [], usarEjemplo = true, configAct = null;
   let editor = null, pendiente = null, abiertos = new Set(), cargando = false;
 
@@ -82,7 +85,9 @@
       (h.version ? ' · v' + h.version : '') + ' · ' + esc(h.usuario) + '</li>').join('') + '</ul>' : '';
     return '<article class="rg-card ' + r.estado + '" style="--c:var(' + (COLOR_VAR[r.color] || ['--line'])[0] + ')">' +
       '<header><span class="rg-cod">' + esc(r.codigo) + '</span><b>' + esc(r.nombre) + '</b>' + chipColor(r.color, 'al menos ' + r.color) +
-      '<span class="rg-est ' + r.estado + '">' + esc(ESTADO[r.estado]) + '</span><span class="hint">v' + r.version + ' · ' + esc(r.actualizada_por) + ', ' + esc(fecha(r.actualizada_en)) + '</span></header>' +
+      '<span class="rg-est ' + r.estado + '">' + esc(ESTADO[r.estado]) + '</span>' +
+      '<span class="rg-org ' + esc(r.origen) + '">' + esc(textoOrigen(r.origen)) + ' · ' + (r.validada_por ? 'validada por ' + esc(r.validada_por) : 'sin validar') + '</span>' +
+      '<span class="hint">v' + r.version + ' · ' + esc(r.actualizada_por) + ', ' + esc(fecha(r.actualizada_en)) + '</span></header>' +
       '<div class="rg-si">' + (r.condiciones.length > 1 ? (r.combinacion === 'todas' ? 'Si se cumplen <b>todas</b> estas condiciones' : 'Si se cumple <b>alguna</b> de estas condiciones') : 'Si se cumple esta condición') + ':<ul>' + conds + '</ul></div>' +
       '<div class="rg-pq"><span class="src h">HRRG</span> <span>' + esc(r.explicacion) + '</span> <span class="hint">(así se ve en el «Por qué»)</span></div>' +
       (r.estado === 'activa' && !soloLectura ? '<div class="hint">Si la editás, vuelve a borrador y deja de intervenir hasta que la actives de nuevo.</div>' : '') +
@@ -93,8 +98,9 @@
   function condVacia() { return { campo: 'saturacion_o2', operador: '<', valor: '' }; }
   function abrirEditor(r) {
     editor = r ? { id: r.id, codigo: r.codigo, estado: r.estado, nombre: r.nombre, explicacion: r.explicacion, color: r.color, combinacion: r.combinacion,
+      origen: r.origen || 'provisoria', validada_por: r.validada_por || '',
       condiciones: r.condiciones.map((c) => ({ campo: c.campo, operador: c.operador, valor: c.valor == null ? '' : String(c.valor).replace('.', ',') })), prueba: {}, error: null }
-      : { id: null, nombre: '', explicacion: '', color: 'NARANJA', combinacion: 'todas', condiciones: [condVacia()], prueba: {}, error: null };
+      : { id: null, nombre: '', explicacion: '', color: 'NARANJA', combinacion: 'todas', origen: 'provisoria', validada_por: '', condiciones: [condVacia()], prueba: {}, error: null };
     pintarEditor();
     $('rgEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
     const i = $('edNombre'); if (i) i.focus();
@@ -116,6 +122,7 @@
   }
   function reglaDelEditor() {
     return { codigo: editor.codigo || 'nueva', nombre: editor.nombre, version: 0, color: editor.color, combinacion: editor.combinacion,
+      origen: editor.origen, validada_por: editor.validada_por,
       explicacion: editor.explicacion, condiciones: editor.condiciones.map((c) => ({ campo: c.campo, operador: c.operador, valor: (CAT[c.campo] || {}).tipo === 'bool' ? null : c.valor })) };
   }
   function frase() {
@@ -139,6 +146,8 @@
       '<div class="rg-grid"><label>Nombre corto <input id="edNombre" maxlength="80" value="' + esc(editor.nombre) + '" placeholder="Ej.: Hipoxemia"></label>' +
       '<div class="rg-colores" role="radiogroup" aria-label="Color mínimo"><span class="lbl">Color mínimo</span>' + Object.keys(COLOR_VAR).map((c) =>
         '<button type="button" class="lvl" data-col="' + c + '" aria-pressed="' + (c === editor.color) + '" style="background:var(' + COLOR_VAR[c][0] + ');color:' + COLOR_VAR[c][1] + '">' + c + '</button>').join('') + '</div></div>' +
+      '<div class="rg-grid"><label>Origen de la regla <select id="edOrigen">' + ORIG.map(([k, t]) => '<option value="' + k + '"' + (k === editor.origen ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></label>' +
+      '<label>Validada por <span class="hint">(profesional o servicio; vacío = sin validar)</span><input id="edValidada" maxlength="120" value="' + esc(editor.validada_por) + '" placeholder="Ej.: Jefatura de Enfermería de Guardia"></label></div>' +
       '<div class="rg-conds"><span class="lbl">Condiciones</span>' +
       (editor.condiciones.length > 1 ? '<div class="rg-comb"><label><input type="radio" name="edComb" value="todas"' + (editor.combinacion === 'todas' ? ' checked' : '') + '> Se tienen que cumplir <b>todas</b></label>' +
         '<label><input type="radio" name="edComb" value="alguna"' + (editor.combinacion === 'alguna' ? ' checked' : '') + '> Alcanza con que se cumpla <b>alguna</b></label></div>' : '') +
@@ -159,8 +168,9 @@
     pintarPrueba();
   }
   async function guardar() {
-    editor.nombre = $('edNombre').value; editor.explicacion = $('edExpl').value;
-    const r = reglaDelEditor(), cuerpo = { nombre: r.nombre, explicacion: r.explicacion, color: r.color, combinacion: r.combinacion, condiciones: r.condiciones };
+    sincronizarTextos();
+    const r = reglaDelEditor(), cuerpo = { nombre: r.nombre, explicacion: r.explicacion, color: r.color, combinacion: r.combinacion, condiciones: r.condiciones,
+      origen: r.origen, validada_por: r.validada_por };
     if (cuerpo.condiciones.length === 1) cuerpo.combinacion = 'todas';
     const btn = $('edGuardar'); btn.disabled = true; btn.textContent = 'Guardando…';
     const res = await llamar(editor.id ? '/api/reglas/' + editor.id : '/api/reglas', cuerpo);
@@ -178,7 +188,11 @@
     if (t.dataset.cq !== undefined) { sincronizarTextos(); editor.condiciones.splice(+t.dataset.cq, 1); return pintarEditor(); }
     const col = t.closest('[data-col]'); if (col) { sincronizarTextos(); editor.color = col.dataset.col; return pintarEditor(); }
   });
-  function sincronizarTextos() { const n = $('edNombre'), x = $('edExpl'); if (n) editor.nombre = n.value; if (x) editor.explicacion = x.value; }
+  function sincronizarTextos() {
+    const n = $('edNombre'), x = $('edExpl'), o = $('edOrigen'), v = $('edValidada');
+    if (n) editor.nombre = n.value; if (x) editor.explicacion = x.value;
+    if (o) editor.origen = o.value; if (v) editor.validada_por = v.value;
+  }
   $('rgEditor').addEventListener('change', (e) => {
     const t = e.target;
     if (t.name === 'edComb') { sincronizarTextos(); editor.combinacion = t.value; return pintarEditor(); }
@@ -235,6 +249,7 @@
     const c = await llamar('/api/reglas/campos');
     if (!c.ok) { error(c.datos.mensaje || 'No se pudo leer el catálogo de datos.'); return; }
     CAT = c.datos.campos; OPS = c.datos.operadores; MAX = c.datos.max_condiciones || 8;
+    if (Array.isArray(c.datos.origenes) && c.datos.origenes.length) ORIG = c.datos.origenes;
     await cargar();
   })();
 })();

@@ -24,9 +24,11 @@ Rutas:
     POST /api/reglas/config            {"usar_ejemplo": bool} (jefatura)
 """
 import json
+import shutil
 import sqlite3
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 from flask import Blueprint, current_app, g, jsonify, request, session
 
@@ -39,6 +41,17 @@ logger = logging.getLogger("hrrg.sistema")
 COLORES = ("ROJO", "NARANJA", "AMARILLO", "VERDE")
 COMBINACIONES = ("todas", "alguna")
 MAX_CONDICIONES = 8
+
+# [Dario 29/10 · pedido de Francisco Navoni] Origen de cada regla. Las tres siguen fijando un piso
+# (el color nunca baja de lo que dicen); el origen se muestra en la pantalla y en el «Por qué»
+# para que el profesional sepa de dónde sale cada criterio y si ya está validado.
+ORIGENES = {
+    "manchester": "Sistema Manchester",
+    "local": "Adaptación local HRRG",
+    "provisoria": "Provisoria / en revisión",
+}
+ORIGEN_POR_DEFECTO = "provisoria"
+MAX_VALIDADA_POR = 120
 
 # Datos que puede usar una regla (mismos nombres que la pantalla de Medición).
 # El DNI y el relato NO están: una regla no puede depender de datos identificatorios.
@@ -137,6 +150,39 @@ def inicializar_reglas(ruta_base):
             """)
     finally:
         conexion.close()
+    _migrar_origen(ruta_base)
+
+
+def _migrar_origen(ruta_base):
+    """[Dario 29/10] Agrega las columnas origen y validada_por a una base que no las tiene.
+    Solo AGREGA columnas (no borra ni cambia reglas). Las reglas que ya existían quedan como
+    «provisoria» y sin validar. Si había reglas, antes se guarda una copia de la base
+    (reglas_hospital.db.antes-origen.bak) para poder volver atrás."""
+    conexion = sqlite3.connect(ruta_base)
+    try:
+        columnas = {fila[1] for fila in conexion.execute("PRAGMA table_info(reglas)")}
+        faltan = [c for c in ("origen", "validada_por") if c not in columnas]
+        if not faltan:
+            return
+        hay_reglas = conexion.execute("SELECT COUNT(*) FROM reglas").fetchone()[0] > 0
+    finally:
+        conexion.close()
+    if hay_reglas:
+        copia = Path(str(ruta_base) + ".antes-origen.bak")
+        if not copia.exists():
+            shutil.copy2(ruta_base, copia)
+            logger.info("REGLAS_BACKUP_ANTES_DE_MIGRAR | %s", copia.name)
+    conexion = sqlite3.connect(ruta_base)
+    try:
+        with conexion:
+            if "origen" in faltan:
+                conexion.execute(
+                    f"ALTER TABLE reglas ADD COLUMN origen TEXT NOT NULL DEFAULT '{ORIGEN_POR_DEFECTO}'")
+            if "validada_por" in faltan:
+                conexion.execute("ALTER TABLE reglas ADD COLUMN validada_por TEXT NOT NULL DEFAULT ''")
+    finally:
+        conexion.close()
+    logger.info("REGLAS_MIGRADAS | columnas agregadas: %s", ", ".join(faltan))
 
 
 def _usar_ejemplo(conexion):
@@ -161,6 +207,8 @@ def _a_dict(fila, eventos=None):
         "color": fila["color"],
         "combinacion": fila["combinacion"],
         "condiciones": json.loads(fila["condiciones_json"]),
+        "origen": fila["origen"],
+        "validada_por": fila["validada_por"],
         "estado": fila["estado"],
         "version": fila["version"],
         "fue_activada": bool(fila["fue_activada"]),
@@ -192,7 +240,7 @@ def validar_regla(datos):
     """Devuelve (regla_normalizada, None) o (None, mensaje_de_error)."""
     if not isinstance(datos, dict):
         return None, "Enviá los datos de la regla."
-    permitidos = {"nombre", "explicacion", "color", "combinacion", "condiciones"}
+    permitidos = {"nombre", "explicacion", "color", "combinacion", "condiciones", "origen", "validada_por"}
     if set(datos) - permitidos:
         return None, "Hay campos que no corresponden a una regla."
 
@@ -206,6 +254,15 @@ def validar_regla(datos):
         return None, "Elegí el color: ROJO, NARANJA, AMARILLO o VERDE."
     if datos.get("combinacion") not in COMBINACIONES:
         return None, "Elegí si se tienen que cumplir todas las condiciones o alguna."
+    # Si no se manda el origen (versiones anteriores de la pantalla), queda como provisoria.
+    origen = datos.get("origen", ORIGEN_POR_DEFECTO)
+    if origen not in ORIGENES:
+        return None, "Elegí el origen de la regla: Manchester, adaptación local HRRG o provisoria."
+    validada_por = datos.get("validada_por", "")
+    if validada_por is None:
+        validada_por = ""
+    if not isinstance(validada_por, str) or len(validada_por.strip()) > MAX_VALIDADA_POR:
+        return None, f"«Validada por» admite hasta {MAX_VALIDADA_POR} caracteres."
 
     condiciones = datos.get("condiciones")
     if not isinstance(condiciones, list) or not 1 <= len(condiciones) <= MAX_CONDICIONES:
@@ -245,6 +302,8 @@ def validar_regla(datos):
         "color": datos["color"],
         "combinacion": datos["combinacion"],
         "condiciones": limpias,
+        "origen": origen,
+        "validada_por": validada_por.strip(),
     }, None
 
 
@@ -307,7 +366,8 @@ def exigir_sesion():
 def campos():
     # Los operadores van como lista de pares para conservar el orden (jsonify ordena las claves).
     operadores = {tipo: [[k, t] for k, t in ops.items()] for tipo, ops in OPERADORES.items()}
-    return _ok(campos=CAMPOS, operadores=operadores, colores=list(COLORES), max_condiciones=MAX_CONDICIONES)
+    return _ok(campos=CAMPOS, operadores=operadores, colores=list(COLORES), max_condiciones=MAX_CONDICIONES,
+               origenes=[[k, t] for k, t in ORIGENES.items()])
 
 
 @bp.get("/api/reglas/activas")
@@ -357,11 +417,12 @@ def crear():
     try:
         with conexion:
             cursor = conexion.execute(
-                """INSERT INTO reglas (nombre, explicacion, color, combinacion, condiciones_json, estado,
-                       version, creada_por, creada_en, actualizada_por, actualizada_en)
-                   VALUES (?, ?, ?, ?, ?, 'borrador', 1, ?, ?, ?, ?)""",
+                """INSERT INTO reglas (nombre, explicacion, color, combinacion, condiciones_json, origen,
+                       validada_por, estado, version, creada_por, creada_en, actualizada_por, actualizada_en)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', 1, ?, ?, ?, ?)""",
                 (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
-                 json.dumps(regla["condiciones"], ensure_ascii=False), usuario, ahora, usuario, ahora)
+                 json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"], regla["validada_por"],
+                 usuario, ahora, usuario, ahora)
             )
             regla_id = cursor.lastrowid
             conexion.execute("UPDATE reglas SET codigo = ? WHERE id = ?", (f"R-{regla_id:03d}", regla_id))
@@ -391,10 +452,11 @@ def editar(regla_id):
             version = fila["version"] + 1
             conexion.execute(
                 """UPDATE reglas SET nombre = ?, explicacion = ?, color = ?, combinacion = ?, condiciones_json = ?,
-                       estado = 'borrador', version = ?, actualizada_por = ?, actualizada_en = ? WHERE id = ?""",
+                       origen = ?, validada_por = ?, estado = 'borrador', version = ?, actualizada_por = ?,
+                       actualizada_en = ? WHERE id = ?""",
                 (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
-                 json.dumps(regla["condiciones"], ensure_ascii=False), version,
-                 g.profesional["usuario"], _ahora(), regla_id)
+                 json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"], regla["validada_por"],
+                 version, g.profesional["usuario"], _ahora(), regla_id)
             )
             accion = "EDITADA (pasó a borrador)" if fila["estado"] == "activa" else "EDITADA"
             _evento(conexion, regla_id, accion, version, regla)

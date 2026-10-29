@@ -476,6 +476,11 @@ html.cargando,html.cargando *{cursor:progress}
 .rg-est{font-family:var(--f-mono);font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
 .rg-est.activa{background:var(--m-verde);color:#fff;border-color:transparent}
 .rg-est.borrador{background:var(--panel-2)}
+/* [Dario 29/10] Origen de la regla: Manchester / adaptación local HRRG / provisoria */
+.rg-org{font-family:var(--f-mono);font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.rg-org.manchester{background:#0B5CAD;color:#fff;border-color:transparent}
+.rg-org.local{background:var(--panel-2)}
+.rg-org.provisoria{border-style:dashed}
 .rg-si{font-size:14px}.rg-si ul{margin:4px 0 0;padding-left:20px}
 .rg-pq{font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
 .rg-card footer{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
