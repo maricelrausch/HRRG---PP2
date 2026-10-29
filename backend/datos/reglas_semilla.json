@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "aviso": "Reglas de seguridad de EJEMPLO del prototipo, pasadas del código (frontend/sugerencia.js, reglas()) a la base para que la Jefatura de Guardia las pueda revisar, editar o desactivar. Los umbrales son PROVISORIOS: hay que validarlos con Enfermería y Guardia del HRRG (mail de Francisco Navoni, 29/10/2026). Se cargan UNA sola vez, al primer arranque; después se administran desde reglas.html.",
+  "reglas": [
+    {
+      "nombre": "Convulsión activa",
+      "explicacion": "Convulsión activa: compromiso neurológico agudo",
+      "color": "ROJO", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "br_convulsion", "operador": "si", "valor": null}]
+    },
+    {
+      "nombre": "Glasgow muy bajo",
+      "explicacion": "Glasgow 8 o menos: conciencia muy deprimida, riesgo para la vía aérea",
+      "color": "ROJO", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "glasgow", "operador": "<=", "valor": 8}]
+    },
+    {
+      "nombre": "Alteración de la conciencia",
+      "explicacion": "Alteración del nivel de conciencia (no está alerta o Glasgow menor a 15): posible compromiso neurológico",
+      "color": "NARANJA", "combinacion": "alguna", "origen": "manchester",
+      "condiciones": [
+        {"campo": "estado_conciencia", "operador": "no_es", "valor": "Alerta"},
+        {"campo": "glasgow", "operador": "<", "valor": 15}
+      ]
+    },
+    {
+      "nombre": "Compromiso respiratorio",
+      "explicacion": "SpO₂ menor a 90 %, frecuencia respiratoria alterada o dificultad para respirar: posible compromiso respiratorio",
+      "color": "NARANJA", "combinacion": "alguna", "origen": "manchester",
+      "condiciones": [
+        {"campo": "saturacion_o2", "operador": "<", "valor": 90},
+        {"campo": "frecuencia_respiratoria", "operador": ">", "valor": 30},
+        {"campo": "frecuencia_respiratoria", "operador": "<", "valor": 8},
+        {"campo": "br_disnea", "operador": "si", "valor": null}
+      ]
+    },
+    {
+      "nombre": "Sangrado con hipotensión",
+      "explicacion": "Sangrado con hipotensión (TA sistólica menor a 90): posible shock por pérdida de sangre",
+      "color": "ROJO", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [
+        {"campo": "br_sangrado", "operador": "si", "valor": null},
+        {"campo": "ta_sistolica", "operador": "<", "valor": 90}
+      ]
+    },
+    {
+      "nombre": "Sangrado evidente",
+      "explicacion": "Sangrado evidente: riesgo de pérdida de volumen",
+      "color": "NARANJA", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "br_sangrado", "operador": "si", "valor": null}]
+    },
+    {
+      "nombre": "Compromiso circulatorio",
+      "explicacion": "Hipotensión (TA sistólica menor a 90) o frecuencia cardíaca mayor a 130 o menor a 40: posible compromiso circulatorio",
+      "color": "NARANJA", "combinacion": "alguna", "origen": "manchester",
+      "condiciones": [
+        {"campo": "ta_sistolica", "operador": "<", "valor": 90},
+        {"campo": "frecuencia_cardiaca", "operador": ">", "valor": 130},
+        {"campo": "frecuencia_cardiaca", "operador": "<", "valor": 40}
+      ]
+    },
+    {
+      "nombre": "Fiebre en inmunosuprimido",
+      "explicacion": "Fiebre (38 °C o más) en paciente inmunosuprimido: riesgo de infección grave",
+      "color": "NARANJA", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [
+        {"campo": "ant_inmuno", "operador": "si", "valor": null},
+        {"campo": "temperatura", "operador": ">=", "valor": 38}
+      ]
+    },
+    {
+      "nombre": "Dolor intenso",
+      "explicacion": "Dolor intenso (8 o más sobre 10)",
+      "color": "NARANJA", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "dolor_intensidad", "operador": ">=", "valor": 8}]
+    }
+  ]
+}

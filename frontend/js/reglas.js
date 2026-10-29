@@ -53,12 +53,14 @@
     const n = (e) => reglas.filter((r) => r.estado === e).length;
     $('rgResumen').innerHTML = '<div><span>Activas</span><b>' + n('activa') + '</b></div><div><span>Borradores</span><b>' + n('borrador') +
       '</b></div><div><span>Inactivas</span><b>' + n('inactiva') + '</b></div>';
-    $('rgEjemplo').innerHTML = '<div><b>Reglas de ejemplo del prototipo: ' + (usarEjemplo ? 'activas' : 'desactivadas') + '.</b> ' +
-      (usarEjemplo ? 'Además de las reglas del hospital, la sugerencia usa las reglas de seguridad de ejemplo que armó el equipo (no son del HRRG). Cuando las reglas del hospital estén completas, se pueden desactivar.'
-        : 'La sugerencia usa solo las reglas del hospital y la IA.') +
+    /* [Dario 29/10 · Etapa B] Las reglas de ejemplo ahora están cargadas en esta lista (origen Manchester, sin validar).
+       El interruptor queda como respaldo: enciende la copia vieja escrita en el código (sugerencia.js). */
+    $('rgEjemplo').innerHTML = '<div><b>Copia de respaldo de las reglas de ejemplo (en el código): ' + (usarEjemplo ? 'encendida' : 'apagada') + '.</b> ' +
+      (usarEjemplo ? 'Además de las reglas de esta lista, la sugerencia usa la copia de las reglas de ejemplo escrita en el código. Como esas reglas ya están cargadas en la lista (origen «Sistema Manchester», sin validar), conviene apagarla.'
+        : 'La sugerencia usa solo las reglas de esta lista y la IA. Las reglas de ejemplo del prototipo están en la lista como «Sistema Manchester · sin validar»: revisalas con Enfermería y Guardia.') +
       (configAct ? ' <span class="hint">Último cambio: ' + esc(configAct.por) + ', ' + esc(fecha(configAct.en)) + '.</span>' : '') + '</div>' +
       (soloLectura ? '' : '<button type="button" class="btn" data-ejemplo="' + (usarEjemplo ? '0' : '1') + '">' +
-        (pendiente === 'ejemplo' ? 'Confirmar: ' + (usarEjemplo ? 'desactivar' : 'activar') : (usarEjemplo ? 'Desactivar reglas de ejemplo' : 'Activar reglas de ejemplo')) + '</button>');
+        (pendiente === 'ejemplo' ? 'Confirmar: ' + (usarEjemplo ? 'apagar' : 'encender') : (usarEjemplo ? 'Apagar copia de respaldo' : 'Encender copia de respaldo')) + '</button>');
 
     if (!reglas.length) {
       $('rgLista').innerHTML = '<div class="rg-vacio">Todavía no hay reglas del hospital.' + (soloLectura ? '' : ' Tocá <b>Nueva regla</b> para cargar la primera.') + '</div>';

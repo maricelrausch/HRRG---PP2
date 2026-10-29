@@ -26,6 +26,9 @@ const PAGE={'Dolor abdominal':'[pág. —]','Dolor torácico':'[pág. —]','_':
 const diag=()=>DISC[st.rev.motivo_categoria]?st.rev.motivo_categoria:'_';
 const diagName=()=>diag()==='_'?'Malestar en adulto (general)':diag();
 /* Reglas de seguridad PROVISORIAS (ejemplo para el prototipo; umbrales a aprobar por Guardia y Enfermería del HRRG) */
+/* [Dario 29/10 · Etapa B] COPIA DE RESPALDO. Estas mismas reglas ahora están en la base (backend/datos/reglas_semilla.json,
+   se cargan solas al primer arranque) y se administran en reglas.html. Esta función solo interviene si la Jefatura
+   enciende la "copia de respaldo". NO cambiar umbrales acá: tests/semilla_equivalencia.test.js compara las dos. */
 /* Explicación clínica comprensible (pedido del documento del proyecto): en vez de listar valores sueltos,
    agrupa los que van juntos en una frase que dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso
    respiratorio"). Los umbrales y niveles son los mismos de antes: solo cambia cómo se explica. */
@@ -113,7 +116,7 @@ function renderCard(){
     :(c.R.length?'<b>Simulación con reglas de ejemplo.</b><span class="old">Coincide o supera las reglas de seguridad.</span>':'<b>Simulación con reglas de ejemplo.</b><span class="old">Reglas de seguridad: sin alertas.</span>');
   if(!REGLAS_HRRG.usarEjemplo&&c.rl===9&&!(c.hl<c.M.lv))$('#tcOrigin').innerHTML='<b>Simulación con las reglas del hospital.</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+' Las reglas de ejemplo están desactivadas.</span>';
   if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
-  if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. La cargó la Jefatura de Guardia.</span>';
+  if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Se administra en la pantalla de reglas (Jefatura de Guardia).</span>';
   if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
   $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h" title="Regla del hospital '+esc(x.codigo)+' v'+x.version+'">HRRG</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+' · '+esc(MotorReglas.ORIGEN[x.origen]||x.origen)+' · '+(x.validada_por?'validada por '+esc(x.validada_por):'sin validar')+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
   renderFuente();renderSubir();pintarDecision();

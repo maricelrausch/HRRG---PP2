@@ -1,48 +1,83 @@
-"""backend/evaluacion/reglas_seguridad.py · Copia en Python de reglas() de frontend/sugerencia.js.
+"""backend/evaluacion/reglas_seguridad.py · Piso de seguridad para la evaluación sin navegador.
 
-Sirve para evaluar el COLOR FINAL que ve enfermería (piso de seguridad + sugerencia de MedGemma)
-sin abrir el navegador. Mismos umbrales PROVISORIOS que el JS: si se cambian allá, cambiarlos acá
-(tests/test_metricas.py tiene casos que avisan si se desalinean).
+[Dario 29/10 · Etapa B] Antes este archivo tenía los umbrales escritos a mano (copia de reglas() de
+frontend/sugerencia.js). Ahora lee las MISMAS reglas que se cargan en la base
+(backend/datos/reglas_semilla.json) y las evalúa igual que frontend/js/motor_reglas.js:
+  - "todas" / "alguna" de las condiciones;
+  - un dato que falta NUNCA cumple una condición;
+  - la PAM se calcula con la TA si no viene cargada.
+Así no hay umbrales repetidos en el código. tests/test_reglas_semilla.py comprueba que da los mismos
+colores que la versión anterior.
 
-Nivel: 0 = ROJO, 1 = NARANJA, 2 = AMARILLO, 3 = VERDE, 4 = AZUL. None = ninguna regla se activó.
+Nivel: 0 = ROJO, 1 = NARANJA, 2 = AMARILLO, 3 = VERDE. None = ninguna regla se activó.
 """
-from .metricas import COLORES, a_numero
+import json
+from functools import lru_cache
+from pathlib import Path
+
+from .metricas import COLORES
+
+RUTA_SEMILLA = Path(__file__).resolve().parent.parent / "datos" / "reglas_semilla.json"
+NIVEL = {"ROJO": 0, "NARANJA": 1, "AMARILLO": 2, "VERDE": 3}
 
 
-def reglas(d: dict) -> list[tuple[int, str]]:
-    n = lambda k: a_numero(d.get(k))           # noqa: E731
+@lru_cache(maxsize=1)
+def reglas_semilla() -> tuple:
+    with open(RUTA_SEMILLA, encoding="utf-8") as archivo:
+        return tuple(json.load(archivo)["reglas"])
+
+
+def _numero(v):
+    if v is None or v == "" or isinstance(v, bool):
+        return None
+    try:
+        n = float(str(v).strip().replace(",", "."))
+    except ValueError:
+        return None
+    return n if n == n and n not in (float("inf"), float("-inf")) else None
+
+
+def _valor(d: dict, campo: str):
+    if campo == "pam":
+        p = _numero(d.get("pam"))
+        if p is not None:
+            return p
+        s, di = _numero(d.get("ta_sistolica")), _numero(d.get("ta_diastolica"))
+        return round((s + 2 * di) / 3) if s is not None and di is not None else None
+    return d.get(campo)
+
+
+_OPS = {"<": lambda a, b: a < b, "<=": lambda a, b: a <= b, ">": lambda a, b: a > b,
+        ">=": lambda a, b: a >= b, "=": lambda a, b: a == b, "!=": lambda a, b: a != b}
+
+
+def cumple(cond: dict, d: dict) -> bool:
+    v, op = _valor(d, cond["campo"]), cond["operador"]
+    if op in _OPS:
+        a, b = _numero(v), _numero(cond.get("valor"))
+        return a is not None and b is not None and _OPS[op](a, b)
+    if op == "es":
+        return v == cond.get("valor")
+    if op == "no_es":
+        return v not in (None, "") and v != cond.get("valor")
+    if op == "si":
+        return v is True
+    if op == "no":
+        return v is False
+    return False
+
+
+def reglas(d: dict, lista=None) -> list[tuple[int, str]]:
+    """Reglas que se cumplen como (nivel, explicación), de la más urgente a la menos urgente."""
     out = []
-    # Neurológico
-    if d.get("br_convulsion"):
-        out.append((0, "Convulsión activa"))
-    g = n("glasgow")
-    if g is not None and g <= 8:
-        out.append((0, f"Glasgow {g:g}"))
-    elif (d.get("estado_conciencia") and d.get("estado_conciencia") != "Alerta") or (g is not None and g < 15):
-        out.append((1, "Alteración del nivel de conciencia"))
-    # Respiratorio
-    sat, fr = n("saturacion_o2"), n("frecuencia_respiratoria")
-    if (sat is not None and sat < 90) or (fr is not None and (fr > 30 or fr < 8)) or d.get("br_disnea"):
-        out.append((1, "Posible compromiso respiratorio"))
-    # Circulatorio
-    tas, fc = n("ta_sistolica"), n("frecuencia_cardiaca")
-    hipo = tas is not None and tas < 90
-    fc_alt = fc is not None and (fc > 130 or fc < 40)
-    if d.get("br_sangrado") and hipo:
-        out.append((0, "Sangrado con hipotensión"))
-    else:
-        if d.get("br_sangrado"):
-            out.append((1, "Sangrado evidente"))
-        if hipo or fc_alt:
-            out.append((1, "Compromiso circulatorio"))
-    # Otros
-    t = n("temperatura")
-    if d.get("ant_inmuno") and t is not None and t >= 38:
-        out.append((1, "Fiebre en inmunosuprimido"))
-    dolor = n("dolor_intensidad")
-    if dolor is not None and dolor >= 8:
-        out.append((1, "Dolor intenso"))
-    return out
+    for r in (reglas_semilla() if lista is None else lista):
+        conds = r.get("condiciones") or []
+        if not conds or r.get("color") not in NIVEL:
+            continue
+        ok = any(cumple(c, d) for c in conds) if r.get("combinacion") == "alguna" else all(cumple(c, d) for c in conds)
+        if ok:
+            out.append((NIVEL[r["color"]], r["explicacion"]))
+    return sorted(out, key=lambda x: x[0])
 
 
 def nivel_reglas(d: dict):

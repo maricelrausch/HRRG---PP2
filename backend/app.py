@@ -209,9 +209,11 @@ app.config["BASE_USUARIOS"] = BASE_USUARIOS
 app.register_blueprint(admin_usuarios_bp)
 
 # [Propuesta Barby 28/10] Reglas del hospital (Jefatura de Guardia): base propia y rutas /api/reglas/...
-from src.reglas_hospital import bp as reglas_bp, inicializar_reglas
+from src.reglas_hospital import bp as reglas_bp, inicializar_reglas, cargar_semilla
 BASE_REGLAS = CARPETA_DATOS / "reglas_hospital.db"
 inicializar_reglas(BASE_REGLAS)
+# [Dario 29/10 · Etapa B] Reglas de ejemplo del prototipo → base (una sola vez). Ver datos/reglas_semilla.json.
+cargar_semilla(BASE_REGLAS, CARPETA_BACKEND / "datos" / "reglas_semilla.json")
 app.config["BASE_REGLAS"] = BASE_REGLAS
 app.register_blueprint(reglas_bp)
 

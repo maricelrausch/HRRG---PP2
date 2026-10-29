@@ -185,6 +185,71 @@ def _migrar_origen(ruta_base):
     logger.info("REGLAS_MIGRADAS | columnas agregadas: %s", ", ".join(faltan))
 
 
+def cargar_semilla(ruta_base, ruta_semilla):
+    """[Dario 29/10 · Etapa B] Carga UNA sola vez las reglas de ejemplo del prototipo como reglas
+    de la base (origen «manchester», sin validar), para que la Jefatura las revise, edite o desactive
+    en reglas.html y no queden umbrales fijos en el código.
+
+    - Quedan ACTIVAS, porque son las mismas que ya intervenían desde sugerencia.js: el color que ve
+      enfermería no cambia (lo comprueba frontend/tests/semilla_equivalencia.test.js).
+    - Como ahora están en la base, se apagan las «reglas de ejemplo» del código (usar_ejemplo = 0)
+      para que no estén repetidas. La Jefatura puede volver a encenderlas si hiciera falta.
+    - Se marca semilla_cargada = 1: si después la Jefatura edita o desactiva alguna, no se vuelve a cargar.
+    - Si la Jefatura YA había apagado las reglas de ejemplo, se respeta: se cargan como BORRADOR
+      (se ven en la pantalla pero no intervienen hasta que alguien las active).
+    Devuelve la cantidad de reglas cargadas (0 si ya estaban)."""
+    conexion = sqlite3.connect(ruta_base)
+    conexion.row_factory = sqlite3.Row
+    try:
+        if conexion.execute("SELECT 1 FROM reglas_config WHERE clave = 'semilla_cargada'").fetchone():
+            return 0
+        with open(ruta_semilla, encoding="utf-8") as archivo:
+            semilla = json.load(archivo)
+        estaban_en_uso = _usar_ejemplo(conexion)
+        estado, fue_activada = ("activa", 1) if estaban_en_uso else ("borrador", 0)
+        normalizadas = []
+        for i, datos in enumerate(semilla["reglas"], start=1):
+            regla, error = validar_regla(datos)
+            if error:
+                raise ValueError(f"Regla {i} de la semilla inválida: {error}")
+            normalizadas.append(regla)
+        ahora, usuario = _ahora(), "sistema"
+        with conexion:
+            for regla in normalizadas:
+                cursor = conexion.execute(
+                    """INSERT INTO reglas (nombre, explicacion, color, combinacion, condiciones_json, origen,
+                           validada_por, estado, version, fue_activada, creada_por, creada_en,
+                           actualizada_por, actualizada_en)
+                       VALUES (?, ?, ?, ?, ?, ?, '', ?, 1, ?, ?, ?, ?, ?)""",
+                    (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
+                     json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"],
+                     estado, fue_activada, usuario, ahora, usuario, ahora)
+                )
+                regla_id = cursor.lastrowid
+                conexion.execute("UPDATE reglas SET codigo = ? WHERE id = ?", (f"R-{regla_id:03d}", regla_id))
+                conexion.execute(
+                    "INSERT INTO reglas_eventos (regla_id, fecha, usuario, accion, version, datos_json) VALUES (?, ?, ?, ?, ?, ?)",
+                    (regla_id, ahora, usuario, f"CARGADA DE EJEMPLO ({estado}, a validar)", 1,
+                     json.dumps(regla, ensure_ascii=False))
+                )
+            for clave, valor in (("semilla_cargada", "1"), ("usar_ejemplo", "0")):
+                conexion.execute(
+                    """INSERT INTO reglas_config (clave, valor, actualizado_por, actualizado_en) VALUES (?, ?, ?, ?)
+                       ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
+                           actualizado_por = excluded.actualizado_por, actualizado_en = excluded.actualizado_en""",
+                    (clave, valor, usuario, ahora)
+                )
+            conexion.execute(
+                "INSERT INTO reglas_eventos (regla_id, fecha, usuario, accion, version, datos_json) VALUES (NULL, ?, ?, ?, NULL, ?)",
+                (ahora, usuario, "REGLAS DE EJEMPLO DEL CÓDIGO DESACTIVADAS (pasaron a la base)",
+                 json.dumps({"reglas_cargadas": len(normalizadas), "version_semilla": semilla.get("version")}))
+            )
+    finally:
+        conexion.close()
+    logger.info("REGLAS_SEMILLA_CARGADAS | %d", len(normalizadas))
+    return len(normalizadas)
+
+
 def _usar_ejemplo(conexion):
     fila = conexion.execute("SELECT valor FROM reglas_config WHERE clave = 'usar_ejemplo'").fetchone()
     return True if fila is None else fila["valor"] == "1"
