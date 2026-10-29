@@ -111,11 +111,28 @@ def _leer(base):
 
 def test_semilla_se_carga_activa_y_apaga_las_del_codigo(tmp_path):
     base = _base(tmp_path)
-    assert rh.cargar_semilla(base, SEMILLA) == 9
+    assert rh.cargar_semilla(base, SEMILLA) == 13
     reglas, config = _leer(base)
-    assert len(reglas) == 9 and [r["codigo"] for r in reglas][:2] == ["R-001", "R-002"]
-    assert all(r["estado"] == "activa" and r["origen"] == "manchester" and r["validada_por"] == "" for r in reglas)
-    assert config["usar_ejemplo"] == "0" and config["semilla_cargada"] == "1"
+    assert len(reglas) == 13 and [r["codigo"] for r in reglas][:2] == ["R-001", "R-002"]
+    # Tanda 1: las 9 del prototipo, activas.
+    assert all(r["estado"] == "activa" and r["origen"] == "manchester" and r["validada_por"] == "" for r in reglas[:9])
+    # Tanda 2 (mail de Navoni): en borrador, nunca activadas.
+    assert all(r["estado"] == "borrador" and r["fue_activada"] == 0 for r in reglas[9:])
+    assert config["usar_ejemplo"] == "0" and config["semilla_cargada"] == "2"
+
+
+def test_base_ya_sembrada_con_la_tanda_1_recibe_solo_la_tanda_2(tmp_path):
+    base = _base(tmp_path)
+    con = sqlite3.connect(base)
+    with con:   # como quedó una base con la Etapa B: tanda 1 cargada y la copia del código encendida a mano
+        con.execute("INSERT INTO reglas_config VALUES ('semilla_cargada', '1', 'sistema', 'x')")
+        con.execute("INSERT INTO reglas_config VALUES ('usar_ejemplo', '1', 'jefa', 'x')")
+    con.close()
+    assert rh.cargar_semilla(base, SEMILLA) == 4
+    reglas, config = _leer(base)
+    assert len(reglas) == 4 and all(r["estado"] == "borrador" for r in reglas)
+    assert config["usar_ejemplo"] == "1" and config["semilla_cargada"] == "2"   # no toca la decisión de la Jefatura
+    assert rh.cargar_semilla(base, SEMILLA) == 0
 
 
 def test_semilla_no_se_carga_dos_veces(tmp_path):
@@ -127,7 +144,7 @@ def test_semilla_no_se_carga_dos_veces(tmp_path):
     con.close()
     assert rh.cargar_semilla(base, SEMILLA) == 0
     reglas, _ = _leer(base)
-    assert len(reglas) == 9 and reglas[0]["estado"] == "inactiva"
+    assert len(reglas) == 13 and reglas[0]["estado"] == "inactiva"
 
 
 def test_respeta_si_la_jefatura_ya_habia_apagado_las_de_ejemplo(tmp_path):
@@ -148,4 +165,4 @@ def test_semilla_valida_y_no_pisa_reglas_existentes(tmp_path):
     con.close()
     rh.cargar_semilla(base, SEMILLA)
     reglas, _ = _leer(base)
-    assert reglas[0]["nombre"] == "Propia" and len(reglas) == 10 and reglas[1]["codigo"] == "R-002"
+    assert reglas[0]["nombre"] == "Propia" and len(reglas) == 14 and reglas[1]["codigo"] == "R-002"

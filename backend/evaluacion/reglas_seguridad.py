@@ -23,8 +23,9 @@ NIVEL = {"ROJO": 0, "NARANJA": 1, "AMARILLO": 2, "VERDE": 3}
 
 @lru_cache(maxsize=1)
 def reglas_semilla() -> tuple:
+    """Las reglas de la semilla que arrancan ACTIVAS (las de tanda 2 arrancan en borrador: no intervienen)."""
     with open(RUTA_SEMILLA, encoding="utf-8") as archivo:
-        return tuple(json.load(archivo)["reglas"])
+        return tuple(r for r in json.load(archivo)["reglas"] if r.get("estado_inicial") != "borrador")
 
 
 def _numero(v):

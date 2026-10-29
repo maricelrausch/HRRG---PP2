@@ -25,7 +25,8 @@ const nivelViejo = (d) => { ctx.st.rev = d; const r = ctx.reglas(); return r.len
 
 // 2) Las mismas reglas cargadas desde la semilla, evaluadas por el motor configurable.
 const semilla = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'backend', 'datos', 'reglas_semilla.json'), 'utf8'));
-const reglas = semilla.reglas.map((r, i) => Object.assign({ codigo: 'R-' + (i + 1), version: 1 }, r));
+// Solo las que arrancan activas: las de la tanda 2 (mail de Navoni) arrancan en borrador y no intervienen.
+const reglas = semilla.reglas.filter((r) => r.estado_inicial !== 'borrador').map((r, i) => Object.assign({ codigo: 'R-' + (i + 1), version: 1 }, r));
 const nivelNuevo = (d) => { const r = M.evaluar(reglas, d); return r.length ? r[0].lv : 9; };
 
 let n = 0;

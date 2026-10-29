@@ -229,36 +229,50 @@ def _migrar_columnas(ruta_base):
 
 
 def cargar_semilla(ruta_base, ruta_semilla):
-    """[Dario 29/10 · Etapa B] Carga UNA sola vez las reglas de ejemplo del prototipo como reglas
-    de la base (origen «manchester», sin validar), para que la Jefatura las revise, edite o desactive
-    en reglas.html y no queden umbrales fijos en el código.
+    """Carga las reglas de ejemplo de datos/reglas_semilla.json en la base, UNA sola vez cada tanda.
 
-    - Quedan ACTIVAS, porque son las mismas que ya intervenían desde sugerencia.js: el color que ve
-      enfermería no cambia (lo comprueba frontend/tests/semilla_equivalencia.test.js).
-    - Como ahora están en la base, se apagan las «reglas de ejemplo» del código (usar_ejemplo = 0)
-      para que no estén repetidas. La Jefatura puede volver a encenderlas si hiciera falta.
-    - Se marca semilla_cargada = 1: si después la Jefatura edita o desactiva alguna, no se vuelve a cargar.
-    - Si la Jefatura YA había apagado las reglas de ejemplo, se respeta: se cargan como BORRADOR
-      (se ven en la pantalla pero no intervienen hasta que alguien las active).
-    Devuelve la cantidad de reglas cargadas (0 si ya estaban)."""
+    Tanda 1 [Dario 29/10 · Etapa B]: las 9 reglas de seguridad del prototipo (origen «manchester»,
+    sin validar), que antes estaban escritas en sugerencia.js.
+      - Quedan ACTIVAS, porque son las mismas que ya intervenían: el color que ve enfermería no cambia
+        (lo comprueba frontend/tests/semilla_equivalencia.test.js).
+      - Se apaga la copia del código (usar_ejemplo = 0) para que no estén repetidas.
+      - Si la Jefatura YA había apagado las reglas de ejemplo, se respeta: se cargan como BORRADOR.
+    Tanda 2 [Dario 29/10 · D2]: las reglas que propone el mail de Francisco Navoni (fiebre y cefalea
+      como adaptación local, fiebre en lactante, dolor torácico), con valores y colores A VALIDAR.
+      Se cargan siempre como BORRADOR: se ven en la pantalla pero NO intervienen hasta que la
+      Jefatura, con Enfermería y Guardia, complete los valores y las active.
+    Cada regla del JSON dice a qué tanda pertenece ("tanda") y, si corresponde, "estado_inicial": "borrador".
+    reglas_config.semilla_cargada guarda la última tanda cargada: si después la Jefatura edita,
+    desactiva o elimina alguna, no se vuelve a cargar. Devuelve la cantidad de reglas cargadas."""
     conexion = sqlite3.connect(ruta_base)
     conexion.row_factory = sqlite3.Row
     try:
-        if conexion.execute("SELECT 1 FROM reglas_config WHERE clave = 'semilla_cargada'").fetchone():
-            return 0
+        fila = conexion.execute("SELECT valor FROM reglas_config WHERE clave = 'semilla_cargada'").fetchone()
+        cargada = int(fila["valor"]) if fila and str(fila["valor"]).isdigit() else 0
         with open(ruta_semilla, encoding="utf-8") as archivo:
             semilla = json.load(archivo)
+        version = int(semilla.get("version", 1))
+        if cargada >= version:
+            return 0
         estaban_en_uso = _usar_ejemplo(conexion)
-        estado, fue_activada = ("activa", 1) if estaban_en_uso else ("borrador", 0)
-        normalizadas = []
+        nuevas = []
         for i, datos in enumerate(semilla["reglas"], start=1):
+            datos = dict(datos)
+            tanda = int(datos.pop("tanda", 1))
+            inicial = datos.pop("estado_inicial", None)
+            if tanda <= cargada:
+                continue
             regla, error = validar_regla(datos)
             if error:
                 raise ValueError(f"Regla {i} de la semilla inválida: {error}")
-            normalizadas.append(regla)
+            if inicial == "borrador" or not estaban_en_uso:
+                estado, fue_activada = "borrador", 0
+            else:
+                estado, fue_activada = "activa", 1
+            nuevas.append((regla, estado, fue_activada))
         ahora, usuario = _ahora(), "sistema"
         with conexion:
-            for regla in normalizadas:
+            for regla, estado, fue_activada in nuevas:
                 cursor = conexion.execute(
                     """INSERT INTO reglas (nombre, explicacion, color, combinacion, condiciones_json, origen,
                            validada_por, discriminador, estado, version, fue_activada, creada_por, creada_en,
@@ -275,22 +289,26 @@ def cargar_semilla(ruta_base, ruta_semilla):
                     (regla_id, ahora, usuario, f"CARGADA DE EJEMPLO ({estado}, a validar)", 1,
                      json.dumps(regla, ensure_ascii=False))
                 )
-            for clave, valor in (("semilla_cargada", "1"), ("usar_ejemplo", "0")):
+            ajustes = [("semilla_cargada", str(version))]
+            if cargada == 0:
+                ajustes.append(("usar_ejemplo", "0"))
+            for clave, valor in ajustes:
                 conexion.execute(
                     """INSERT INTO reglas_config (clave, valor, actualizado_por, actualizado_en) VALUES (?, ?, ?, ?)
                        ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
                            actualizado_por = excluded.actualizado_por, actualizado_en = excluded.actualizado_en""",
                     (clave, valor, usuario, ahora)
                 )
-            conexion.execute(
-                "INSERT INTO reglas_eventos (regla_id, fecha, usuario, accion, version, datos_json) VALUES (NULL, ?, ?, ?, NULL, ?)",
-                (ahora, usuario, "REGLAS DE EJEMPLO DEL CÓDIGO DESACTIVADAS (pasaron a la base)",
-                 json.dumps({"reglas_cargadas": len(normalizadas), "version_semilla": semilla.get("version")}))
-            )
+            if cargada == 0:
+                conexion.execute(
+                    "INSERT INTO reglas_eventos (regla_id, fecha, usuario, accion, version, datos_json) VALUES (NULL, ?, ?, ?, NULL, ?)",
+                    (ahora, usuario, "REGLAS DE EJEMPLO DEL CÓDIGO DESACTIVADAS (pasaron a la base)",
+                     json.dumps({"reglas_cargadas": len(nuevas), "version_semilla": version}))
+                )
     finally:
         conexion.close()
-    logger.info("REGLAS_SEMILLA_CARGADAS | %d", len(normalizadas))
-    return len(normalizadas)
+    logger.info("REGLAS_SEMILLA_CARGADAS | %d (tanda %d)", len(nuevas), version)
+    return len(nuevas)
 
 
 def validar_tiempos(datos):
