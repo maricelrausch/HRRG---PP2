@@ -89,7 +89,9 @@ MAX_TIEMPO_MIN = 1440
 # Datos que puede usar una regla (mismos nombres que la pantalla de Medición).
 # El DNI y el relato NO están: una regla no puede depender de datos identificatorios.
 CATEGORIAS = ["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
-              "Cefalea", "Síntoma neurológico", "Otro"]
+              "Cefalea", "Síntoma neurológico", "Alteración de conciencia", "Convulsiones",
+              "Hemorragia", "Intoxicación", "Reacción alérgica", "Embarazo / obstétrico",
+              "Salud mental", "Otro"]   # [D3] misma lista que src/esquemas.py (un test lo comprueba)
 CAMPOS = {
     "edad": {"etiqueta": "Edad", "tipo": "num", "unidad": "años", "min": 0, "max": 120},
     "ta_sistolica": {"etiqueta": "TA sistólica", "tipo": "num", "unidad": "mmHg", "min": 30, "max": 300},

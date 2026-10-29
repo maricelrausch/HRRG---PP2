@@ -21,8 +21,14 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 
 Color = Literal["Rojo", "Naranja", "Amarillo", "Verde", "Azul"]
 Sexo = Literal["Femenino", "Masculino", "No informado"]
+# [Dario 29/10 · D3] Motivos que lista el mail de Francisco Navoni: se suman los que faltaban
+# (alteración de conciencia, convulsiones, hemorragia, intoxicación, reacción alérgica, embarazo y
+# salud mental). MedGemma sigue proponiendo solo las 8 primeras (ia/medgemma.py, sin cambios, para
+# no alterar la extracción ya evaluada); las nuevas las elige el profesional en la pantalla.
 Categoria = Literal["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
-                    "Cefalea", "Síntoma neurológico", "Otro"]
+                    "Cefalea", "Síntoma neurológico", "Alteración de conciencia", "Convulsiones",
+                    "Hemorragia", "Intoxicación", "Reacción alérgica", "Embarazo / obstétrico",
+                    "Salud mental", "Otro"]
 UnidadTiempo = Literal["minutos", "horas", "días"]
 Conciencia = Literal["Alerta", "Responde a la voz", "Responde al dolor", "No responde"]
 

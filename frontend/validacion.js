@@ -39,7 +39,9 @@
   // 4 · Opciones cerradas
   const options = {
     sexo: ['Femenino', 'Masculino', 'No informado'],
-    motivo_categoria: ['Dolor torácico', 'Dolor abdominal', 'Disnea', 'Trauma', 'Fiebre', 'Cefalea', 'Síntoma neurológico', 'Otro'],
+    /* [Dario 29/10 · D3] Motivos del mail de Navoni (misma lista que backend/src/esquemas.py). */
+    motivo_categoria: ['Dolor torácico', 'Dolor abdominal', 'Disnea', 'Trauma', 'Fiebre', 'Cefalea', 'Síntoma neurológico',
+      'Alteración de conciencia', 'Convulsiones', 'Hemorragia', 'Intoxicación', 'Reacción alérgica', 'Embarazo / obstétrico', 'Salud mental', 'Otro'],
     tiempo_evolucion_unidad: ['minutos', 'horas', 'días'],
     estado_conciencia: ['Alerta', 'Responde a la voz', 'Responde al dolor', 'No responde']
   };
