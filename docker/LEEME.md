@@ -31,6 +31,7 @@ Tres contenedores en un servidor (Windows o Linux). Las PCs de la guardia entran
 | `descargar_modelos.bat` | `descargar_modelos.sh` | Descarga los modelos de IA desde internet |
 | `cargar_modelos.bat` | `cargar_modelos.sh` | Carga los modelos desde una carpeta (sin internet) |
 | `exportar_certificado.bat` | `exportar_certificado.sh` | Extrae el certificado de Caddy para instalarlo en las PCs |
+| `crear_acceso_directo.bat` + `icono_ingenia.ico` | — | **En cada PC:** crea el acceso directo con el logo del HRRG |
 | `aplicar_actualizacion.bat` | `aplicar_actualizacion.sh` | Aplica una actualización traída en pendrive |
 | `publicar_imagen.bat` | — | **Equipo:** publica la imagen en el registro |
 | `exportar_offline.bat` | — | **Equipo:** prepara la instalación completa en pendrive |

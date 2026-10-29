@@ -5,6 +5,9 @@ cd /d "%~dp0"
 echo.
 echo ===== Configuracion de IngenIA Salud - Triage =====
 echo.
+echo IP de este equipo (use la de la red del hospital, no las que empiezan con 172.):
+ipconfig | findstr /i "IPv4"
+echo.
 set IP=
 set /p IP=IP fija del servidor (ej. 192.168.1.50): 
 if "%IP%"=="" ( echo Debe indicar la IP. & pause & exit /b 1 )

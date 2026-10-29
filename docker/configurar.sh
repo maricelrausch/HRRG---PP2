@@ -2,6 +2,9 @@
 # Configura el acceso desde la red (crea .env). Ejecutar una vez, antes de iniciar.
 cd "$(dirname "$0")" || exit 1
 echo "===== Configuración de IngenIA Salud – Triage ====="
+echo "IP de este equipo (use la de la red del hospital, no las que empiezan con 172.):"
+hostname -I 2>/dev/null | tr " " "\n" | grep -E "^[0-9]+\." | sed "s/^/   /"
+echo
 read -rp "IP fija del servidor (ej. 192.168.1.50): " IP
 [ -n "$IP" ] || { echo "Debe indicar la IP."; exit 1; }
 read -rp "Nombre de red del servidor (ej. triage.hrrg.local) o Enter para omitir: " NOMBRE

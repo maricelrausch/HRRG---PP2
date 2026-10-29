@@ -23,6 +23,8 @@ for %%f in (configurar iniciar detener actualizar aplicar_actualizacion crear_ad
   copy "%%f.sh" "%KIT%\" >nul
 )
 copy certificados\LEEME.txt "%KIT%\certificados\" >nul
+copy crear_acceso_directo.bat "%KIT%\" >nul
+copy icono_ingenia.ico "%KIT%\" >nul
 if exist documentacion\*.pdf copy documentacion\*.pdf "%KIT%\documentacion\" >nul
 
 echo [3/4] Exportando imagenes (app + Ollama + Caddy), unos minutos...
