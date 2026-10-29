@@ -67,7 +67,12 @@ curl -H "Authorization: Bearer $TOKEN" http://<pc-de-triage>:5000/api/cola-esper
       "espera_min": 2,
       "tiempo_maximo_min": 0,
       "vencido": false,
-      "motivo_categoria": "Disnea"
+      "ingreso_en": "2026-10-27T21:34:15+00:00",
+      "triage_en": "2026-10-27T21:42:15+00:00",
+      "tiempo_restante_min": -2,
+      "proximo_a_vencer": false,
+      "motivo_categoria": "Disnea",
+      "condicion_especial": null
     },
     {
       "posicion": 2,
@@ -79,13 +84,25 @@ curl -H "Authorization: Bearer $TOKEN" http://<pc-de-triage>:5000/api/cola-esper
       "espera_min": 75,
       "tiempo_maximo_min": 60,
       "vencido": true,
-      "motivo_categoria": "Cefalea"
+      "ingreso_en": "2026-10-27T20:21:15+00:00",
+      "triage_en": "2026-10-27T20:29:15+00:00",
+      "tiempo_restante_min": -15,
+      "proximo_a_vencer": false,
+      "motivo_categoria": "Cefalea",
+      "condicion_especial": "Custodia policial"
     }
   ]
 }
 ```
 
-`prioridad`: 1 ROJO (inmediato), 2 NARANJA (10 min), 3 AMARILLO (60 min), 4 VERDE (120 min). `vencido` es `true` cuando la espera supera el tiempo máximo del color.
+`prioridad`: 1 ROJO, 2 NARANJA, 3 AMARILLO, 4 VERDE. `vencido` es `true` cuando la espera supera el tiempo máximo del color.
+
+[Actualizado 29/10, pedido de Francisco Navoni]
+- `tiempo_maximo_min`: ya no es fijo. Sale de la configuración de la Jefatura de Guardia (`reglas.html`); por defecto, los de referencia Manchester: ROJO 0, NARANJA 10, AMARILLO 60, VERDE 120.
+- `ingreso_en`: cuándo se creó el episodio. `triage_en`: cuándo se registró la última clasificación.
+- `tiempo_restante_min`: minutos que faltan para el tiempo máximo; negativo = ya lo superó.
+- `proximo_a_vencer`: `true` en el último 25 % del tiempo máximo (nunca en ROJO).
+- `condicion_especial`: Policial, Judicial, Custodia policial, Violencia, Accidente laboral, Salud mental, Otra o `null`. Es una condición administrativa o legal, **no** cambia `color` ni `prioridad`.
 
 ## GET /api/episodios/<codigo_episodio>/mediciones
 
@@ -104,6 +121,7 @@ curl -H "Authorization: Bearer $TOKEN" http://<pc-de-triage>:5000/api/episodios/
   "episodio": {"codigo_episodio": "EPI-AMARI01", "codigo_paciente": "PAC-AMARI01",
                "creado_en": "2026-10-27T20:29:15+00:00", "estado": "en_espera"},
   "datos_ingreso": {"edad": 58, "sexo": "Femenino", "motivo_categoria": "Cefalea", "motivo_consulta": null,
+                    "condicion_especial": "Custodia policial",
                     "tiempo_evolucion": {"valor": 6, "unidad": "horas"},
                     "banderas_rojas": ["Dificultad para respirar"], "antecedentes": ["Diabetes"],
                     "registrado_en": "2026-10-27T20:29:15+00:00"},
