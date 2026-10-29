@@ -1,0 +1,15 @@
+# Puerta de entrada HTTPS de IngenIA Salud – Triage.
+# HTTPS es necesario para que el navegador permita usar el micrófono (dictado por voz)
+# desde otras PCs de la red. Los valores vienen de .env (HRRG_SITIO, HRRG_TLS, HRRG_IP_SERVIDOR).
+
+{
+	# Al entrar por IP el navegador no envía el nombre del sitio (SNI):
+	# Caddy usa entonces el certificado de esta IP.
+	default_sni {$HRRG_IP_SERVIDOR:localhost}
+}
+
+{$HRRG_SITIO} {
+	tls {$HRRG_TLS}
+	encode gzip
+	reverse_proxy app:5000
+}

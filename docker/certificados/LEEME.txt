@@ -1,0 +1,9 @@
+Carpeta para el certificado HTTPS del hospital (opcional).
+
+Si Informatica entrega un certificado para el servidor:
+  1. Copiar aqui cert.pem (certificado, con la cadena completa) y key.pem (clave privada).
+  2. En .env:  HRRG_TLS="/certs/cert.pem /certs/key.pem"   (con comillas)
+  3. Ejecutar actualizar (o detener + iniciar).
+
+Si esta carpeta queda vacia, Caddy usa su propio certificado interno (HRRG_TLS=internal).
+NO subir cert.pem ni key.pem a git.

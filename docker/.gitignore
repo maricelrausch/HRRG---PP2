@@ -1,0 +1,7 @@
+.env
+imagenes/
+ollama_modelos/
+certificados/*.pem
+certificados/*.key
+certificado_ingenia.crt
+entrega/

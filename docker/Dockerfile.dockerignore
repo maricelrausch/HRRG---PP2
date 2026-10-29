@@ -1,0 +1,10 @@
+# Solo entra a la imagen lo necesario (el contexto es la raíz del repo).
+*
+!backend
+!frontend
+!empaquetado/launcher.py
+**/__pycache__
+**/*.pyc
+backend/tests
+backend/.pytest_cache
+frontend/tests
