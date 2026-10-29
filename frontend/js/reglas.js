@@ -61,7 +61,7 @@
     const box = $('rgTiempos'); if (!box) return;
     if (!tiempos) { box.innerHTML = '<div class="hint">' + esc(tiemposMsg || 'Cargando tiempos…') + '</div>'; return; }
     const estado = tiemposConf
-      ? 'Guardados por ' + esc(tiemposAct.por) + ', ' + esc(fecha(tiemposAct.en)) + '.'
+      ? 'Guardados por ' + esc(tiemposAct.por) + ', ' + esc(fecha(tiemposAct.en))
       : 'Son los de <b>referencia del Sistema Manchester</b>: todavía no fueron confirmados por la Guardia del HRRG.';
     box.innerHTML = '<div><b>Tiempo objetivo máximo de atención por color</b> (minutos). Lo usan la pantalla En espera, la sala de espera y la API del hospital. ' + estado + '</div>' +
       '<div class="rg-tgrid">' + Object.keys(COLOR_VAR).map((c) => '<label>' + chipColor(c) + '<input data-t="' + c + '" inputmode="numeric" value="' + esc(tiempos[c]) + '"' +
