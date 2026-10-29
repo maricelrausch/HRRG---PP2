@@ -53,6 +53,13 @@ ORIGENES = {
 ORIGEN_POR_DEFECTO = "provisoria"
 MAX_VALIDADA_POR = 120
 
+# [Dario 29/10 · Etapa C] Tiempo objetivo máximo de atención por color (minutos).
+# Por defecto, los de referencia del Sistema Manchester; la Jefatura los confirma o cambia en reglas.html
+# y quedan en reglas_config (clave tiempos_objetivo). Los leen la pantalla En espera, la sala de espera
+# y la API del hospital: es el ÚNICO lugar donde están.
+TIEMPOS_POR_DEFECTO = {"ROJO": 0, "NARANJA": 10, "AMARILLO": 60, "VERDE": 120}
+MAX_TIEMPO_MIN = 1440
+
 # Datos que puede usar una regla (mismos nombres que la pantalla de Medición).
 # El DNI y el relato NO están: una regla no puede depender de datos identificatorios.
 CATEGORIAS = ["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
@@ -250,6 +257,46 @@ def cargar_semilla(ruta_base, ruta_semilla):
     return len(normalizadas)
 
 
+def validar_tiempos(datos):
+    """Devuelve (tiempos, None) o (None, mensaje). Exige los 4 colores, minutos enteros entre 0 y 1440
+    y que un color más urgente nunca tenga más tiempo que uno menos urgente."""
+    if not isinstance(datos, dict) or set(datos) != set(COLORES):
+        return None, "Enviá el tiempo de los 4 colores: ROJO, NARANJA, AMARILLO y VERDE."
+    tiempos = {}
+    for color in COLORES:
+        valor = datos[color]
+        try:
+            numero = _numero(valor)
+        except (ValueError, TypeError):
+            return None, f"El tiempo de {color} tiene que ser un número de minutos."
+        if not numero.is_integer() or not 0 <= numero <= MAX_TIEMPO_MIN:
+            return None, f"El tiempo de {color} tiene que ser un número entero de minutos entre 0 y {MAX_TIEMPO_MIN}."
+        tiempos[color] = int(numero)
+    for mas, menos in zip(COLORES, COLORES[1:]):
+        if tiempos[mas] > tiempos[menos]:
+            return None, f"{mas} no puede tener más tiempo que {menos}."
+    return tiempos, None
+
+
+def leer_tiempos(ruta_base):
+    """Tiempos objetivo vigentes. NUNCA falla: si no hay base, no están cargados o algo está mal,
+    devuelve los de referencia Manchester (así la sala de espera nunca se queda sin tiempos)."""
+    if ruta_base and Path(ruta_base).exists():
+        try:
+            conexion = sqlite3.connect(ruta_base)
+            try:
+                fila = conexion.execute("SELECT valor FROM reglas_config WHERE clave = 'tiempos_objetivo'").fetchone()
+            finally:
+                conexion.close()
+            if fila:
+                tiempos, error = validar_tiempos(json.loads(fila[0]))
+                if not error:
+                    return tiempos
+        except (sqlite3.Error, ValueError, TypeError):
+            logger.warning("TIEMPOS_OBJETIVO_ILEGIBLES | se usan los de referencia")
+    return dict(TIEMPOS_POR_DEFECTO)
+
+
 def _usar_ejemplo(conexion):
     fila = conexion.execute("SELECT valor FROM reglas_config WHERE clave = 'usar_ejemplo'").fetchone()
     return True if fila is None else fila["valor"] == "1"
@@ -411,7 +458,7 @@ def exigir_sesion():
 
     rol = profesional["rol"]
     endpoint = request.endpoint or ""
-    if endpoint in {"reglas_hospital.campos", "reglas_hospital.activas"}:
+    if endpoint in {"reglas_hospital.campos", "reglas_hospital.activas", "reglas_hospital.tiempos"}:
         permitido = rol in LECTURA_MOTOR
     elif request.method == "GET":
         permitido = rol in LECTURA_COMPLETA
@@ -582,6 +629,44 @@ def eliminar(regla_id):
         conexion.close()
     logger.info("REGLA_ELIMINADA | %s | R-%03d", g.profesional["usuario"], regla_id)
     return _ok()
+
+
+@bp.get("/api/reglas/tiempos")
+def tiempos():
+    conexion = _conectar()
+    try:
+        fila = conexion.execute(
+            "SELECT actualizado_por, actualizado_en FROM reglas_config WHERE clave = 'tiempos_objetivo'"
+        ).fetchone()
+    finally:
+        conexion.close()
+    return _ok(tiempos=leer_tiempos(current_app.config["BASE_REGLAS"]), por_defecto=TIEMPOS_POR_DEFECTO,
+               confirmados=fila is not None,
+               actualizado=None if fila is None else {"por": fila["actualizado_por"], "en": fila["actualizado_en"]})
+
+
+@bp.post("/api/reglas/tiempos")
+def guardar_tiempos():
+    tiempos_nuevos, error = validar_tiempos(request.get_json(silent=True))
+    if error:
+        return _error(error, 422, "TIEMPOS_INVALIDOS")
+    anteriores = leer_tiempos(current_app.config["BASE_REGLAS"])
+    conexion = _conectar()
+    try:
+        with conexion:
+            conexion.execute(
+                """INSERT INTO reglas_config (clave, valor, actualizado_por, actualizado_en)
+                   VALUES ('tiempos_objetivo', ?, ?, ?)
+                   ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
+                       actualizado_por = excluded.actualizado_por, actualizado_en = excluded.actualizado_en""",
+                (json.dumps(tiempos_nuevos), g.profesional["usuario"], _ahora())
+            )
+            _evento(conexion, None, "TIEMPOS OBJETIVO GUARDADOS", None,
+                    {"anteriores": anteriores, "nuevos": tiempos_nuevos})
+    finally:
+        conexion.close()
+    logger.info("TIEMPOS_OBJETIVO | %s | %s", g.profesional["usuario"], tiempos_nuevos)
+    return _ok(tiempos=tiempos_nuevos)
 
 
 @bp.post("/api/reglas/config")

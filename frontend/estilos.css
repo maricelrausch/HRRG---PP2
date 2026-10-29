@@ -465,6 +465,11 @@ html.cargando,html.cargando *{cursor:progress}
 .rg-resumen b{font-family:var(--f-display);font-size:26px;line-height:1}
 .rg-ejemplo{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
 .rg-ejemplo>div{flex:1 1 420px}
+/* [Dario 29/10 · Etapa C] Tiempos objetivo por color */
+.rg-tiempos{border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;display:flex;flex-direction:column;gap:10px}
+.rg-tiempos .rg-tgrid{display:flex;flex-wrap:wrap;gap:10px}
+.rg-tiempos label{display:flex;align-items:center;gap:8px}
+.rg-tiempos input{width:80px}
 .rg-lista{display:flex;flex-direction:column;gap:12px}
 .rg-vacio{border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--muted)}
 .rg-card{border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--panel)}

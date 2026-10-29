@@ -92,6 +92,7 @@ function medgemma(){
 const REGLAS_HRRG={lista:[],usarEjemplo:true,error:null};
 async function cargarReglasHospital(){
   if(!TriageAPI.MODO_REAL)return;
+  if(typeof cargarTiempos==='function')cargarTiempos();   /* [Dario 29/10 · Etapa C] tiempos por color al día */
   const r=await TriageAPI.reglasActivas();
   if(r.estado===401){location.href='index.html';return}
   if(r.ok){REGLAS_HRRG.lista=r.datos.reglas||[];REGLAS_HRRG.usarEjemplo=r.datos.usar_ejemplo!==false;REGLAS_HRRG.error=null}

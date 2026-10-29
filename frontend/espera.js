@@ -9,7 +9,19 @@
    Se carga DESPUÉS de formulario.js y sugerencia.js. */
 /* En espera y re-triage */
 const TARGET=[0,10,60,120,240];
+/* [Dario 29/10 · Etapa C] Tiempo objetivo por color: los valores de arriba son solo los de referencia (Manchester).
+   Con servidor se leen de /api/reglas/tiempos (los administra la Jefatura en reglas.html). Si falla, quedan estos. */
+function aplicarTiempos(t){
+  const N=['Inmediato','Muy urgente','Urgente','Normal'];
+  ['ROJO','NARANJA','AMARILLO','VERDE'].forEach((c,i)=>{if(Number.isFinite(t[c])){TARGET[i]=t[c];DESC[i]=N[i]+' · '+(t[c]===0?'atención inmediata':fmtMin(t[c]))}});
+}
+async function cargarTiempos(){
+  if(!TriageAPI.MODO_REAL)return;
+  const r=await TriageAPI.pedir('/api/reglas/tiempos',{method:'GET',cache:'no-store'});
+  if(r.ok&&r.datos&&r.datos.tiempos)aplicarTiempos(r.datos.tiempos);
+}
 const fmtMin=m=>m<60?m+' min':Math.floor(m/60)+' h'+(m%60?' '+m%60+' min':'');
+cargarTiempos();
 const mk=o=>Object.assign(init(),o);
 const WAIT=[
   {ep:'EP-004818',lv:1,mot:'Dolor torácico',min:6,relato:'Me duele el pecho desde hace media hora, como una presión, y estoy sudando.',rev:mk({motivo_categoria:'Dolor torácico',motivo_consulta:'Dolor de pecho opresivo con sudoración',tiempo_evolucion_valor:'30',tiempo_evolucion_unidad:'minutos',dolor_localizacion:'Tórax',sintomas_asociados:'Sudoración',ant_diabetes:false,antecedentes_otros:'Hipertensión',ta_sistolica:'150',ta_diastolica:'95',frecuencia_cardiaca:'110',frecuencia_respiratoria:'22',saturacion_o2:'94',temperatura:'36,8',estado_conciencia:'Alerta',dolor_intensidad:'8'})},

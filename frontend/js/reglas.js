@@ -23,6 +23,8 @@
   const textoOrigen = (o) => (ORIG.find((x) => x[0] === o) || [o, o])[1];
   let reglas = [], usarEjemplo = true, configAct = null;
   let editor = null, pendiente = null, abiertos = new Set(), cargando = false;
+  /* [Dario 29/10 · Etapa C] Tiempos objetivo por color (minutos). */
+  let tiempos = null, tiemposRef = null, tiemposConf = false, tiemposAct = null, tiemposMsg = null;
 
   const chipColor = (c, txt) => {
     const v = COLOR_VAR[c] || ['--line', 'inherit'];
@@ -47,6 +49,34 @@
     reglas = r.datos.reglas || []; usarEjemplo = r.datos.usar_ejemplo !== false; configAct = r.datos.config_actualizada;
     pintar();
   }
+
+  /* ---------- Tiempos objetivo por color (Etapa C) ---------- */
+  async function cargarTiempos() {
+    const r = await llamar('/api/reglas/tiempos');
+    if (!r.ok) { tiemposMsg = r.datos.mensaje || 'No se pudieron leer los tiempos.'; return pintarTiempos(); }
+    tiempos = r.datos.tiempos; tiemposRef = r.datos.por_defecto; tiemposConf = !!r.datos.confirmados; tiemposAct = r.datos.actualizado;
+    pintarTiempos();
+  }
+  function pintarTiempos() {
+    const box = $('rgTiempos'); if (!box) return;
+    if (!tiempos) { box.innerHTML = '<div class="hint">' + esc(tiemposMsg || 'Cargando tiempos…') + '</div>'; return; }
+    const estado = tiemposConf
+      ? 'Guardados por ' + esc(tiemposAct.por) + ', ' + esc(fecha(tiemposAct.en)) + '.'
+      : 'Son los de <b>referencia del Sistema Manchester</b>: todavía no fueron confirmados por la Guardia del HRRG.';
+    box.innerHTML = '<div><b>Tiempo objetivo máximo de atención por color</b> (minutos). Lo usan la pantalla En espera, la sala de espera y la API del hospital. ' + estado + '</div>' +
+      '<div class="rg-tgrid">' + Object.keys(COLOR_VAR).map((c) => '<label>' + chipColor(c) + '<input data-t="' + c + '" inputmode="numeric" value="' + esc(tiempos[c]) + '"' +
+        (soloLectura ? ' disabled' : '') + '><span class="hint">min' + (tiemposRef && tiemposRef[c] !== tiempos[c] ? ' (ref. ' + tiemposRef[c] + ')' : '') + '</span></label>').join('') + '</div>' +
+      (tiemposMsg ? '<div class="werr">' + esc(tiemposMsg) + '</div>' : '') +
+      (soloLectura ? '' : '<div class="row"><button type="button" class="btn" id="tGuardar">' + (tiemposConf ? 'Guardar cambios' : 'Confirmar o guardar tiempos') + '</button></div>');
+  }
+  async function guardarTiempos() {
+    const cuerpo = {};
+    document.querySelectorAll('#rgTiempos input[data-t]').forEach((i) => { cuerpo[i.dataset.t] = i.value.trim(); });
+    const res = await llamar('/api/reglas/tiempos', cuerpo);
+    tiemposMsg = res.ok ? null : (res.datos.mensaje || 'No se pudieron guardar los tiempos.');
+    if (res.ok) await cargarTiempos(); else pintarTiempos();
+  }
+  $('rgTiempos').addEventListener('click', (e) => { if (e.target.id === 'tGuardar') guardarTiempos(); });
 
   /* ---------- Lista ---------- */
   function pintar() {
@@ -253,5 +283,6 @@
     CAT = c.datos.campos; OPS = c.datos.operadores; MAX = c.datos.max_condiciones || 8;
     if (Array.isArray(c.datos.origenes) && c.datos.origenes.length) ORIG = c.datos.origenes;
     await cargar();
+    await cargarTiempos();
   })();
 })();

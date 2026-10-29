@@ -24,6 +24,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from src.registro import (listar_espera_demo, obtener_episodio, obtener_estado_demo,
                           _BANDERAS, _ANTECEDENTES)
+from src.reglas_hospital import leer_tiempos
 
 bp = Blueprint("api_hospital", __name__)
 logger = logging.getLogger("hrrg.sistema.api_hospital")   # va al mismo archivo de log del sistema
@@ -31,7 +32,8 @@ logger = logging.getLogger("hrrg.sistema.api_hospital")   # va al mismo archivo 
 VERSION_API = "1.0"
 COLORES = ("ROJO", "NARANJA", "AMARILLO", "VERDE")              # AZUL fuera (decisión del equipo)
 PRIORIDAD = {c: i + 1 for i, c in enumerate(COLORES)}            # 1 = más urgente
-OBJETIVO_MIN = {"ROJO": 0, "NARANJA": 10, "AMARILLO": 60, "VERDE": 120}
+# [Dario 29/10 · Etapa C] Los tiempos objetivo ya no están acá: se leen de la configuración de reglas
+# (src/reglas_hospital.leer_tiempos), que administra la Jefatura de Guardia.
 
 
 # ---------------------------------------------------------------- utilidades
@@ -119,6 +121,7 @@ def cola_espera():
         return _error("No se pudo consultar la cola de espera.", 500, "ERROR_REGISTRO")
 
     ahora = _ahora()
+    objetivo = leer_tiempos(current_app.config.get("BASE_REGLAS"))
     cola = []
     for ep in episodios:
         color = ep.get("color_final")
@@ -132,8 +135,8 @@ def cola_espera():
             "prioridad": PRIORIDAD[color],
             "en_espera_desde": ep["en_espera_desde"],
             "espera_min": espera,
-            "tiempo_maximo_min": OBJETIVO_MIN[color],
-            "vencido": color != "ROJO" and espera > OBJETIVO_MIN[color],
+            "tiempo_maximo_min": objetivo[color],
+            "vencido": color != "ROJO" and espera > objetivo[color],
             "motivo_categoria": ep.get("motivo_categoria"),
         })
 
