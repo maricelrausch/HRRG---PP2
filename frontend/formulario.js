@@ -97,6 +97,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function go(s){
+  /* [Dario 29/10] Después de Aceptar/Modificar/Rechazar, volver a Ingreso o Medición blanquea las pantallas. */
+  if(st.cerrado&&(s==='ingreso'||s==='revision')){nuevoCaso();return}
   if(s!=='resumen'&&$('#chat'))abrirChat(false);
   st.screen=s;
   if(!st.user){location.href='index.html';return}
@@ -113,7 +115,7 @@ function go(s){
   const sp=SPECS[s];
   $('#specs').innerHTML='<div class="eyebrow">Especificaciones</div><h2>'+sp.t+'</h2><ol>'+sp.items.map(i=>'<li><span class="n">'+i[0]+'</span><span>'+i[1]+'</span></li>').join('')+'</ol><div class="src">Fuente: '+sp.src+'</div>';
   if(s==='revision'){$('#epCode').textContent=st.ep;$('#dniTag').textContent=st.dni?'DNI '+fmtDni(st.dni):'Sin DNI';$('#reBadge').hidden=!st.prev;if(st.prev)$('#reBadge').textContent='Reevaluación · antes '+LEVELS[st.prev.lv][0]+', hace '+fmtMin(st.prev.min);$('#demoWorse').hidden=!st.prev;$('#demoVitals').hidden=!!st.prev;renderForm();updOllama();setTimeout(()=>{const i=$('#r-ta_sistolica');i&&!i.value&&i.focus()},0)}
-  if(s==='resumen')renderResumen();
+  if(s==='resumen'){document.querySelectorAll('#s-resumen [data-go="revision"]').forEach(b=>b.hidden=!!st.cerrado);renderResumen()}
   if(s==='espera'){renderWait();if(TriageAPI.MODO_REAL)cargarEspera().then(renderWait)}
   window.scrollTo({top:0});
 }
@@ -202,6 +204,8 @@ $('#extraer').addEventListener('click', async () => {
     st.extraccion = resultado;
     /* A08: guarda el relato tal como se envió, aunque después se edite el Ingreso. */
     st.relatoOriginal = texto;
+    edadSexoDelRelato(texto);
+    respaldoPalabrasClave(texto);
     st.modoServidor = resultado.modo;
     renderSimbar();
     st.disc = {};
@@ -614,7 +618,10 @@ function renderReg(){
 }
 
 $('#nuevo').addEventListener('click',()=>nuevoCaso());
+const HINT_INGRESO=$('#hint').textContent;
 function nuevoCaso(){
+  st.cerrado=false;
+  $('#errBanner').hidden=true;$('#piiBanner').hidden=true;$('#hint').textContent=HINT_INGRESO;$('#hint').classList.remove('err');
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
   cerrarCancelar();$('#cancelOk').hidden=true;
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
@@ -739,3 +746,58 @@ function leerDni(){
   el.classList.remove('bad');st.dni=d;el.value=fmtDni(d);return true;
 }
 $('#dni').addEventListener('blur',()=>{if($('#dni').value.trim())leerDni()});
+/* [Dario 29/10] Enter en el DNI valida y pasa al relato. */
+$('#dni').addEventListener('keydown',e=>{if(e.key!=='Enter')return;e.preventDefault();if(leerDni())$('#caso').focus()});
+
+/* [Dario 29/10] Edad y sexo desde el relato, sin MedGemma (regex local: no suma latencia).
+   Edad: "27 años", "de 27 años", "tengo 27 años", "8 meses" (bebé = 0). Se descarta si es una
+   duración ("hace 3 años", "desde hace 2 años", "durante 5 años").
+   Sexo: solo palabras explícitas (masculino, hombre, mujer, embarazada…), no el género de otras.
+   No pisa lo ya cargado y queda marcado como IA para revisar. */
+function edadSexoDelRelato(texto){
+  const t=' '+String(texto||'').toLowerCase()+' ';
+  const marcar=(k,v)=>{const f=F.find(x=>x.k===k);if(f)f.ia=v;st.rev[k]=v};
+  if(!st.rev.edad){
+    const re=/(\d{1,3})\s*(años|anos|meses)\b/g;let m;
+    while((m=re.exec(t))){
+      const antes=t.slice(Math.max(0,m.index-14),m.index);
+      if(/(hace|durante|por|desde|cada|hasta|en)\s+$/.test(antes))continue;
+      const n=+m[1];if(n>120)continue;
+      marcar('edad',String(m[2]==='meses'?0:n));break;
+    }
+  }
+  if(!st.rev.sexo){
+    const F_=/[^a-záéíóúñ](femenino|mujer|señora|nena|niña|embarazada|gestante)[^a-záéíóúñ]/,
+          M_=/[^a-záéíóúñ](masculino|hombre|varón|varon|señor|nene|niño)[^a-záéíóúñ]/;
+    const v=F_.test(t)&&!M_.test(t)?'Femenino':M_.test(t)&&!F_.test(t)?'Masculino':null;
+    if(v)marcar('sexo',v);
+  }
+}
+
+/* [Dario 29/10] Respaldo por palabras clave para banderas rojas y antecedentes (sin MedGemma,
+   no suma latencia). Solo MARCA lo que MedGemma no marcó; nunca desmarca. Ignora menciones
+   negadas ("sin sangrado", "niega convulsiones", "no tiene asma"). Queda como IA para revisar. */
+const CLAVES_RELATO={
+  br_sangrado:/sangr\w*|hemorrag\w*/,
+  br_convulsion:/convuls\w*/,
+  br_disnea:/falta (de|el) aire|no (puede|puedo|podia|podía) respirar|(le|me) cuesta respirar|dificultad para respirar|ahog\w*|disnea/,
+  br_trauma:/golpe\w*|caida|se cayo|me cai|choque|chocó|choco|accidente|atropell\w*|fractur\w*|traumat\w*/,
+  ant_diabetes:/diabet\w*|insulin\w*/,
+  ant_cardio:/hipertens\w*|presion alta|cardiac\w*|cardiopat\w*|infarto|marcapaso\w*|arritmi\w*|del corazon/,
+  ant_resp:/asma\w*|epoc|enfisema|bronquitis cronica/,
+  ant_anticoag:/anticoagul\w*|warfarina|acenocumarol|sintrom|apixaban|rivaroxaban|heparina/,
+  ant_inmuno:/inmunosupr\w*|quimioterapia|\bvih\b|\bhiv\b|trasplant\w*/,
+  ant_embarazo:/embarazad\w*|gestante|semanas de embarazo/
+};
+function respaldoPalabrasClave(texto){
+  const t=String(texto||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  Object.entries(CLAVES_RELATO).forEach(([k,re])=>{
+    if(st.rev[k]===true)return;
+    const g=new RegExp(re.source,'g');let m;
+    while((m=g.exec(t))){
+      const antes=t.slice(Math.max(0,m.index-25),m.index);
+      if(/\b(no|sin|niega|nunca|tampoco|descarta)\b[^.,;]*$/.test(antes))continue;
+      const f=F.find(x=>x.k===k);if(f)f.ia=true;st.rev[k]=true;break;
+    }
+  });
+}

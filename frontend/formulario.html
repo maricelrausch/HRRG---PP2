@@ -58,7 +58,7 @@
         <!-- Textos del ingreso simplificados (pedido 22/10): el aviso de caso ficticio va al lado del título. -->
         <label class="label" for="caso">Descripción del evento. <span class="n">1</span> <span class="opt">Caso ficticio: sin nombre, DNI, domicilio ni teléfono en el relato.</span></label>
         <div class="field-wrap">
-          <textarea id="caso">Me duele mucho la panza, acá arriba, desde hace unas 6 horas. Tengo ganas de vomitar y me siento afiebrada. Soy diabética, tomo pastillas.</textarea>
+          <textarea id="caso" placeholder="Ej.: me duele mucho la panza desde hace 6 horas, tengo ganas de vomitar…"></textarea>
           <button type="button" class="mic" id="mic" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             <span id="micTxt">Dictar</span><span class="n">M</span>
@@ -80,7 +80,8 @@
             <div class="strip">
               <span class="ep"><span class="eyebrow">Episodio</span><b id="epCode">EP-004812</b><span class="dnitag" id="dniTag"></span></span><span class="rebadge" id="reBadge" hidden></span>
               <div class="strip-f" id="g-ident"></div>
-              <button type="button" class="relline" id="relline" aria-expanded="false"><b>Relato:</b> <span id="origTxt"></span></button>
+              <!-- [Dario 29/10] Relato oculto en Medición (pedido del grupo); se deja el elemento porque formulario.js lo usa -->
+              <button type="button" class="relline" id="relline" aria-expanded="false" style="display:none"><b>Relato:</b> <span id="origTxt"></span></button>
             </div>
             <div class="cx"><div class="cx-h">Signos vitales <span class="n">1</span><span class="sub">Enter pasa al siguiente · referencias orientativas para adultos</span></div><div class="gvt" id="g-vitales"></div></div>
             <div class="cx"><div class="cx-h">Conciencia, dolor y aspecto</div><div class="gvt" id="g-dolor"></div></div>

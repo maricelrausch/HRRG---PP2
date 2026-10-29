@@ -193,6 +193,7 @@ function commit(lv){
   else WAIT.push({ep:st.ep,dni:st.dni,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
   w=WAIT.find(x=>x.ep===st.ep);w.base=Date.now();w.extra=0;
   ponerEnEspera(w);guardarDecision(w,decisionActual(lv));
+  st.cerrado=true;document.querySelectorAll('#s-resumen [data-go="revision"]').forEach(b=>b.hidden=true); /* [Dario 29/10] decisión registrada: el caso ya no se edita desde Ingreso/Medición */
 }
 
 /* ===== Espera persistente (con servidor) =====
@@ -343,7 +344,7 @@ $('#wList').addEventListener('click',e=>{
     renderWait();return}
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]'),fi=e.target.closest('[data-fin]');
   if(fi){const ep=fi.dataset.fin;if(finPending===ep){finPending=null;const w=WAIT.find(x=>x.ep===ep);if(w)finalizar(w)}else{finPending=ep;renderWait()}return}
-  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
+  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.cerrado=false;st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
   if(es){escPending=es.dataset.esc;escForm={mot:'',det:''};renderWait();const sel=$('[data-escmot]');if(sel)sel.focus();return}

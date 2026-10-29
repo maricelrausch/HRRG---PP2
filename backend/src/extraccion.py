@@ -64,8 +64,18 @@ Reglas:
   ("hace 3 días", "media hora"). Expresiones vagas ("desde ayer", "unos minutos") -> null.
 - dolor_localizacion: dónde le duele, con las palabras del relato o su término anatómico.
 - sintomas_asociados: otros síntomas que refiere, separados por coma.
-- br_*: true solo si el relato lo afirma. "Niega sangrado" o "sin sangrado" -> false.
-- ant_*: true solo si el relato menciona ese antecedente.
+- br_* (banderas rojas): true si el relato lo menciona, aunque sea al pasar. Ejemplos:
+  br_sangrado: sangra, sangrado, hemorragia, vómito con sangre.
+  br_convulsion: convulsión, convulsiones, convulsionó.
+  br_disnea: le falta el aire, no puede respirar, se ahoga, dificultad para respirar.
+  br_trauma: golpe, caída, se cayó, choque, accidente, fractura.
+  "Niega sangrado" o "sin sangrado" -> false.
+- ant_* (antecedentes): true si el relato menciona ese antecedente. Ejemplos:
+  ant_diabetes: diabético/a, usa insulina. ant_cardio: hipertenso, infarto, problemas del corazón.
+  ant_resp: asma, EPOC. ant_anticoag: anticoagulado, toma sintrom o warfarina.
+  ant_inmuno: quimioterapia, trasplante, VIH. ant_embarazo: embarazada.
+  ant_medicacion: insulina, anticoagulantes, quimioterapia u otra medicación de riesgo.
+- Ante la duda en una bandera roja, marcala true: la revisa el profesional.
 Respondé únicamente con el objeto JSON."""
 
 
