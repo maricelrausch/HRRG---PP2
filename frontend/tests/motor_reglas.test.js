@@ -48,4 +48,13 @@ t('origen y validación pasan al resultado sin cambiar el cálculo (Dario 29/10)
   // Sin origen (reglas anteriores) se toma como provisoria.
   assert.strictEqual(M.evaluar([R('NARANJA', 'todas', [{ campo: 'saturacion_o2', operador: '<', valor: 90 }])], base)[0].origen, 'provisoria');
 });
+t('grupo etario calculado con la edad (mismos casos que backend/tests/test_reglas_matriz.py)', () => {
+  [[0, 'Lactante'], ['0,5', 'Lactante'], [1, 'Niño'], [11, 'Niño'], [12, 'Adolescente'], [17, 'Adolescente'], [18, 'Adulto'],
+    [64, 'Adulto'], [65, 'Adulto mayor'], [99, 'Adulto mayor'], ['', null], [null, null], [-1, null], ['abc', null]]
+    .forEach(([e, g]) => assert.strictEqual(M.grupoEtario(e), g, 'edad ' + e));
+  const r = [R('NARANJA', 'todas', [{ campo: 'grupo_etario', operador: 'es', valor: 'Lactante' }, { campo: 'temperatura', operador: '>=', valor: 38 }])];
+  assert.strictEqual(M.evaluar(r, { edad: 0, temperatura: '38,2' }).length, 1);
+  assert.strictEqual(M.evaluar(r, { edad: 30, temperatura: '38,2' }).length, 0);
+  assert.strictEqual(M.evaluar(r, { temperatura: '38,2' }).length, 0);   // sin edad no se adivina
+});
 console.log('motor_reglas: ' + n + ' pruebas OK');

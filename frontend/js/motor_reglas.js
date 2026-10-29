@@ -21,8 +21,17 @@
     const n = Number(String(v).trim().replace(',', '.'));
     return Number.isFinite(n) ? n : null;
   }
-  /* Valor de un dato del caso. La PAM se calcula con la TA si no viene cargada. */
+  /* [Dario 29/10 · D1] Grupo etario calculado con la edad (mismos cortes que backend/src/reglas_hospital.py). */
+  const GRUPOS = [['Lactante', 0, 0], ['Niño', 1, 11], ['Adolescente', 12, 17], ['Adulto', 18, 64], ['Adulto mayor', 65, 200]];
+  function grupoEtario(edad) {
+    const a = numero(edad);
+    if (a === null || a < 0) return null;
+    const g = GRUPOS.find(([, min, max]) => a >= min && a < max + 1);
+    return g ? g[0] : null;
+  }
+  /* Valor de un dato del caso. La PAM se calcula con la TA si no viene cargada; el grupo etario, con la edad. */
   function valor(datos, campo) {
+    if (campo === 'grupo_etario') return datos.grupo_etario || grupoEtario(datos.edad);
     if (campo === 'pam') {
       const p = numero(datos.pam);
       if (p !== null) return p;
@@ -63,9 +72,10 @@
       if (ok) out.push({ codigo: r.codigo, nombre: r.nombre, version: r.version, color: r.color,
         lv: NIVEL[r.color], texto: r.explicacion,
         origen: r.origen in ORIGEN ? r.origen : 'provisoria', validada_por: r.validada_por || '',
+        discriminador: r.discriminador || '',
         cumplidas: conds.filter(c => cumple(c, datos)) });
     });
     return out.sort((a, b) => a.lv - b.lv);
   }
-  root.MotorReglas = { evaluar: evaluar, cumple: cumple, describir: describir, NIVEL: NIVEL, ORIGEN: ORIGEN };
+  root.MotorReglas = { evaluar: evaluar, cumple: cumple, describir: describir, NIVEL: NIVEL, ORIGEN: ORIGEN, grupoEtario: grupoEtario };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

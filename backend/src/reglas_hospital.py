@@ -52,6 +52,32 @@ ORIGENES = {
 }
 ORIGEN_POR_DEFECTO = "provisoria"
 MAX_VALIDADA_POR = 120
+MAX_DISCRIMINADOR = 200
+
+# [Dario 29/10 · D1] Grupos etarios (pedido de Francisco Navoni: "la edad debe ser una variable estructural").
+# Se calculan solos a partir de la edad en años; una regla puede usar "Grupo etario es Lactante", etc.
+# Mismos cortes en frontend/js/motor_reglas.js y evaluacion/reglas_seguridad.py (los tests los comparan).
+GRUPOS_ETARIOS = [  # (nombre, edad mínima en años, edad máxima en años)
+    ("Lactante", 0, 0),          # menos de 1 año
+    ("Niño", 1, 11),
+    ("Adolescente", 12, 17),
+    ("Adulto", 18, 64),
+    ("Adulto mayor", 65, 200),
+]
+
+
+def grupo_etario(edad):
+    """Grupo etario para una edad en años (None si no hay edad válida)."""
+    try:
+        anios = _numero(edad)
+    except (ValueError, TypeError):
+        return None
+    if anios < 0:
+        return None
+    for nombre, minimo, maximo in GRUPOS_ETARIOS:
+        if anios < maximo + 1 and anios >= minimo:
+            return nombre
+    return None
 
 # [Dario 29/10 · Etapa C] Tiempo objetivo máximo de atención por color (minutos).
 # Por defecto, los de referencia del Sistema Manchester; la Jefatura los confirma o cambia en reglas.html
@@ -80,6 +106,10 @@ CAMPOS = {
                           "opciones": ["Alerta", "Responde a la voz", "Responde al dolor", "No responde"]},
     "motivo_categoria": {"etiqueta": "Categoría del motivo", "tipo": "opcion", "opciones": CATEGORIAS},
     "sexo": {"etiqueta": "Sexo", "tipo": "opcion", "opciones": ["Femenino", "Masculino", "No informado"]},
+    "grupo_etario": {"etiqueta": "Grupo etario (se calcula con la edad)", "tipo": "opcion",
+                     "opciones": [g[0] for g in GRUPOS_ETARIOS],
+                     "ayuda": "Lactante: menos de 1 año · Niño: 1 a 11 · Adolescente: 12 a 17 · "
+                              "Adulto: 18 a 64 · Adulto mayor: 65 o más"},
     "br_sangrado": {"etiqueta": "Bandera roja: sangrado evidente", "tipo": "bool"},
     "br_convulsion": {"etiqueta": "Bandera roja: convulsión activa", "tipo": "bool"},
     "br_disnea": {"etiqueta": "Bandera roja: dificultad para respirar", "tipo": "bool"},
@@ -157,36 +187,42 @@ def inicializar_reglas(ruta_base):
             """)
     finally:
         conexion.close()
-    _migrar_origen(ruta_base)
+    _migrar_columnas(ruta_base)
 
 
-def _migrar_origen(ruta_base):
-    """[Dario 29/10] Agrega las columnas origen y validada_por a una base que no las tiene.
+# Columnas agregadas después de la primera versión de la tabla (en orden de aparición).
+COLUMNAS_NUEVAS = {
+    "origen": f"TEXT NOT NULL DEFAULT '{ORIGEN_POR_DEFECTO}'",   # Etapa A
+    "validada_por": "TEXT NOT NULL DEFAULT ''",                     # Etapa A
+    "discriminador": "TEXT NOT NULL DEFAULT ''",                    # D1: matriz de Navoni
+    "validada_en": "TEXT NOT NULL DEFAULT ''",                      # D1: fecha de validación
+}
+
+
+def _migrar_columnas(ruta_base):
+    """[Dario 29/10] Agrega las columnas nuevas a una base que no las tiene.
     Solo AGREGA columnas (no borra ni cambia reglas). Las reglas que ya existían quedan como
-    «provisoria» y sin validar. Si había reglas, antes se guarda una copia de la base
-    (reglas_hospital.db.antes-origen.bak) para poder volver atrás."""
+    «provisoria», sin validar y sin discriminador. Si había reglas, antes se guarda una copia de la
+    base (reglas_hospital.db.antes-<primera columna nueva>.bak) para poder volver atrás."""
     conexion = sqlite3.connect(ruta_base)
     try:
         columnas = {fila[1] for fila in conexion.execute("PRAGMA table_info(reglas)")}
-        faltan = [c for c in ("origen", "validada_por") if c not in columnas]
+        faltan = [c for c in COLUMNAS_NUEVAS if c not in columnas]
         if not faltan:
             return
         hay_reglas = conexion.execute("SELECT COUNT(*) FROM reglas").fetchone()[0] > 0
     finally:
         conexion.close()
     if hay_reglas:
-        copia = Path(str(ruta_base) + ".antes-origen.bak")
+        copia = Path(str(ruta_base) + f".antes-{faltan[0]}.bak")
         if not copia.exists():
             shutil.copy2(ruta_base, copia)
             logger.info("REGLAS_BACKUP_ANTES_DE_MIGRAR | %s", copia.name)
     conexion = sqlite3.connect(ruta_base)
     try:
         with conexion:
-            if "origen" in faltan:
-                conexion.execute(
-                    f"ALTER TABLE reglas ADD COLUMN origen TEXT NOT NULL DEFAULT '{ORIGEN_POR_DEFECTO}'")
-            if "validada_por" in faltan:
-                conexion.execute("ALTER TABLE reglas ADD COLUMN validada_por TEXT NOT NULL DEFAULT ''")
+            for columna in faltan:
+                conexion.execute(f"ALTER TABLE reglas ADD COLUMN {columna} {COLUMNAS_NUEVAS[columna]}")
     finally:
         conexion.close()
     logger.info("REGLAS_MIGRADAS | columnas agregadas: %s", ", ".join(faltan))
@@ -225,12 +261,12 @@ def cargar_semilla(ruta_base, ruta_semilla):
             for regla in normalizadas:
                 cursor = conexion.execute(
                     """INSERT INTO reglas (nombre, explicacion, color, combinacion, condiciones_json, origen,
-                           validada_por, estado, version, fue_activada, creada_por, creada_en,
+                           validada_por, discriminador, estado, version, fue_activada, creada_por, creada_en,
                            actualizada_por, actualizada_en)
-                       VALUES (?, ?, ?, ?, ?, ?, '', ?, 1, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 1, ?, ?, ?, ?, ?)""",
                     (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
                      json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"],
-                     estado, fue_activada, usuario, ahora, usuario, ahora)
+                     regla["discriminador"], estado, fue_activada, usuario, ahora, usuario, ahora)
                 )
                 regla_id = cursor.lastrowid
                 conexion.execute("UPDATE reglas SET codigo = ? WHERE id = ?", (f"R-{regla_id:03d}", regla_id))
@@ -321,6 +357,8 @@ def _a_dict(fila, eventos=None):
         "condiciones": json.loads(fila["condiciones_json"]),
         "origen": fila["origen"],
         "validada_por": fila["validada_por"],
+        "validada_en": fila["validada_en"],
+        "discriminador": fila["discriminador"],
         "estado": fila["estado"],
         "version": fila["version"],
         "fue_activada": bool(fila["fue_activada"]),
@@ -352,7 +390,8 @@ def validar_regla(datos):
     """Devuelve (regla_normalizada, None) o (None, mensaje_de_error)."""
     if not isinstance(datos, dict):
         return None, "Enviá los datos de la regla."
-    permitidos = {"nombre", "explicacion", "color", "combinacion", "condiciones", "origen", "validada_por"}
+    permitidos = {"nombre", "explicacion", "color", "combinacion", "condiciones", "origen", "validada_por",
+                  "discriminador"}
     if set(datos) - permitidos:
         return None, "Hay campos que no corresponden a una regla."
 
@@ -375,6 +414,12 @@ def validar_regla(datos):
         validada_por = ""
     if not isinstance(validada_por, str) or len(validada_por.strip()) > MAX_VALIDADA_POR:
         return None, f"«Validada por» admite hasta {MAX_VALIDADA_POR} caracteres."
+    # Discriminador Manchester o criterio clínico que respalda la regla (texto para la matriz; no se evalúa).
+    discriminador = datos.get("discriminador", "")
+    if discriminador is None:
+        discriminador = ""
+    if not isinstance(discriminador, str) or len(discriminador.strip()) > MAX_DISCRIMINADOR:
+        return None, f"El discriminador admite hasta {MAX_DISCRIMINADOR} caracteres."
 
     condiciones = datos.get("condiciones")
     if not isinstance(condiciones, list) or not 1 <= len(condiciones) <= MAX_CONDICIONES:
@@ -416,7 +461,18 @@ def validar_regla(datos):
         "condiciones": limpias,
         "origen": origen,
         "validada_por": validada_por.strip(),
+        "discriminador": discriminador.strip(),
     }, None
+
+
+def _validada_en(regla, anterior=None):
+    """Fecha de validación: se pone sola cuando se carga «Validada por»; si no cambia quién validó,
+    se conserva la fecha anterior; si se borra, queda vacía."""
+    if not regla["validada_por"]:
+        return ""
+    if anterior is not None and anterior["validada_por"] == regla["validada_por"] and anterior["validada_en"]:
+        return anterior["validada_en"]
+    return _ahora()
 
 
 # ------------------------------------------------
@@ -530,11 +586,12 @@ def crear():
         with conexion:
             cursor = conexion.execute(
                 """INSERT INTO reglas (nombre, explicacion, color, combinacion, condiciones_json, origen,
-                       validada_por, estado, version, creada_por, creada_en, actualizada_por, actualizada_en)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'borrador', 1, ?, ?, ?, ?)""",
+                       validada_por, validada_en, discriminador, estado, version, creada_por, creada_en,
+                       actualizada_por, actualizada_en)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrador', 1, ?, ?, ?, ?)""",
                 (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
                  json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"], regla["validada_por"],
-                 usuario, ahora, usuario, ahora)
+                 _validada_en(regla), regla["discriminador"], usuario, ahora, usuario, ahora)
             )
             regla_id = cursor.lastrowid
             conexion.execute("UPDATE reglas SET codigo = ? WHERE id = ?", (f"R-{regla_id:03d}", regla_id))
@@ -564,10 +621,11 @@ def editar(regla_id):
             version = fila["version"] + 1
             conexion.execute(
                 """UPDATE reglas SET nombre = ?, explicacion = ?, color = ?, combinacion = ?, condiciones_json = ?,
-                       origen = ?, validada_por = ?, estado = 'borrador', version = ?, actualizada_por = ?,
-                       actualizada_en = ? WHERE id = ?""",
+                       origen = ?, validada_por = ?, validada_en = ?, discriminador = ?, estado = 'borrador',
+                       version = ?, actualizada_por = ?, actualizada_en = ? WHERE id = ?""",
                 (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
                  json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"], regla["validada_por"],
+                 _validada_en(regla, fila), regla["discriminador"],
                  version, g.profesional["usuario"], _ahora(), regla_id)
             )
             accion = "EDITADA (pasó a borrador)" if fila["estado"] == "activa" else "EDITADA"

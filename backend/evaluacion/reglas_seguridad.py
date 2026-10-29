@@ -37,7 +37,20 @@ def _numero(v):
     return n if n == n and n not in (float("inf"), float("-inf")) else None
 
 
+GRUPOS_ETARIOS = [("Lactante", 0, 0), ("Niño", 1, 11), ("Adolescente", 12, 17),
+                  ("Adulto", 18, 64), ("Adulto mayor", 65, 200)]   # mismos cortes que src/reglas_hospital.py
+
+
+def grupo_etario(edad):
+    a = _numero(edad)
+    if a is None or a < 0:
+        return None
+    return next((n for n, mn, mx in GRUPOS_ETARIOS if mn <= a < mx + 1), None)
+
+
 def _valor(d: dict, campo: str):
+    if campo == "grupo_etario":
+        return d.get("grupo_etario") or grupo_etario(d.get("edad"))
     if campo == "pam":
         p = _numero(d.get("pam"))
         if p is not None:
