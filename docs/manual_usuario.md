@@ -52,7 +52,7 @@ Ayuda a ordenar la atención en la guardia:
 |---|---|---|
 | **Enfermería** | Cargar casos, pedir la sugerencia, decidir el color, reevaluar, escalar a ROJO, finalizar | Exportar ni administrar usuarios |
 | **Médico/a** | Lo mismo que Enfermería | Exportar ni administrar usuarios |
-| **Auditoría** | Ver En espera, el historial completo de cada caso y el DNI; buscar por DNI; ver todos los casos (incluidos los finalizados y los anulados); **exportar** a Excel o PDF; ver las reglas del hospital | Cargar, modificar ni decidir nada (**solo lectura**) |
+| **Auditoría** | Ver En espera, el historial completo de cada caso y el DNI; buscar por DNI; ver todos los casos (incluidos los finalizados); **exportar** a Excel o PDF; ver las reglas del hospital | Cargar, modificar ni decidir nada (**solo lectura**) |
 | **Jefatura de Guardia** | Cargar, probar, activar, desactivar y editar las **reglas del hospital** | Atender pacientes ni ver casos |
 | **Administración** | Crear usuarios, asignar perfiles, desbloquear cuentas, generar claves temporales | Ver casos de pacientes |
 
@@ -108,7 +108,6 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
    - Con MedGemma, la primera vez puede tardar **1 o 2 minutos**.
    - Si algo falla, **el texto no se pierde**.
 4. **Borrar texto** limpia solo el cuadro del relato.
-5. **Cancelar caso:** para empezar de cero si te equivocaste (ver [Cancelar un caso](#cancelar-un-caso)).
 
 ### Paso 2 · Medición
 
@@ -137,20 +136,10 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
    - **Pedir sugerencia** (④): pasa al paso 3.
    - **Clasificar sin IA**: elegís el color a mano. Está siempre disponible, por si la IA no anda.
    - **Volver al relato**: vuelve al paso 1.
-   - **Cancelar caso**: descarta todo (ver abajo).
 
-### Cancelar un caso
+### Después de decidir: pantalla en blanco
 
-Si te equivocaste en algún dato y querés empezar de cero, tocá **Cancelar caso** en el paso 1 o en el paso 2.
-
-- **Si todavía no tocaste "Extraer datos":** no se guardó nada. El sistema pregunta *"¿Descartar todo lo cargado?"* y, con **Sí, descartar y empezar de cero**, borra el DNI, el relato y la medición.
-- **Si ya se guardó en el servidor:** hay que elegir un **motivo (obligatorio)**: datos cargados por error, paciente equivocado, el paciente se retiró antes del triage, caso duplicado u otro. Con **Anular caso**:
-  - el caso queda **anulado**: no pasa a la lista de espera ni aparece en la sala;
-  - **no se borra**: queda registrado quién lo canceló, cuándo y por qué, y Auditoría lo ve con el filtro **Anulados**.
-- **En una reevaluación** el botón dice **Cancelar reevaluación**: descarta los cambios y el paciente sigue en espera con su color.
-- **Una vez que el paciente pasó a la lista de espera, el caso no se puede cancelar.** Si ya lo atendieron, se usa **Finalizar (atendido)**.
-
-![Cancelar un caso](img/manual/17_cancelar.png)
+Una vez que registraste la decisión (**Aceptar**, **Modificar** o **Rechazar**), el caso queda cerrado y pasa a **En espera**. Si después volvés a **Ingreso** o a **Medición**, la pantalla aparece **en blanco**, lista para el próximo paciente. Para cambiar algo de ese paciente, usá **Reevaluar** desde En espera.
 
 ### Paso 3 · Sugerencia y decisión
 
@@ -381,7 +370,7 @@ El sistema está pensado para usar **las reglas del propio hospital**. Las carga
 | La pantalla de la sala dice "Sin conexión con el servidor" | Se cortó la red o se cerró el servidor. Mientras tanto se muestran los últimos datos; cuando vuelve la conexión, se actualiza sola. |
 | La pantalla se ve vieja o rara | Apretá **Ctrl+F5** en el navegador. |
 | Me sacó al inicio de sesión | Si dice *"La sesión se cerró por inactividad"*, pasaron 15 minutos sin uso. Volvé a ingresar. |
-| No me deja cancelar un caso | El caso ya pasó a la lista de espera o ya tiene una decisión registrada. Desde ahí no se puede anular. |
+| Volví a Ingreso y la pantalla está en blanco | Es así a propósito después de registrar la decisión: el caso ya está en **En espera**. Para cambiarlo, usá **Reevaluar**. |
 | Activé una regla y no cambió la sugerencia | La regla se aplica desde el **próximo** "Pedir sugerencia". Revisá que esté **Activa** (no en borrador) y que el caso tenga cargados todos los datos de sus condiciones. |
 
 ---

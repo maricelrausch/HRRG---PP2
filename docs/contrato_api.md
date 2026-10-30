@@ -862,6 +862,8 @@ El cuerpo de `POST /api/demo/episodios/exportar` suma un campo:
 
 ### Cancelar (anular) un caso cargado por error — `POST /api/demo/episodios/<codigo>/anular`
 
+> **Actualización 29/10:** el botón "Cancelar caso" se sacó de la pantalla. La ruta queda en el backend sin uso desde el frontend; el grupo decide si se conserva.
+
 Entrada: `{"motivo": "Datos cargados por error. …", "version_esperada": 1}` (la versión de `GET …/estado`).
 
 - Solo **enfermería y médicos** (el auditor no puede escribir).

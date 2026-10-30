@@ -327,16 +327,11 @@ function aUsuario(datos) {
     return pedir('/api/cuenta/password', { method: 'POST', body: JSON.stringify({ actual: actual, nueva: nueva }) });
   }
 
-  /* [Propuesta Barby 28/10] Cancelar un caso cargado por error (antes de la espera): queda ANULADO. */
-  function anularEpisodio(episodio, motivo, versionEsperada) {
-    return pedir('/api/demo/episodios/' + encodeURIComponent(episodio) + '/anular', { method: 'POST',
-      body: JSON.stringify({ motivo: motivo, version_esperada: versionEsperada }) });
-  }
   /* [Propuesta Barby 28/10] Reglas del hospital activas (las carga la Jefatura de Guardia). */
   function reglasActivas() {
     return pedir('/api/reglas/activas', { method: 'GET', cache: 'no-store' });
   }
-  root.TriageAPI = { MODO_REAL: MODO_REAL, enSegundoPlano: enSegundoPlano, anularEpisodio: anularEpisodio, reglasActivas: reglasActivas, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
+  root.TriageAPI = { MODO_REAL: MODO_REAL, enSegundoPlano: enSegundoPlano, reglasActivas: reglasActivas, login: login, sesion: sesion, logout: logout, pedir: pedir, cambiarPassword: cambiarPassword,
     crearEpisodio: crearEpisodio, registrarMedicion: registrarMedicion, registrarDatosIngreso: registrarDatosIngreso, corregirMedicion: corregirMedicion, consultarEpisodio: consultarEpisodio,
     consultarEstado: consultarEstado, cambiarEstado: cambiarEstado, listarEspera: listarEspera,
     identificarPaciente: identificarPaciente, buscarPaciente: buscarPaciente, episodiosDePaciente: episodiosDePaciente, listarCasos: listarCasos, exportarCasos: exportarCasos, registrarDecision: registrarDecision };

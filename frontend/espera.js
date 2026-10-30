@@ -82,7 +82,7 @@ function renderCasos(){
   /* El título de arriba y la lista de espera cambian según lo que se está mirando. */
   $('#wList').hidden=CASOS.abierto;$('#wTitulo').textContent=CASOS.abierto?'Historial de casos':'Pacientes en espera';
   if(!CASOS.abierto){$('#wCount').textContent=WAIT.length+' pacientes';return}
-  const est={'':'Todos los estados',en_espera:'En espera',finalizado:'Finalizados',en_ingreso:'En ingreso',anulado:'Anulados'};
+  const est={'':'Todos los estados',en_espera:'En espera',finalizado:'Finalizados',en_ingreso:'En ingreso'};
   const {q,qDni}=textoBusqueda(),porPac=CASOS.pac&&CASOS.pac.estado==='ok';
   const vis=CASOS.lista.filter(c=>(!CASOS.filtro||c.estado===CASOS.filtro)&&
     (porPac||!q||(qDni?(c.dni||'').startsWith(qDni):(c.codigo_episodio||'').includes(q))));

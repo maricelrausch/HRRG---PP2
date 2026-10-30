@@ -19,7 +19,7 @@ const SPECS={
     ['M','Dictado por voz: transcribe al cuadro y se puede editar.'],
     ['2','No envía texto vacío. Mientras procesa, botón bloqueado.'],
     ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.'],
-    ['✕','Cancelar caso: descarta lo cargado o, si ya se guardó, lo deja anulado con motivo. Después de pasar a la espera no se puede cancelar.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
+    ['↺','Después de registrar la decisión, volver a Ingreso o Medición deja la pantalla en blanco para el próximo paciente.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
   revision:{t:'Pantalla 2 · Medición',items:[
     ['1','Solo lo que se mide en el box. Nombre completo, unidad y referencia en cada campo. Enter pasa al siguiente.'],
     ['A','Aviso inmediato: fuera de lo normal (borde oscuro), crítico por regla de seguridad o valor imposible (rojo).'],
@@ -105,10 +105,6 @@ function go(s){
   if(st.user.rol==='auditor'&&s!=='espera')s='espera';
   st.screen=s;
   ['ingreso','revision','resumen','espera'].forEach(x=>$('#s-'+x).hidden=x!==s);
-  /* Cancelar caso: solo en Ingreso y Medición; en una reevaluación cancela la reevaluación. */
-  if(s!=='ingreso'&&s!=='revision')cerrarCancelar();else if(cancelForm)pintarCancelar();
-  if(s!=='ingreso')$('#cancelOk').hidden=true;
-  document.querySelectorAll('[data-cancelar]').forEach(b=>b.textContent=st.prev?'Cancelar reevaluación':'Cancelar caso');
   document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-current',b.dataset.go===s?'page':'false'));
   document.querySelectorAll('#stepper span').forEach(sp=>sp.classList.toggle('on',sp.dataset.s===s));
   $('#stepper').hidden=s==='espera';
@@ -623,67 +619,9 @@ function nuevoCaso(){
   st.cerrado=false;
   $('#errBanner').hidden=true;$('#piiBanner').hidden=true;$('#hint').textContent=HINT_INGRESO;$('#hint').classList.remove('err');
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
-  cerrarCancelar();$('#cancelOk').hidden=true;
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
   st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');
   F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')}
-/* ===== Cancelar caso (pedido 28/10) =====
-   En Ingreso y Medición, antes de que el caso pase a la lista de espera:
-   - Si todavía no se guardó nada en el servidor: se descarta lo cargado y se empieza de cero.
-   - Si el episodio ya existe en el servidor: se pide el motivo y queda ANULADO (no se borra:
-     queda registrado quién lo canceló y por qué; no aparece en En espera ni en la sala).
-   - En una reevaluación: se descartan los cambios y el paciente sigue en espera con su color.
-   Una vez en la lista de espera no se puede cancelar (lo controla también el servidor). */
-const MOTIVOS_ANULAR=['Datos cargados por error','Paciente equivocado (DNI o persona)','El paciente se retiró antes del triage','Caso duplicado','Otro'];
-var cancelForm=null;
-function cerrarCancelar(){cancelForm=null;$('#cancelBox').hidden=true;$('#cancelBox').innerHTML=''}
-function abrirCancelar(){
-  cancelForm={mot:'',det:'',error:null,enviando:false};
-  $('#cancelOk').hidden=true;pintarCancelar();
-  const b=$('#cancelBox');b.scrollIntoView({behavior:'smooth',block:'nearest'});
-  const f=b.querySelector('select,button');if(f)f.focus();
-}
-function pintarCancelar(){
-  const b=$('#cancelBox');if(!cancelForm){b.hidden=true;return}
-  const enSrv=TriageAPI.MODO_REAL&&st.srv&&st.srv.ep;
-  let h;
-  if(st.prev){
-    h='<b id="cancelTit">¿Cancelar la reevaluación de '+esc(st.ep)+'?</b><span>Se descartan los cambios de esta pantalla y el paciente sigue en espera con su color '+esc(LEVELS[st.prev.lv][0])+'.</span>'+
-      '<div class="row"><button type="button" class="btn danger" data-cx="reeval">Descartar cambios</button><button type="button" class="btn" data-cx="no">Volver</button></div>';
-  }else if(!enSrv){
-    h='<b id="cancelTit">¿Descartar todo lo cargado?</b><span>Se borran el DNI, el relato y los datos de la medición. Todavía no se guardó nada en el servidor.</span>'+
-      '<div class="row"><button type="button" class="btn danger" data-cx="descartar">Sí, descartar y empezar de cero</button><button type="button" class="btn" data-cx="no">Volver</button></div>';
-  }else{
-    const ok=!!cancelForm.mot&&(cancelForm.mot!=='Otro'||!!cancelForm.det.trim());
-    h='<b id="cancelTit">Cancelar el caso '+esc(st.ep)+'</b><span>El caso queda <b>anulado</b>: no pasa a la lista de espera y queda registrado quién lo canceló y por qué (no se borra del historial).</span>'+
-      '<div class="row"><label>Motivo (obligatorio) <select id="cxMot"><option value="">Seleccionar…</option>'+MOTIVOS_ANULAR.map(o=>'<option'+(o===cancelForm.mot?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></label>'+
-      '<label class="cx-det">Detalle'+(cancelForm.mot==='Otro'?' (obligatorio)':' (opcional)')+' <input id="cxDet" maxlength="300" value="'+esc(cancelForm.det)+'" placeholder="Qué pasó"></label></div>'+
-      (cancelForm.error?'<div class="werr">'+esc(cancelForm.error)+'</div>':'')+
-      '<div class="row"><button type="button" class="btn danger" data-cx="anular"'+(ok&&!cancelForm.enviando?'':' disabled')+'>'+(cancelForm.enviando?'Anulando…':'Anular caso')+'</button><button type="button" class="btn" data-cx="no">Volver</button></div>';
-  }
-  b.innerHTML=h;b.hidden=false;
-}
-async function anularCaso(){
-  const ep=st.srv.ep,motivo=[cancelForm.mot,cancelForm.det.trim()].filter(Boolean).join('. ');
-  cancelForm.enviando=true;cancelForm.error=null;pintarCancelar();
-  const e=await TriageAPI.consultarEstado(ep);
-  if(e.estado===401){location.href='index.html';return}
-  const r=e.ok?await TriageAPI.anularEpisodio(ep,motivo,e.datos.estado.version):e;
-  if(r.estado===401){location.href='index.html';return}
-  if(!r.ok){cancelForm.enviando=false;cancelForm.error='No se pudo anular: '+((r.datos&&r.datos.mensaje)||'error del servidor')+'.';pintarCancelar();return}
-  const w=WAIT.find(x=>x.ep===ep);if(w)WAIT.splice(WAIT.indexOf(w),1);
-  nuevoCaso();
-  $('#cancelOk').innerHTML='<b>Caso '+esc(ep)+' anulado.</b> Motivo: '+esc(motivo)+'. Podés cargar el próximo paciente.';$('#cancelOk').hidden=false;
-}
-document.addEventListener('click',e=>{if(e.target.closest('[data-cancelar]')){abrirCancelar();return}
-  const b=e.target.closest('#cancelBox [data-cx]');if(!b)return;const a=b.dataset.cx;
-  if(a==='no'){cerrarCancelar();return}
-  if(a==='descartar'){nuevoCaso();$('#cancelOk').innerHTML='<b>Se descartó lo cargado.</b> Podés empezar de nuevo.';$('#cancelOk').hidden=false;return}
-  if(a==='reeval'){nuevoCaso();go('espera');return}
-  if(a==='anular')anularCaso();});
-$('#cancelBox').addEventListener('change',e=>{if(e.target.id==='cxMot'&&cancelForm){cancelForm.mot=e.target.value;pintarCancelar();const i=$('#cxDet');if(i&&cancelForm.mot==='Otro')i.focus()}});
-$('#cancelBox').addEventListener('input',e=>{if(e.target.id==='cxDet'&&cancelForm){cancelForm.det=e.target.value;
-  const ok=!!cancelForm.mot&&(cancelForm.mot!=='Otro'||!!cancelForm.det.trim()),btn=$('#cancelBox [data-cx="anular"]');if(btn)btn.disabled=!ok}});
 /* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
 /* Sesión (A07): la consulta api.js. Modo real = Flask (/api/sesion); modo demo = login simulado. */
 async function salir() {
