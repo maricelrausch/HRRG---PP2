@@ -58,15 +58,28 @@ def reglas_v1(d: dict) -> list[tuple[int, str]]:
 
 
 def _nivel_v1(d):
-    r = reglas_v1(d)
+    r = reglas_v1(d) + simulacion_v1(d)
     return min(lv for lv, _ in r) if r else None
+
+
+# ---- [Dario 30/10] Tanda 3: los umbrales de la simulación de MedGemma (frontend/sugerencia.js, medgemma()) ----
+def simulacion_v1(d: dict) -> list[tuple[int, str]]:
+    n = lambda k: a_numero(d.get(k))           # noqa: E731
+    dolor, t, out = n("dolor_intensidad"), n("temperatura"), []
+    if dolor is not None and 5 <= dolor < 8:
+        out.append((2, "Dolor moderado"))
+    if t is not None and 37.5 <= t < 38.5:
+        out.append((2, "Febrícula"))
+    if t is not None and t >= 38.5:
+        out.append((2, "Fiebre"))
+    return out
 
 
 VALORES = {
     "saturacion_o2": ["", 85, 89, "89,5", 90, 91, 98], "frecuencia_respiratoria": ["", 6, 7, 8, 9, 30, 31],
     "ta_sistolica": ["", 70, 89, 90, 91, 120], "frecuencia_cardiaca": ["", 35, 39, 40, 41, 130, 131],
-    "glasgow": ["", 3, 8, 9, 14, 15], "temperatura": ["", 36.5, 37.9, "38", 38, "38,2"],
-    "dolor_intensidad": ["", 0, 7, 8, 10],
+    "glasgow": ["", 3, 8, 9, 14, 15], "temperatura": ["", 36.5, 37.4, "37,5", 37.9, "38", 38, "38,2", 38.4, 38.5, 39],
+    "dolor_intensidad": ["", 0, 4, 5, 7, 8, 10],
     "estado_conciencia": ["", "Alerta", "Responde a la voz", "Responde al dolor", "No responde"],
     "br_convulsion": [True, False, None], "br_disnea": [True, False, None],
     "br_sangrado": [True, False, None], "ant_inmuno": [True, False, None],
@@ -111,27 +124,31 @@ def _leer(base):
 
 def test_semilla_se_carga_activa_y_apaga_las_del_codigo(tmp_path):
     base = _base(tmp_path)
-    assert rh.cargar_semilla(base, SEMILLA) == 13
+    assert rh.cargar_semilla(base, SEMILLA) == 16
     reglas, config = _leer(base)
-    assert len(reglas) == 13 and [r["codigo"] for r in reglas][:2] == ["R-001", "R-002"]
+    assert len(reglas) == 16 and [r["codigo"] for r in reglas][:2] == ["R-001", "R-002"]
     # Tanda 1: las 9 del prototipo, activas.
     assert all(r["estado"] == "activa" and r["origen"] == "manchester" and r["validada_por"] == "" for r in reglas[:9])
     # Tanda 2 (mail de Navoni): en borrador, nunca activadas.
-    assert all(r["estado"] == "borrador" and r["fue_activada"] == 0 for r in reglas[9:])
-    assert config["usar_ejemplo"] == "0" and config["semilla_cargada"] == "2"
+    assert all(r["estado"] == "borrador" and r["fue_activada"] == 0 for r in reglas[9:13])
+    # Tanda 3 (umbrales de la simulación): activas, porque ya intervenían en el color.
+    assert [r["nombre"] for r in reglas[13:]] == ["Dolor moderado", "Febrícula", "Fiebre"]
+    assert all(r["estado"] == "activa" and r["color"] == "AMARILLO" for r in reglas[13:])
+    assert config["usar_ejemplo"] == "0" and config["semilla_cargada"] == "3"
 
 
-def test_base_ya_sembrada_con_la_tanda_1_recibe_solo_la_tanda_2(tmp_path):
+def test_base_ya_sembrada_con_la_tanda_1_recibe_las_tandas_2_y_3(tmp_path):
     base = _base(tmp_path)
     con = sqlite3.connect(base)
     with con:   # como quedó una base con la Etapa B: tanda 1 cargada y la copia del código encendida a mano
         con.execute("INSERT INTO reglas_config VALUES ('semilla_cargada', '1', 'sistema', 'x')")
         con.execute("INSERT INTO reglas_config VALUES ('usar_ejemplo', '1', 'jefa', 'x')")
     con.close()
-    assert rh.cargar_semilla(base, SEMILLA) == 4
+    assert rh.cargar_semilla(base, SEMILLA) == 7
     reglas, config = _leer(base)
-    assert len(reglas) == 4 and all(r["estado"] == "borrador" for r in reglas)
-    assert config["usar_ejemplo"] == "1" and config["semilla_cargada"] == "2"   # no toca la decisión de la Jefatura
+    assert len(reglas) == 7 and all(r["estado"] == "borrador" for r in reglas[:4])
+    assert all(r["estado"] == "activa" for r in reglas[4:])
+    assert config["usar_ejemplo"] == "1" and config["semilla_cargada"] == "3"   # no toca la decisión de la Jefatura
     assert rh.cargar_semilla(base, SEMILLA) == 0
 
 
@@ -144,14 +161,27 @@ def test_semilla_no_se_carga_dos_veces(tmp_path):
     con.close()
     assert rh.cargar_semilla(base, SEMILLA) == 0
     reglas, _ = _leer(base)
-    assert len(reglas) == 13 and reglas[0]["estado"] == "inactiva"
+    assert len(reglas) == 16 and reglas[0]["estado"] == "inactiva"
+
+
+def test_base_con_tandas_1_y_2_recibe_solo_la_tanda_3_activa(tmp_path):
+    """La base de cada uno (ya con 13 reglas, semilla_cargada = 2) recibe solo las 3 nuevas, activas."""
+    base = _base(tmp_path, usar_ejemplo=False)
+    con = sqlite3.connect(base)
+    with con:
+        con.execute("INSERT INTO reglas_config VALUES ('semilla_cargada', '2', 'sistema', 'x')")
+    con.close()
+    assert rh.cargar_semilla(base, SEMILLA) == 3
+    reglas, _ = _leer(base)
+    assert [(r["codigo"], r["estado"]) for r in reglas] == [("R-001", "activa"), ("R-002", "activa"), ("R-003", "activa")]
 
 
 def test_respeta_si_la_jefatura_ya_habia_apagado_las_de_ejemplo(tmp_path):
     base = _base(tmp_path, usar_ejemplo=False)
     rh.cargar_semilla(base, SEMILLA)
     reglas, config = _leer(base)
-    assert all(r["estado"] == "borrador" and r["fue_activada"] == 0 for r in reglas)
+    assert all(r["estado"] == "borrador" and r["fue_activada"] == 0 for r in reglas[:13])
+    assert all(r["estado"] == "activa" for r in reglas[13:])      # la tanda 3 fuerza «activa»
     assert config["usar_ejemplo"] == "0"
 
 
@@ -165,4 +195,4 @@ def test_semilla_valida_y_no_pisa_reglas_existentes(tmp_path):
     con.close()
     rh.cargar_semilla(base, SEMILLA)
     reglas, _ = _leer(base)
-    assert reglas[0]["nombre"] == "Propia" and len(reglas) == 14 and reglas[1]["codigo"] == "R-002"
+    assert reglas[0]["nombre"] == "Propia" and len(reglas) == 17 and reglas[1]["codigo"] == "R-002"

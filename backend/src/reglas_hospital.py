@@ -244,6 +244,9 @@ def cargar_semilla(ruta_base, ruta_semilla):
       como adaptación local, fiebre en lactante, dolor torácico), con valores y colores A VALIDAR.
       Se cargan siempre como BORRADOR: se ven en la pantalla pero NO intervienen hasta que la
       Jefatura, con Enfermería y Guardia, complete los valores y las active.
+    Tanda 3 [Dario 30/10]: los umbrales que usaba la simulación de MedGemma en sugerencia.js (dolor moderado
+      5–7, febrícula y fiebre → AMARILLO). Al conectar MedGemma real salen del código y pasan a reglas;
+      quedan ACTIVAS ("estado_inicial": "activa") porque ya intervenían en el color.
     Cada regla del JSON dice a qué tanda pertenece ("tanda") y, si corresponde, "estado_inicial": "borrador".
     reglas_config.semilla_cargada guarda la última tanda cargada: si después la Jefatura edita,
     desactiva o elimina alguna, no se vuelve a cargar. Devuelve la cantidad de reglas cargadas."""
@@ -268,7 +271,9 @@ def cargar_semilla(ruta_base, ruta_semilla):
             regla, error = validar_regla(datos)
             if error:
                 raise ValueError(f"Regla {i} de la semilla inválida: {error}")
-            if inicial == "borrador" or not estaban_en_uso:
+            if inicial == "activa":          # [Dario 30/10] tanda 3: ya intervenían en el color, quedan activas
+                estado, fue_activada = "activa", 1
+            elif inicial == "borrador" or not estaban_en_uso:
                 estado, fue_activada = "borrador", 0
             else:
                 estado, fue_activada = "activa", 1

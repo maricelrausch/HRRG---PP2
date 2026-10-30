@@ -32,7 +32,7 @@ const SPECS={
     ['3','Aceptar con un toque. Modificar o Rechazar piden motivo.'],
     ['4','Corregir datos del relato: lo que extrajo la IA se puede corregir acá. La decisión final es del profesional.'],
     ['5','Reglas del hospital (HRRG): las carga y activa la Jefatura de Guardia; intervienen desde el próximo paciente y fijan un piso. Las reglas de ejemplo del equipo se pueden apagar.'],
-    ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No, recalculan al instante y quedan guardados en la decisión del servidor (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
+    ['↑','Discriminadores de la guía: se sacaron los de ejemplo. Se cargan cuando el HRRG mande su adaptación de Manchester.']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
   espera:{t:'Pantalla 4 · En espera',items:[
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],
     ['2','Marca a quien superó el tiempo objetivo de su color (tiempos según guía HRRG).'],
@@ -91,7 +91,7 @@ const base=f=>f.t==='chk'?f.ia:(f.ia??f.hce??'');
 /* Al iniciar un caso con servidor, deja vacíos los datos no obtenidos aún. */
 const init=()=>Object.fromEntries(FI.map(f=>[f.k,
   TriageAPI.MODO_REAL ? (f.t==='chk'?false:'') : base(f)]));
-const st={user:null,disc:{},fast:false,screen:'ingreso',rev:init(),insuf:false,decision:null,level:null,ollama:true,ep:'EP-004812',prev:null,manual:false,mlv:null};
+const st={user:null,fast:false,screen:'ingreso',rev:init(),insuf:false,decision:null,level:null,ollama:true,ep:'EP-004812',prev:null,manual:false,mlv:null};
 let epN=4812;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -204,7 +204,6 @@ $('#extraer').addEventListener('click', async () => {
     respaldoPalabrasClave(texto);
     st.modoServidor = resultado.modo;
     renderSimbar();
-    st.disc = {};
     resetDecision();
     $('#hint').classList.remove('err');
     $('#hint').textContent = 'Respuesta recibida. Revisá los datos antes de continuar.';
@@ -270,6 +269,8 @@ function status(f){
 /* A08: los obligatorios salen del esquema común (TriageDatos.required = OBLIGATORIOS del backend). */
 const REQ=window.TriageDatos?[...TriageDatos.required.ingreso,...TriageDatos.required.medicion]:null;
 function isReq(f){
+  const p=typeof param==='function'&&f.box!=='ident'?param(f.k):null;   /* [Dario 30/10] obligatorio desde la tabla */
+  if(p)return p.obligatorio;
   if(REQ?REQ.includes(f.k):f.req)return true;
   if(f.k==='glasgow'||f.k==='estado_conciencia')return !st.rev.glasgow&&!st.rev.estado_conciencia;
   return false;
@@ -302,47 +303,91 @@ const SHORT={glucemia:'Glucemia (mg/dL)',frecuencia_cardiaca:'FC (lpm)',frecuenc
 function taCell(){const a=byK('ta_sistolica'),b=byK('ta_diastolica');
   return '<div class="f ta s-'+status(a)+'" id="f-ta_sistolica"><div class="fl"><label for="r-ta_sistolica">TA (mmHg)</label><span class="tg" id="t-ta_sistolica">'+tag(a)+'</span></div><div class="tapair"><input id="r-ta_sistolica" data-k="ta_sistolica" inputmode="decimal" aria-label="TA sistólica" placeholder="sist." value="'+esc(st.rev.ta_sistolica)+'"><span>/</span><span class="f s-'+status(b)+'" id="f-ta_diastolica"><input id="r-ta_diastolica" data-k="ta_diastolica" inputmode="decimal" aria-label="TA diastólica" placeholder="diast." value="'+esc(st.rev.ta_diastolica)+'"><span class="tg" id="t-ta_diastolica" hidden></span></span></div></div>';}
 
-/* Signos vitales: celdas con nombre completo, unidad, referencia y aviso inmediato */
+/* Signos vitales: celdas con nombre completo, unidad, referencia y aviso inmediato.
+   [Dario 30/10 · pedido de Navoni] Los números (rango normal, rango posible, textos, obligatorio) vienen de la
+   tabla parametros_signos (GET /api/signos), según el grupo etario del paciente (si el grupo no tiene su fila,
+   la de Adulto). Lo que sigue en VIT es la presentación y el respaldo sin servidor (doble clic).
+   La marca ROJA («regla de seguridad») ya no está acá: sale de las reglas activas del hospital. */
 const VIT={
   ta:{n:'Tensión arterial',ab:'TA',u:'mmHg',ref:'Normal 90–140 / 60–90',cls:'ta'},
-  frecuencia_cardiaca:{n:'Frecuencia cardíaca',ab:'FC',u:'lpm',ref:'Normal 60–100',lo:60,hi:100,clo:40,chi:130,lt:'Bradicardia',ht:'Taquicardia'},
-  frecuencia_respiratoria:{n:'Frecuencia respiratoria',ab:'FR',u:'rpm',ref:'Normal 12–20',lo:12,hi:20,clo:8,chi:30,lt:'Bradipnea',ht:'Taquipnea'},
-  saturacion_o2:{n:'Saturación de oxígeno',ab:'SpO₂',u:'%',ref:'Normal 95–100',lo:95,clo:90,lt:'Saturación baja'},
+  ta_sistolica:{lo:90,hi:140,lt:'Hipotensión',ht:'Hipertensión'},ta_diastolica:{lo:60,hi:90,lt:'Diastólica baja',ht:'Hipertensión'},
+  frecuencia_cardiaca:{n:'Frecuencia cardíaca',ab:'FC',u:'lpm',ref:'Normal 60–100',lo:60,hi:100,lt:'Bradicardia',ht:'Taquicardia'},
+  frecuencia_respiratoria:{n:'Frecuencia respiratoria',ab:'FR',u:'rpm',ref:'Normal 12–20',lo:12,hi:20,lt:'Bradipnea',ht:'Taquipnea'},
+  saturacion_o2:{n:'Saturación de oxígeno',ab:'SpO₂',u:'%',ref:'Normal 95–100',lo:95,lt:'Saturación baja'},
   temperatura:{n:'Temperatura',ab:'T°',u:'°C',ref:'Normal 36–37,5',lo:36,hi:37.5,lt:'Hipotermia',ht:'Fiebre'},
   glucemia:{n:'Glucemia capilar',ab:'opcional',u:'mg/dL',ref:'Normal 70–140',lo:70,hi:140,lt:'Hipoglucemia',ht:'Hiperglucemia'},
   pam:{n:'Presión arterial media',ab:'PAM',u:'mmHg',ref:'Se calcula sola con la TA',calc:true},
   estado_conciencia:{n:'Nivel de conciencia',ab:'',sel:true,ref:'Con esto o Glasgow alcanza'},
-  glasgow:{n:'Escala de Glasgow',ab:'3–15',u:'pts',ref:'15 = normal',lo:15,clo:15,lt:'Alteración de conciencia'},
-  dolor_intensidad:{n:'Intensidad del dolor',ab:'0–10',u:'/10',ref:'0 sin dolor · 10 el peor',hi:4,chi:7,ht:'Dolor'},
+  glasgow:{n:'Escala de Glasgow',ab:'3–15',u:'pts',ref:'15 = normal',lo:15,lt:'Alteración de conciencia'},
+  dolor_intensidad:{n:'Intensidad del dolor',ab:'0–10',u:'/10',ref:'0 sin dolor · 10 el peor',hi:4,ht:'Dolor moderado'},
   aspecto_general:{n:'Aspecto general',ab:'opcional',text:true,ref:'Pálido, sudoroso, agitado…'}
 };
+const SIGNOS={filas:[]};
+async function cargarParametrosSignos(){
+  if(!TriageAPI.MODO_REAL)return;
+  const r=await TriageAPI.pedir('/api/signos',{method:'GET',cache:'no-store'});
+  if(r.ok){SIGNOS.filas=r.datos.parametros||[];sincronizarRangos()}
+}
+const fmtN=n=>String(n).replace('.',',');
+/* Fila de la tabla para este dato y la edad del paciente (o null sin servidor). */
+function param(k){
+  const g=(window.MotorReglas&&MotorReglas.grupoEtario(st.rev.edad))||'Adulto';
+  return SIGNOS.filas.find(p=>p.campo===k&&p.grupo_etario===g)||SIGNOS.filas.find(p=>p.campo===k&&p.grupo_etario==='Adulto')||null;
+}
+/* VIT[k] con los números de la tabla encima. */
+function vit(k){
+  const c=Object.assign({},VIT[k]),p=param(k);
+  if(!p)return c;
+  Object.assign(c,{n:p.nombre,ab:p.abreviatura,u:p.unidad,lo:p.normal_min,hi:p.normal_max,lt:p.texto_bajo,ht:p.texto_alto});
+  c.ref=p.referencia||(p.normal_min!=null&&p.normal_max!=null?'Normal '+fmtN(p.normal_min)+'–'+fmtN(p.normal_max):c.ref);
+  return c;
+}
+/* Rango posible (frena errores de tipeo) y obligatorios: la tabla manda; validacion.js queda de respaldo. */
+function sincronizarRangos(){
+  if(!window.TriageDatos)return;
+  Object.keys(TriageDatos.numeric).forEach(k=>{const p=param(k),f=byK(k);if(!p)return;
+    TriageDatos.numeric[k].min=p.minimo_posible;TriageDatos.numeric[k].max=p.maximo_posible;
+    if(f){f.min=p.minimo_posible;f.max=p.maximo_posible}});
+}
+/* Marca roja: la regla activa ROJA o NARANJA que se dispara SOLO con este dato (regla de una condición o «alguna»). */
+function reglaCritica(k,v){
+  if(!window.MotorReglas||typeof REGLAS_HRRG==='undefined')return null;
+  const d={[k]:v};
+  const rs=REGLAS_HRRG.lista.filter(r=>(r.color==='ROJO'||r.color==='NARANJA')&&
+    ((r.condiciones||[]).length===1||r.combinacion==='alguna')&&(r.condiciones||[]).some(c=>c.campo===k&&MotorReglas.cumple(c,d)));
+  rs.sort((a,b)=>(a.color==='ROJO'?0:1)-(b.color==='ROJO'?0:1));
+  return rs[0]||null;
+}
+const msgCrit=r=>r.nombre+' · regla de seguridad ('+r.codigo+')';
 function vEval(k){
-  const c=VIT[k],v=st.rev[k],f=byK(k);
+  const c=vit(k),v=st.rev[k],f=byK(k);
   if(v===''||v==null)return {s:status(f)==='none'?'none':'',m:c.ref};
-  if(c.sel)return v!=='Alerta'?{s:'crit',m:'Alteración de conciencia · regla de seguridad'}:{s:'',m:c.ref};
   if(c.text)return {s:'',m:c.ref};
+  if(c.sel){const r=reglaCritica(k,v);return r?{s:'crit',m:msgCrit(r)}:{s:'',m:c.ref}}
   if(check(f,v)==='bad')return {s:'bad',m:errorTecnico(f,v)||('Valor imposible ('+f.min+'–'+f.max+'). Verificá el dato.')};
-  const n=num(v);
-  if(c.clo!=null&&n<c.clo)return {s:'crit',m:(c.lt||'Bajo')+' · regla de seguridad'};
-  if(c.chi!=null&&n>c.chi)return {s:'crit',m:(c.ht||'Alto')+(k==='dolor_intensidad'?' intenso':'')+' · regla de seguridad'};
+  const n=num(v),r=reglaCritica(k,n);
+  if(r)return {s:'crit',m:msgCrit(r)};
   if(c.lo!=null&&n<c.lo)return {s:'abn',m:(c.lt||'Bajo')+' · '+c.ref.toLowerCase()};
-  if(c.hi!=null&&n>c.hi)return {s:'abn',m:(c.ht||'Alto')+(k==='dolor_intensidad'?' moderado':'')+' · '+c.ref.toLowerCase()};
+  if(c.hi!=null&&n>c.hi)return {s:'abn',m:(c.ht||'Alto')+' · '+c.ref.toLowerCase()};
   return {s:'',m:c.ref};
 }
+function taRef(){const a=vit('ta_sistolica'),b=vit('ta_diastolica');
+  return param('ta_sistolica')||param('ta_diastolica')?'Normal '+fmtN(a.lo)+'–'+fmtN(a.hi)+' / '+fmtN(b.lo)+'–'+fmtN(b.hi):VIT.ta.ref}
 function taEval(){
-  const a=byK('ta_sistolica'),b=byK('ta_diastolica'),sv=st.rev.ta_sistolica,dv=st.rev.ta_diastolica;
-  if(!sv&&!dv)return {s:'none',m:VIT.ta.ref};
+  const a=byK('ta_sistolica'),b=byK('ta_diastolica'),sv=st.rev.ta_sistolica,dv=st.rev.ta_diastolica,ref=taRef();
+  if(!sv&&!dv)return {s:'none',m:ref};
   if((sv&&check(a,sv)==='bad')||(dv&&check(b,dv)==='bad'))return {s:'bad',m:(sv&&errorTecnico(a,sv))||(dv&&errorTecnico(b,dv))||'Valor imposible. Verificá el dato.'};
   if(!sv||!dv)return {s:'none',m:'Falta '+(!sv?'la sistólica':'la diastólica')};
-  const s1=num(sv),d1=num(dv);
+  const s1=num(sv),d1=num(dv),ps=vit('ta_sistolica'),pd=vit('ta_diastolica'),r=reglaCritica('ta_sistolica',s1)||reglaCritica('ta_diastolica',d1);
   if(d1>=s1)return {s:'bad',m:'La diastólica no puede ser mayor que la sistólica.'};
-  if(s1<90)return {s:'crit',m:'Hipotensión · regla de seguridad'};
-  if(s1>140||d1>90)return {s:'abn',m:'Hipertensión · normal 90–140 / 60–90'};
-  if(d1<60)return {s:'abn',m:'Diastólica baja · normal 60–90'};
-  return {s:'',m:VIT.ta.ref};
+  if(r)return {s:'crit',m:msgCrit(r)};
+  if(s1>ps.hi||d1>pd.hi)return {s:'abn',m:(ps.ht||'Hipertensión')+' · '+ref.toLowerCase()};
+  if(s1<ps.lo)return {s:'abn',m:(ps.lt||'Hipotensión')+' · '+ref.toLowerCase()};
+  if(d1<pd.lo)return {s:'abn',m:(pd.lt||'Diastólica baja')+' · normal '+fmtN(pd.lo)+'–'+fmtN(pd.hi)};
+  return {s:'',m:ref};
 }
 function vCell(k){
-  const c=VIT[k];
+  const c=vit(k);
   if(k==='ta'){const e=taEval();
     return '<div class="v ta s-'+e.s+'" id="f-ta"><label for="r-ta_sistolica"><b>'+c.n+'</b><span class="ab">'+c.ab+' · sistólica / diastólica</span></label><div class="vin"><input id="r-ta_sistolica" data-k="ta_sistolica" inputmode="numeric" aria-label="TA sistólica" placeholder="120" value="'+esc(st.rev.ta_sistolica)+'"><span class="sl">/</span><input id="r-ta_diastolica" data-k="ta_diastolica" inputmode="numeric" aria-label="TA diastólica" placeholder="80" value="'+esc(st.rev.ta_diastolica)+'"><span class="u">'+c.u+'</span></div><div class="vh" id="h-ta">'+e.m+'</div></div>'}
   if(c.calc)return '<div class="v calc" id="f-pam"><div class="vl"><b>'+c.n+'</b><span class="ab">'+c.ab+'</span></div><div class="vin"><span class="pv" id="pamv">'+(pam()||'—')+'</span><span class="u">'+c.u+'</span></div><div class="vh">'+c.ref+'</div></div>';
@@ -394,6 +439,7 @@ $('#rvForm').addEventListener('keydown',e=>{
 $('#rvForm').addEventListener('input',e=>{
   const k=e.target.dataset.k;if(!k)return;const f=byK(k);
   st.rev[k]=f.t==='chk'?e.target.checked:e.target.value;
+  if(k==='edad'&&SIGNOS.filas.length){sincronizarRangos();['ta_sistolica','frecuencia_cardiaca','frecuencia_respiratoria','saturacion_o2','temperatura','glucemia','glasgow','dolor_intensidad'].forEach(x=>$('#f-'+(x==='ta_sistolica'?'ta':x))&&updVital(x))}
   updField(f);updControl();
 });
 $('#rvForm').addEventListener('click',e=>{const k=e.target.dataset.restore;if(!k)return;e.preventDefault();const f=byK(k);st.rev[k]=base(f);renderForm()});
@@ -616,20 +662,20 @@ function refreshSummary(){
 }
 function renderReg(){
   const d=st.decision,l=st.level!=null?LEVELS[st.level][0]:null;
-  const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.H.length?' · reglas HRRG: '+c.H.map(x=>x.codigo+' v'+x.version).join(', '):'')+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
+  const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' ('+(c.M.fuente==='ia'?'MedGemma: '+LEVELS[c.M.lv][0]:'sin IA')+(c.H.length?' · reglas HRRG: '+c.H.map(x=>x.codigo+' v'+x.version).join(', '):'')+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
   const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+LEVELS[SUG][0]:d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
-  $('#reg').textContent='Episodio:  '+st.ep+'\nPaciente:  '+(st.dni?'DNI '+fmtDni(st.dni):'sin identificar')+'\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
+  $('#reg').textContent='Episodio:  '+st.ep+'\nPaciente:  '+(st.dni?'DNI '+fmtDni(st.dni):'sin identificar')+'\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nFuente:    reglas del hospital'+(medgemma().fuente==='ia'?' y MedGemma':'')+' · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
 }
 
 $('#nuevo').addEventListener('click',()=>nuevoCaso());
 const HINT_INGRESO=$('#hint').textContent;
 function nuevoCaso(){
-  st.cerrado=false;
+  st.cerrado=false;st.registrado=null;
   $('#errBanner').hidden=true;$('#piiBanner').hidden=true;$('#hint').textContent=HINT_INGRESO;$('#hint').classList.remove('err');
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
   st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');st.condicion=null;$('#condEsp').value='';
-  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')}
+  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')}
 /* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
 /* Sesión (A07): la consulta api.js. Modo real = Flask (/api/sesion); modo demo = login simulado. */
 async function salir() {
@@ -658,6 +704,7 @@ document.addEventListener('DOMContentLoaded',async function iniciarSesion(){
   $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+(st.user.rol==='auditor'&&st.user.modo==='real'?' · <a href="reglas.html">Reglas del hospital</a>':'')+' <button type="button" class="linkbtn" id="logout">Salir</button>';
   $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});
   go(st.user.rol==='auditor'?'espera':'ingreso');
+  cargarParametrosSignos();cargarReglasHospital();   /* [Dario 30/10] rangos de la tabla y reglas para las marcas rojas */
 });
 /* ===== Imprimir / PDF =====
    Imprime solo el resumen del episodio (datos, correcciones, historial y registro).

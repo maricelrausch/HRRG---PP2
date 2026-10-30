@@ -32,3 +32,28 @@ function reglas(){
   if(n('dolor_intensidad')!=null&&n('dolor_intensidad')>=8)add(1,'Dolor intenso ('+r.dolor_intensidad+'/10)');
   return out;
 }
+
+/* [Dario 30/10] Copia CONGELADA de la simulación medgemma() de frontend/sugerencia.js (hasta el 30/10/2026).
+   Al conectar MedGemma real, sus umbrales (dolor 5–7, febrícula, fiebre) pasaron a la tanda 3 de la semilla.
+   tests/semilla_equivalencia.test.js comprueba que las reglas dan el mismo color que esta simulación. No modificar. */
+function medgemmaSimulada(){
+  const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),why=[];let lv=3;
+  const d=n('dolor_intensidad');
+  /* El motivo va siempre primero: categoría + lo que dijo el paciente + tiempo de evolución */
+  const cat=(r.motivo_categoria||'').trim(),mc=(r.motivo_consulta||'').trim();
+  if(cat||mc){
+    const det=mc&&mc.toLowerCase()!==cat.toLowerCase()?mc.toLowerCase():'';
+    const tpo=r.tiempo_evolucion_valor?' (hace '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad+')':'';
+    why.push('Motivo: '+(cat&&det?cat+' — '+det:(cat||mc))+tpo);
+  }
+  const base=why.length;
+  if(d!=null&&d>=5&&d<8){lv=2;why.push('Dolor moderado ('+d+'/10)')}
+  const t=n('temperatura');if(t!=null&&t>=37.5&&t<38.5){lv=Math.min(lv,2);why.push('Febrícula ('+r.temperatura+' °C)')}
+  if(t!=null&&t>=38.5){lv=Math.min(lv,2);why.push('Fiebre ('+r.temperatura+' °C)')}
+  if(r.ant_diabetes)why.push('Diabetes'+(n('glucemia')>=250?' con glucemia '+r.glucemia+' mg/dL':''));
+  if(r.sintomas_asociados)why.push('Refiere: '+r.sintomas_asociados.toLowerCase());
+  /* AZUL: la simulación ya no lo sugiere (reunión 21/10: en el HRRG el Azul se usa para casos como presos o
+     policiales, no por dolor leve). Queda solo como elección manual del profesional hasta confirmar el criterio. */
+  if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
+  return {lv,why};
+}

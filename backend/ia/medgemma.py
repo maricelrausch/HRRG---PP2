@@ -12,6 +12,7 @@ import json
 import os
 import re
 import unicodedata
+from pathlib import Path
 
 import ollama
 
@@ -202,15 +203,8 @@ def _norm(s):
 
 
 # Palabras del relato que definen la categoría (orden = prioridad). Corrigen al modelo cuando se confunde.
-CLAVES_CATEGORIA = [
-    ("Dolor torácico", r"\b(pecho|torax|toracic\w*|precordial\w*)\b"),
-    ("Cefalea", r"\b(cabeza|cefalea|migran\w*|jaqueca)\b"),
-    ("Dolor abdominal", r"\b(panza|abdomen|abdominal|estomago|barriga|epigastr\w*|vientre)\b"),
-    ("Disnea", r"(falta de aire|\bahog\w*|\bdisnea\b|no puede respirar|cuesta respirar)"),
-    ("Trauma", r"\b(golpe\w*|caida|cayo|choque|accidente|fractur\w*|torc\w*|herida|corte)\b"),
-    ("Síntoma neurológico", r"(convulsi\w*|desmay\w*|paralisis|no puede hablar|hormigueo|perdida de fuerza)"),
-    ("Fiebre", r"\b(fiebre|afiebrad\w*|febril)\b"),
-]
+# [Dario 30/10] Una sola lista, la de src/extraccion.py (antes había dos copias distintas).
+from src.extraccion import CLAVES_CATEGORIA, categorias_del_relato  # noqa: E402
 LOCALIZACION = {"Dolor torácico": "Pecho", "Cefalea": "Cabeza", "Dolor abdominal": "Abdomen"}
 
 
@@ -226,7 +220,7 @@ def _anclar(d, texto):
         if v is not None and not any(abs(float(v) - n) < 0.05 for n in nums):
             d[k] = None                                   # número que no aparece en el relato
 
-    halladas = [c for c, rx in CLAVES_CATEGORIA if re.search(rx, t)]
+    halladas = categorias_del_relato(t)
     if halladas and d.get("motivo_categoria") not in halladas:
         d["motivo_categoria"] = halladas[0]
 
@@ -344,7 +338,7 @@ def _fuente(motivo, relato):
 
 
 # ---- Presentación legible de los datos para el modelo + control de afirmaciones falsas ----
-SIGNOS = [  # campo, nombre, unidad, rango normal (adultos, orientativo)
+SIGNOS = [  # Respaldo si no se puede leer la tabla. campo, nombre, unidad, rango normal (adultos, orientativo)
     ("ta_sistolica", "TA sistólica", "mmHg", 90, 140),
     ("ta_diastolica", "TA diastólica", "mmHg", 60, 90),
     ("frecuencia_cardiaca", "Frecuencia cardíaca", "lpm", 60, 100),
@@ -355,6 +349,28 @@ SIGNOS = [  # campo, nombre, unidad, rango normal (adultos, orientativo)
     ("glasgow", "Glasgow", "pts", 15, 15),
     ("dolor_intensidad", "Intensidad del dolor", "/10", 0, 3),
 ]
+# [Dario 30/10 · pedido de Navoni] Los rangos normales salen de la tabla parametros_signos (reglas_hospital.db),
+# los mismos que ve la enfermera en la pantalla y edita la Jefatura, según el grupo etario del paciente.
+BASE_PARAMETROS = Path.home() / ".hrrg_pp2" / "reglas_hospital.db"
+
+
+def signos_para(datos):
+    """Lista (campo, nombre, unidad, normal_min, normal_max) para la edad del paciente; SIGNOS si no hay tabla."""
+    try:
+        from src.parametros_signos import parametros_para
+        p = parametros_para(BASE_PARAMETROS, (datos or {}).get("edad"))
+    except Exception:  # noqa: BLE001  (sin tabla, la IA sigue con el respaldo)
+        p = {}
+    salida = []
+    for k, n, u, lo, hi in SIGNOS:
+        f = p.get(k)
+        if f and f["normal_min"] is not None and f["normal_max"] is not None:
+            salida.append((k, f["nombre"] or n, f["unidad"] or u, f["normal_min"], f["normal_max"]))
+        else:
+            salida.append((k, n, u, lo, hi))
+    return salida
+
+
 BANDERAS = {"br_sangrado": "Sangrado evidente", "br_convulsion": "Convulsión activa",
             "br_disnea": "Dificultad para respirar", "br_trauma": "Mecanismo de trauma"}
 ANTECED = {"ant_diabetes": "Diabetes", "ant_cardio": "Cardiovascular", "ant_resp": "Respiratorio",
@@ -372,7 +388,7 @@ def _num_campo(datos, k):
 def _estado_signos(datos):
     """{campo: 'normal' | 'alterado' | None (no medido)}"""
     est = {}
-    for k, _, _, lo, hi in SIGNOS:
+    for k, _, _, lo, hi in signos_para(datos):
         v = _num_campo(datos, k)
         est[k] = None if v is None else ("normal" if lo <= v <= hi else "alterado")
     c = str(datos.get("estado_conciencia") or "")
@@ -395,7 +411,7 @@ def _entrada_legible(datos, relato):
     if ant:
         lineas.append("Antecedentes: " + ", ".join(ant))
     medidos, faltan = [], []
-    for k, n, u, lo, hi in SIGNOS:
+    for k, n, u, lo, hi in signos_para(datos):
         if est[k] is None:
             faltan.append(n)
         else:
@@ -457,6 +473,22 @@ def _afirmacion_falsa(motivo, datos, relato):
     return bool(palabras) and not any(w[:5] in _norm(relato) for w in palabras)
 
 
+def _signo_normal(motivo, datos):
+    """[Dario 30/10] True si el motivo solo nombra un signo vital medido que está NORMAL («TA sistólica 120 mmHg»).
+    No explica por qué sube el color, así que no se muestra como motivo. Una aclaración («sin fiebre») no se toca."""
+    m = _norm(motivo)
+    if RX_NEGACION.search(m) or RX_ALTERADO.search(m):
+        return False
+    est = _estado_signos(datos)
+    if re.search(r"sistol", m):
+        campos = ["ta_sistolica"]
+    elif re.search(r"diastol", m):
+        campos = ["ta_diastolica"]
+    else:
+        campos = next((c for rx, c in TEMA_CAMPOS if re.search(rx, m)), None)
+    return bool(campos) and all(est.get(c) == "normal" for c in campos)
+
+
 def datos_insuficientes(datos, relato=""):
     """Sin relato/motivo y con menos de 3 signos medidos no hay con qué sugerir un color."""
     est = _estado_signos(datos)
@@ -476,11 +508,14 @@ def sugerir(datos, relato=""):
     motivos = [str(m).strip()[:120] for m in d.get("motivos", []) if str(m).strip()][:5]
     descartados = [m for m in motivos if _afirmacion_falsa(m, datos, relato)]
     motivos = [m for m in motivos if m not in descartados]
+    normales = [m for m in motivos if _signo_normal(m, datos)]     # [Dario 30/10] no justifican el color
+    motivos = [m for m in motivos if m not in normales]
     return {"nivel": NIVELES.get(color, NIVELES["AMARILLO"]),
             "color": color if color in NIVELES else "AMARILLO",
             "motivos": motivos,
             "fuentes": [_fuente(m, relato) for m in motivos],
             "descartados": descartados,
+            "normales_omitidos": normales,
             "modelo": MODELO}
 
 
