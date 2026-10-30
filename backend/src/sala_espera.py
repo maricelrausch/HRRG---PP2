@@ -66,7 +66,7 @@ def sala_espera():
 "objetivo_min": objetivo[color],
             # [Barby 30/10] Para pantallas externas de la sala: hora del triage y si superó el tiempo.
             "en_espera_desde": desde.isoformat(),
-            "vencido": color != "ROJO" and (ahora - desde).total_seconds() / 60 > objetivo[color], origin/barby
+            "vencido": color != "ROJO" and (ahora - desde).total_seconds() / 60 > objetivo[color],
         })
 
     # Primero por color (ROJO arriba) y después por quien espera más.
