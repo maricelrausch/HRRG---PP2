@@ -106,3 +106,11 @@ def test_cola_informa_ingreso_triage_restante_y_proximos(cliente_api):  # noqa: 
     for p in pacientes.values():
         assert p["ingreso_en"] and p["triage_en"]
     assert pacientes["EPI-ROJO001"]["proximo_a_vencer"] is False
+
+
+def test_historial_general_incluye_los_tiempos(cliente):  # noqa: F811
+    """[30/10] La pestaña «Historial de cambios» muestra también los cambios que no son de una regla."""
+    c = cliente.como("jefa")
+    c.post("/api/reglas/tiempos", json=NUEVOS)
+    general = c.get("/api/reglas").get_json()["historial_general"]
+    assert [h["accion"] for h in general] == ["TIEMPOS OBJETIVO GUARDADOS"] and general[0]["usuario"] == "jefa"

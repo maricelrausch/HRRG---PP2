@@ -4,12 +4,14 @@ Las carga la Jefatura de Guardia (perfil "jefatura") desde reglas.html. Cada reg
 "si se cumplen (todas | alguna de) estas condiciones, el color no puede ser menor que X",
 con una explicación que se muestra en el "Por qué" de la sugerencia.
 
-Ciclo de vida:
-    borrador  -> se crea o se edita; NO interviene en la sugerencia.
+Ciclo de vida (en pantalla se muestran solo dos estados: ACTIVA e INACTIVA):
+    borrador  -> recién creada, nunca activada; NO interviene (en pantalla: «Inactiva»).
     activa    -> la usa el motor desde la próxima sugerencia (no hace falta reiniciar nada).
-    inactiva  -> deja de intervenir; se conserva para la trazabilidad.
-Editar una regla activa la vuelve a borrador (hay que activarla de nuevo) y sube su versión.
-Solo se pueden eliminar los borradores que nunca estuvieron activos; el resto se desactiva.
+    inactiva  -> estuvo activa y se apagó; se conserva para la trazabilidad.
+[Dario 30/10] Editar una regla ya NO la apaga: conserva su estado y sube la versión (antes, guardar una
+regla activa la pasaba a borrador aunque no se cambiara nada, y dejaba de intervenir sin que se notara).
+Guardar sin cambios no crea una versión nueva.
+Solo se pueden eliminar las reglas que nunca estuvieron activas; el resto se desactiva.
 Cada cambio queda en reglas_eventos (quién, cuándo, qué versión y el contenido).
 
 Rutas:
@@ -584,7 +586,9 @@ def listar():
             )
     finally:
         conexion.close()
-    return _ok(reglas=[_a_dict(f, eventos.get(f["id"], [])) for f in filas])
+    # [30/10] historial_general: cambios que no son de una regla (tiempos por color, carga de ejemplos…).
+    return _ok(reglas=[_a_dict(f, eventos.get(f["id"], [])) for f in filas],
+               historial_general=eventos.get(None, []))
 
 
 @bp.post("/api/reglas")
@@ -630,17 +634,24 @@ def editar(regla_id):
             fila = _buscar(conexion, regla_id)
             if fila is None:
                 return _error("La regla no existe.", 404, "REGLA_NO_ENCONTRADA")
+            # Guardar sin cambios: no hay versión nueva ni evento (y la regla sigue como estaba).
+            actual = {"nombre": fila["nombre"], "explicacion": fila["explicacion"], "color": fila["color"],
+                      "combinacion": fila["combinacion"], "condiciones": json.loads(fila["condiciones_json"]),
+                      "origen": fila["origen"], "validada_por": fila["validada_por"],
+                      "discriminador": fila["discriminador"]}
+            if actual == regla:
+                return _ok(regla=_a_dict(fila), sin_cambios=True)
             version = fila["version"] + 1
             conexion.execute(
                 """UPDATE reglas SET nombre = ?, explicacion = ?, color = ?, combinacion = ?, condiciones_json = ?,
-                       origen = ?, validada_por = ?, validada_en = ?, discriminador = ?, estado = 'borrador',
+                       origen = ?, validada_por = ?, validada_en = ?, discriminador = ?,
                        version = ?, actualizada_por = ?, actualizada_en = ? WHERE id = ?""",
                 (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
                  json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"], regla["validada_por"],
                  _validada_en(regla, fila), regla["discriminador"],
                  version, g.profesional["usuario"], _ahora(), regla_id)
             )
-            accion = "EDITADA (pasó a borrador)" if fila["estado"] == "activa" else "EDITADA"
+            accion = "EDITADA (sigue activa)" if fila["estado"] == "activa" else "EDITADA"
             _evento(conexion, regla_id, accion, version, regla)
             fila = _buscar(conexion, regla_id)
     finally:

@@ -87,13 +87,16 @@ def test_ciclo_completo_borrador_activa_inactiva(cliente):
     activas = c.get("/api/reglas/activas").get_json()
     assert [x["codigo"] for x in activas["reglas"]] == ["R-001"]
 
-    # Editar una regla activa la vuelve a borrador y sube la versión.
+    # [Dario 30/10] Editar una regla activa NO la apaga: sigue activa y sube la versión.
     cambio = dict(REGLA, color="ROJO")
     r = c.post(f"/api/reglas/{regla['id']}", json=cambio).get_json()["regla"]
-    assert r["estado"] == "borrador" and r["version"] == 2 and r["color"] == "ROJO"
-    assert c.get("/api/reglas/activas").get_json()["reglas"] == []
+    assert r["estado"] == "activa" and r["version"] == 2 and r["color"] == "ROJO"
+    assert [x["color"] for x in c.get("/api/reglas/activas").get_json()["reglas"]] == ["ROJO"]
 
-    c.post(f"/api/reglas/{regla['id']}/activar", json={})
+    # Guardar sin cambios no crea versión nueva ni evento.
+    d = c.post(f"/api/reglas/{regla['id']}", json=cambio).get_json()
+    assert d["sin_cambios"] is True and d["regla"]["version"] == 2 and d["regla"]["estado"] == "activa"
+
     assert c.post(f"/api/reglas/{regla['id']}/desactivar", json={}).status_code == 200
 
     # Ya estuvo activa: no se puede eliminar, solo desactivar.
@@ -101,7 +104,7 @@ def test_ciclo_completo_borrador_activa_inactiva(cliente):
 
     hist = c.get("/api/reglas").get_json()["reglas"][0]["historial"]
     assert [h["accion"] for h in hist] == [
-        "CREADA (borrador)", "ACTIVADA", "EDITADA (pasó a borrador)", "ACTIVADA", "DESACTIVADA"]
+        "CREADA (borrador)", "ACTIVADA", "EDITADA (sigue activa)", "DESACTIVADA"]
     assert all(h["usuario"] == "jefa" for h in hist)
 
 
