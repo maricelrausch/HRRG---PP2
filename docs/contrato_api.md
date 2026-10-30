@@ -889,13 +889,12 @@ Base propia: `~/.hrrg_pp2/reglas_hospital.db` (tablas `reglas`, `reglas_eventos`
 | Ruta | Quién | Qué hace |
 |---|---|---|
 | `GET /api/reglas/campos` | enfermería, médico, auditor, jefatura | Catálogo de datos que puede usar una regla y sus operadores |
-| `GET /api/reglas/activas` | enfermería, médico, auditor, jefatura | Reglas activas + `usar_ejemplo` (lo usa el motor) |
+| `GET /api/reglas/activas` | enfermería, médico, auditor, jefatura | Reglas activas (las usa el motor) |
 | `GET /api/reglas` | auditor, jefatura | Todas, con su historial |
 | `POST /api/reglas` | jefatura | Crear (queda en **borrador**) |
 | `POST /api/reglas/<id>` | jefatura | Editar: vuelve a **borrador** y sube la versión |
 | `POST /api/reglas/<id>/activar` · `/desactivar` | jefatura | Cambiar el estado |
 | `POST /api/reglas/<id>/eliminar` | jefatura | Solo borradores que nunca se activaron |
-| `POST /api/reglas/config` | jefatura | `{"usar_ejemplo": true/false}`: usar o no las reglas de ejemplo del equipo |
 
 Formato de una regla:
 

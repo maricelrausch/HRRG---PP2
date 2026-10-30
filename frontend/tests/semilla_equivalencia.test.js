@@ -13,11 +13,12 @@ const vm = require('vm');
 require('../js/motor_reglas.js');
 const M = globalThis.MotorReglas;
 
-// 1) La función reglas() original, tal como está en sugerencia.js.
-const fuente = fs.readFileSync(path.join(__dirname, '..', 'sugerencia.js'), 'utf8').replace(/\r\n/g, '\n');
+// 1) La función reglas() original, tal como estaba en sugerencia.js (copia congelada).
+// [30/10] La función ya no está en sugerencia.js: se compara contra su copia congelada.
+const fuente = fs.readFileSync(path.join(__dirname, 'referencia_reglas_codigo_v1.js'), 'utf8').replace(/\r\n/g, '\n');
 const ini = fuente.indexOf('function reglas(){');
 const fin = fuente.indexOf('\n}\n', ini);
-assert.ok(ini >= 0 && fin > ini, 'no se encontró reglas() en sugerencia.js');
+assert.ok(ini >= 0 && fin > ini, 'no se encontró reglas() en la copia congelada');
 const ctx = { st: { rev: {} }, num: (v) => Number(String(v).replace(',', '.')) };   // num() igual que formulario.js
 vm.createContext(ctx);
 vm.runInContext(fuente.slice(ini, fin + 2) + '\nthis.reglas = reglas;', ctx);

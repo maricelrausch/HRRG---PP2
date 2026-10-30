@@ -21,7 +21,6 @@ Rutas:
     POST /api/reglas/<id>/activar      (jefatura)
     POST /api/reglas/<id>/desactivar   (jefatura)
     POST /api/reglas/<id>/eliminar     solo borradores nunca activados (jefatura)
-    POST /api/reglas/config            {"usar_ejemplo": bool} (jefatura)
 """
 import json
 import shutil
@@ -354,6 +353,7 @@ def leer_tiempos(ruta_base):
 
 
 def _usar_ejemplo(conexion):
+    # [30/10] Ya no hay interruptor en la pantalla: solo se lee para respetar bases viejas al cargar la semilla.
     fila = conexion.execute("SELECT valor FROM reglas_config WHERE clave = 'usar_ejemplo'").fetchone()
     return True if fila is None else fila["valor"] == "1"
 
@@ -565,10 +565,9 @@ def activas():
         filas = conexion.execute(
             "SELECT * FROM reglas WHERE estado = 'activa' ORDER BY id"
         ).fetchall()
-        usar = _usar_ejemplo(conexion)
     finally:
         conexion.close()
-    return _ok(reglas=[_a_dict(f) for f in filas], usar_ejemplo=usar)
+    return _ok(reglas=[_a_dict(f) for f in filas])
 
 
 @bp.get("/api/reglas")
@@ -583,16 +582,9 @@ def listar():
             eventos.setdefault(ev["regla_id"], []).append(
                 {"fecha": ev["fecha"], "usuario": ev["usuario"], "accion": ev["accion"], "version": ev["version"]}
             )
-        config = conexion.execute(
-            "SELECT valor, actualizado_por, actualizado_en FROM reglas_config WHERE clave = 'usar_ejemplo'"
-        ).fetchone()
     finally:
         conexion.close()
-    return _ok(
-        reglas=[_a_dict(f, eventos.get(f["id"], [])) for f in filas],
-        usar_ejemplo=True if config is None else config["valor"] == "1",
-        config_actualizada=None if config is None else {"por": config["actualizado_por"], "en": config["actualizado_en"]},
-    )
+    return _ok(reglas=[_a_dict(f, eventos.get(f["id"], [])) for f in filas])
 
 
 @bp.post("/api/reglas")
@@ -746,26 +738,3 @@ def guardar_tiempos():
     logger.info("TIEMPOS_OBJETIVO | %s | %s", g.profesional["usuario"], tiempos_nuevos)
     return _ok(tiempos=tiempos_nuevos)
 
-
-@bp.post("/api/reglas/config")
-def configurar():
-    datos = request.get_json(silent=True)
-    if not isinstance(datos, dict) or set(datos) != {"usar_ejemplo"} or not isinstance(datos["usar_ejemplo"], bool):
-        return _error("Enviá únicamente usar_ejemplo (true o false).", 400, "CAMPOS_INVALIDOS")
-    conexion = _conectar()
-    try:
-        with conexion:
-            conexion.execute(
-                """INSERT INTO reglas_config (clave, valor, actualizado_por, actualizado_en)
-                   VALUES ('usar_ejemplo', ?, ?, ?)
-                   ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
-                       actualizado_por = excluded.actualizado_por, actualizado_en = excluded.actualizado_en""",
-                ("1" if datos["usar_ejemplo"] else "0", g.profesional["usuario"], _ahora())
-            )
-            _evento(conexion, None,
-                    "REGLAS DE EJEMPLO " + ("ACTIVADAS" if datos["usar_ejemplo"] else "DESACTIVADAS"),
-                    None, datos)
-    finally:
-        conexion.close()
-    logger.info("REGLAS_EJEMPLO | %s | %s", g.profesional["usuario"], datos["usar_ejemplo"])
-    return _ok(usar_ejemplo=datos["usar_ejemplo"])

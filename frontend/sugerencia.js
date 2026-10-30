@@ -1,5 +1,6 @@
 /* frontend/sugerencia.js · Tarjeta de sugerencia (A09) · Pantalla 3.
-   - Color SIMULADO con reglas de seguridad y de ejemplo (no es la guía del HRRG): reglas(), medgemma(), calcSug().
+   - Color: el más urgente entre las reglas de la base (motor_reglas.js), la IA, los discriminadores y la clasificación anterior: calcSug().
+     [Dario 30/10] Ya no hay reglas escritas en este archivo: se administran en reglas.html.
      Cuando estén las guías aprobadas (D09) y la autorización del HRRG, acá se reemplaza por la respuesta validada del backend.
    - "Por qué", fuente, qué lo haría subir, decisión del profesional (aceptar / modificar / rechazar / manual)
      y su guardado en el servidor.
@@ -25,43 +26,6 @@ const DISC={
 const PAGE={'Dolor abdominal':'[pág. —]','Dolor torácico':'[pág. —]','_':'[pág. —]'};
 const diag=()=>DISC[st.rev.motivo_categoria]?st.rev.motivo_categoria:'_';
 const diagName=()=>diag()==='_'?'Malestar en adulto (general)':diag();
-/* Reglas de seguridad PROVISORIAS (ejemplo para el prototipo; umbrales a aprobar por Guardia y Enfermería del HRRG) */
-/* [Dario 29/10 · Etapa B] COPIA DE RESPALDO. Estas mismas reglas ahora están en la base (backend/datos/reglas_semilla.json,
-   se cargan solas al primer arranque) y se administran en reglas.html. Esta función solo interviene si la Jefatura
-   enciende la "copia de respaldo". NO cambiar umbrales acá: tests/semilla_equivalencia.test.js compara las dos. */
-/* Explicación clínica comprensible (pedido del documento del proyecto): en vez de listar valores sueltos,
-   agrupa los que van juntos en una frase que dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso
-   respiratorio"). Los umbrales y niveles son los mismos de antes: solo cambia cómo se explica. */
-function reglas(){
-  const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),out=[];
-  const add=(lv,t)=>out.push({lv,t});
-  const lista=a=>a.length<2?a[0]:a.slice(0,-1).join(', ')+' y '+a[a.length-1];
-  /* Neurológico */
-  if(r.br_convulsion)add(0,'Convulsión activa: compromiso neurológico agudo');
-  if(n('glasgow')!=null&&n('glasgow')<=8)add(0,'Glasgow '+r.glasgow+': conciencia muy deprimida, riesgo para la vía aérea');
-  else if((r.estado_conciencia&&r.estado_conciencia!=='Alerta')||(n('glasgow')!=null&&n('glasgow')<15))
-    add(1,'Alteración del nivel de conciencia ('+(n('glasgow')!=null&&n('glasgow')<15?'Glasgow '+r.glasgow:r.estado_conciencia)+'): posible compromiso neurológico');
-  /* Respiratorio: SpO₂ baja, FR alterada y disnea se explican juntas */
-  const resp=[];
-  if(n('saturacion_o2')!=null&&n('saturacion_o2')<90)resp.push('SpO₂ '+r.saturacion_o2+' %');
-  if(n('frecuencia_respiratoria')!=null&&n('frecuencia_respiratoria')>30)resp.push('taquipnea (FR '+r.frecuencia_respiratoria+' rpm)');
-  if(n('frecuencia_respiratoria')!=null&&n('frecuencia_respiratoria')<8)resp.push('bradipnea (FR '+r.frecuencia_respiratoria+' rpm)');
-  if(r.br_disnea)resp.push('dificultad para respirar');
-  if(resp.length){const t=lista(resp);add(1,t.charAt(0).toUpperCase()+t.slice(1)+': posible compromiso respiratorio')}
-  /* Circulatorio: sangrado, hipotensión y FC alterada */
-  const hipo=n('ta_sistolica')!=null&&n('ta_sistolica')<90,ta='TA '+r.ta_sistolica+'/'+(r.ta_diastolica||'—');
-  const fc=n('frecuencia_cardiaca')!=null&&(n('frecuencia_cardiaca')>130||n('frecuencia_cardiaca')<40)?(n('frecuencia_cardiaca')>130?'taquicardia':'bradicardia')+' (FC '+r.frecuencia_cardiaca+' lpm)':null;
-  if(r.br_sangrado&&hipo)add(0,'Sangrado con hipotensión ('+ta+(fc?', FC '+r.frecuencia_cardiaca+' lpm':'')+'): posible shock por pérdida de sangre');
-  else{
-    if(r.br_sangrado)add(1,'Sangrado evidente: riesgo de pérdida de volumen');
-    const circ=[];if(hipo)circ.push('hipotensión ('+ta+')');if(fc)circ.push(fc);
-    if(circ.length){const t=lista(circ);add(1,t.charAt(0).toUpperCase()+t.slice(1)+(hipo?': posible compromiso circulatorio (shock)':': alteración del ritmo o compromiso circulatorio'))}
-  }
-  /* Otros */
-  if(r.ant_inmuno&&n('temperatura')!=null&&n('temperatura')>=38)add(1,'Fiebre ('+r.temperatura+' °C) en paciente inmunosuprimido: riesgo de infección grave');
-  if(n('dolor_intensidad')!=null&&n('dolor_intensidad')>=8)add(1,'Dolor intenso ('+r.dolor_intensidad+'/10)');
-  return out;
-}
 /* Sugerencia simulada de MedGemma (en el sistema real: JSON validado del modelo con RAG sobre la guía) */
 function medgemma(){
   const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),why=[];let lv=3;
@@ -89,18 +53,19 @@ function medgemma(){
    sugerencia, así una regla recién activada interviene en el próximo paciente sin recargar nada.
    Fijan un piso (no se puede sugerir menos) y aparecen en el "Por qué" con la marca HRRG.
    Si la Jefatura apaga las "reglas de ejemplo", quedan solo las del hospital (más la IA). */
-const REGLAS_HRRG={lista:[],usarEjemplo:true,error:null};
+const REGLAS_HRRG={lista:[],error:null};
 async function cargarReglasHospital(){
   if(!TriageAPI.MODO_REAL)return;
   if(typeof cargarTiempos==='function')cargarTiempos();   /* [Dario 29/10 · Etapa C] tiempos por color al día */
   const r=await TriageAPI.reglasActivas();
   if(r.estado===401){location.href='index.html';return}
-  if(r.ok){REGLAS_HRRG.lista=r.datos.reglas||[];REGLAS_HRRG.usarEjemplo=r.datos.usar_ejemplo!==false;REGLAS_HRRG.error=null}
+  if(r.ok){REGLAS_HRRG.lista=r.datos.reglas||[];REGLAS_HRRG.error=null}
   else REGLAS_HRRG.error='No se pudieron leer las reglas del hospital: se usan las últimas conocidas.';
 }
 function calcSug(){
   const H=window.MotorReglas?MotorReglas.evaluar(REGLAS_HRRG.lista,st.rev):[],hl=H.length?H[0].lv:9;
-  const R=REGLAS_HRRG.usarEjemplo?reglas():[],M=medgemma(),rl=R.length?Math.min(...R.map(x=>x.lv)):9;
+  /* R y rl quedan vacíos (antes: reglas escritas en el código); se conservan para no cambiar quien los lee. */
+  const R=[],M=medgemma(),rl=9;
   const C=Object.entries(st.disc).filter(([k,v])=>v==='si').map(([k])=>{const [lv,t]=k.split('|');return {lv:+lv,t}});
   const cl=C.length?Math.min(...C.map(x=>x.lv)):9;
   /* Reevaluación: el color anterior (aceptado o modificado por el profesional) es un piso, como las reglas.
@@ -113,13 +78,11 @@ function renderCard(){
   $('#tcPrev').hidden=!st.prev;if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
   $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
   $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[SUG]+' [tiempo de ejemplo]';
-  $('#tcOrigin').innerHTML=c.rl<c.M.lv?'<b>Color fijado por regla de seguridad.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'; la regla no permite bajar.</span><span class="prov">Reglas provisorias</span>'
-    :(c.R.length?'<b>Simulación con reglas de ejemplo.</b><span class="old">Coincide o supera las reglas de seguridad.</span>':'<b>Simulación con reglas de ejemplo.</b><span class="old">Reglas de seguridad: sin alertas.</span>');
-  if(!REGLAS_HRRG.usarEjemplo&&c.rl===9&&!(c.hl<c.M.lv))$('#tcOrigin').innerHTML='<b>Simulación con las reglas del hospital.</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+' Las reglas de ejemplo están desactivadas.</span>';
+  $('#tcOrigin').innerHTML='<b>Sugerencia con las reglas del hospital y la IA.</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+'</span>';
   if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
   if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Se administra en la pantalla de reglas (Jefatura de Guardia).</span>';
   if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
-  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h" title="Regla del hospital '+esc(x.codigo)+' v'+x.version+'">HRRG</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+' · '+esc(MotorReglas.ORIGEN[x.origen]||x.origen)+' · '+(x.validada_por?'validada por '+esc(x.validada_por):'sin validar')+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
+  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h'+(x.origen==='provisoria'?' prov':'')+'" title="Regla '+esc(x.codigo)+' v'+x.version+'">'+esc(MotorReglas.etiqueta(x.origen,x.validada_por))+'</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+' · '+esc(MotorReglas.ORIGEN[x.origen]||x.origen)+' · '+(x.validada_por?'validada por '+esc(x.validada_por):'sin validar')+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
   renderFuente();renderSubir();pintarDecision();
 }
 /* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
@@ -275,8 +238,8 @@ function respuestaSimulada(q){
   if(/tiempo|esper|cu[aá]nto|minutos/.test(t))
     return 'Para '+L+' el tiempo de ejemplo es: '+DESC[SUG]+'.\nLos tiempos reales salen de la guía del hospital.';
   if(/por ?qu[eé]|motivo|raz[oó]n|color|prioridad/.test(t)){
-    const r=[...c.H.map(x=>'• Regla del hospital '+x.codigo+': '+x.texto),...c.R.map(x=>'• Regla: '+x.t),...c.C.map(x=>'• Confirmado: '+x.t),...c.M.why.map(x=>'• Del relato: '+x)];
-    return 'Sugiero '+L+' por:\n'+r.join('\n')+(c.rl<c.M.lv?'\nUna regla de seguridad no deja bajar el color.':'');}
+    const r=[...c.H.map(x=>'• Regla del hospital '+x.codigo+': '+x.texto),...c.C.map(x=>'• Confirmado: '+x.t),...c.M.why.map(x=>'• Del relato: '+x)];
+    return 'Sugiero '+L+' por:\n'+r.join('\n')+(c.hl<c.M.lv?'\nUna regla del hospital no deja bajar el color.':'');}
   return 'Puedo explicarte por qué se sugirió '+L+', qué datos faltan, qué lo haría subir o de qué guía sale. Probá con alguna de esas preguntas.';
 }
 async function preguntarIA(q){

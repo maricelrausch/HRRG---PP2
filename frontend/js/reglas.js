@@ -21,7 +21,7 @@
   /* [Dario 29/10] Origen de la regla (lo manda el servidor en /api/reglas/campos). */
   let ORIG = [['manchester', 'Sistema Manchester'], ['local', 'Adaptación local HRRG'], ['provisoria', 'Provisoria / en revisión']];
   const textoOrigen = (o) => (ORIG.find((x) => x[0] === o) || [o, o])[1];
-  let reglas = [], usarEjemplo = true, configAct = null;
+  let reglas = [];
   let editor = null, pendiente = null, abiertos = new Set(), cargando = false;
   /* [Dario 29/10 · Etapa C] Tiempos objetivo por color (minutos). */
   let tiempos = null, tiemposRef = null, tiemposConf = false, tiemposAct = null, tiemposMsg = null;
@@ -46,7 +46,7 @@
     cargando = false;
     if (!r.ok) { error(r.datos.mensaje || 'No se pudieron leer las reglas.'); return; }
     error(null);
-    reglas = r.datos.reglas || []; usarEjemplo = r.datos.usar_ejemplo !== false; configAct = r.datos.config_actualizada;
+    reglas = r.datos.reglas || [];
     pintar();
   }
 
@@ -83,14 +83,6 @@
     const n = (e) => reglas.filter((r) => r.estado === e).length;
     $('rgResumen').innerHTML = '<div><span>Activas</span><b>' + n('activa') + '</b></div><div><span>Borradores</span><b>' + n('borrador') +
       '</b></div><div><span>Inactivas</span><b>' + n('inactiva') + '</b></div>';
-    /* [Dario 29/10 · Etapa B] Las reglas de ejemplo ahora están cargadas en esta lista (origen Manchester, sin validar).
-       El interruptor queda como respaldo: enciende la copia vieja escrita en el código (sugerencia.js). */
-    $('rgEjemplo').innerHTML = '<div><b>Copia de respaldo de las reglas de ejemplo (en el código): ' + (usarEjemplo ? 'encendida' : 'apagada') + '.</b> ' +
-      (usarEjemplo ? 'Además de las reglas de esta lista, la sugerencia usa la copia de las reglas de ejemplo escrita en el código. Como esas reglas ya están cargadas en la lista (origen «Sistema Manchester», sin validar), conviene apagarla.'
-        : 'La sugerencia usa solo las reglas de esta lista y la IA. Las reglas de ejemplo del prototipo están en la lista como «Sistema Manchester · sin validar»: revisalas con Enfermería y Guardia.') +
-      (configAct ? ' <span class="hint">Último cambio: ' + esc(configAct.por) + ', ' + esc(fecha(configAct.en)) + '.</span>' : '') + '</div>' +
-      (soloLectura ? '' : '<button type="button" class="btn" data-ejemplo="' + (usarEjemplo ? '0' : '1') + '">' +
-        (pendiente === 'ejemplo' ? 'Confirmar: ' + (usarEjemplo ? 'apagar' : 'encender') : (usarEjemplo ? 'Apagar copia de respaldo' : 'Encender copia de respaldo')) + '</button>');
 
     if (!reglas.length) {
       $('rgLista').innerHTML = '<div class="rg-vacio">Todavía no hay reglas del hospital.' + (soloLectura ? '' : ' Tocá <b>Nueva regla</b> para cargar la primera.') + '</div>';
@@ -122,7 +114,7 @@
       '<span class="hint">v' + r.version + ' · ' + esc(r.actualizada_por) + ', ' + esc(fecha(r.actualizada_en)) + '</span></header>' +
       '<div class="rg-si">' + (r.condiciones.length > 1 ? (r.combinacion === 'todas' ? 'Si se cumplen <b>todas</b> estas condiciones' : 'Si se cumple <b>alguna</b> de estas condiciones') : 'Si se cumple esta condición') + ':<ul>' + conds + '</ul></div>' +
       (r.discriminador ? '<div class="hint">Discriminador / criterio: ' + esc(r.discriminador) + '</div>' : '') +
-      '<div class="rg-pq"><span class="src h">HRRG</span> <span>' + esc(r.explicacion) + '</span> <span class="hint">(así se ve en el «Por qué»)</span></div>' +
+      '<div class="rg-pq"><span class="src h' + (r.origen === 'provisoria' ? ' prov' : '') + '">' + esc(MotorReglas.etiqueta(r.origen, r.validada_por)) + '</span> <span>' + esc(r.explicacion) + '</span> <span class="hint">(así se ve en el «Por qué»)</span></div>' +
       (r.estado === 'activa' && !soloLectura ? '<div class="hint">Si la editás, vuelve a borrador y deja de intervenir hasta que la actives de nuevo.</div>' : '') +
       '<footer>' + acciones + '</footer>' + hist + '</article>';
   }
@@ -257,14 +249,6 @@
     pendiente = null; b.disabled = true;
     const res = await llamar('/api/reglas/' + id + '/' + acc, {});
     if (!res.ok) error(res.datos.mensaje || 'No se pudo completar la acción.');
-    await cargar();
-  });
-  $('rgEjemplo').addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-ejemplo]'); if (!b) return;
-    if (pendiente !== 'ejemplo') { pendiente = 'ejemplo'; return pintar(); }
-    pendiente = null;
-    const res = await llamar('/api/reglas/config', { usar_ejemplo: b.dataset.ejemplo === '1' });
-    if (!res.ok) error(res.datos.mensaje || 'No se pudo cambiar.');
     await cargar();
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && pendiente) { pendiente = null; pintar(); } });
