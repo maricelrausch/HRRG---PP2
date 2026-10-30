@@ -443,16 +443,9 @@ html.cargando,html.cargando *{cursor:progress}
 .ver-clave:hover{background:var(--panel)}
 .ver-clave[aria-pressed=true]{border-color:var(--ink)}
 
-/* [Propuesta Barby 28/10] Cancelar caso (pantallas 1 y 2) */
-.btn.cancelar{border-color:var(--err);color:var(--err);background:transparent}
+/* [Barby 28/10] Botón de peligro */
 .btn.danger{background:var(--err);border-color:var(--err);color:#fff}
 .btn.danger:disabled{opacity:.5;cursor:not-allowed}
-.cancelbox{margin:12px 20px 0;padding:14px 16px;border:1px solid var(--err);border-radius:10px;background:var(--err-soft);display:flex;flex-direction:column;gap:8px;font-size:14px}
-.cancelbox>b{color:var(--err);font-size:15px}
-.cancelbox label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px}
-.cancelbox select,.cancelbox input{min-height:40px;border:1px solid var(--line);border-radius:8px;padding:0 10px;background:var(--panel);color:var(--ink);font:inherit;font-weight:400}
-.cancelbox .cx-det{flex:1;min-width:220px}
-.cancel-ok{margin:12px 20px 0}
 .src.h{background:#0B5CAD;color:#fff}
 
 /* [Propuesta Barby 28/10] Pantalla de reglas del hospital (reglas.html) */

@@ -743,10 +743,18 @@ def buscar_episodios(
     limite=50,
     desplazamiento=0,
     desde=None,
-    hasta=None
+    hasta=None,
+    estado=None
 ):
     condiciones = []
     parametros = []
+
+    # [Barby 30/10] Filtro opcional por estado (lo usa la API de auditoría).
+    if estado is not None:
+        if estado not in ("en_ingreso", "en_espera", "finalizado", "anulado"):
+            raise ValueError("Estado inválido. Usá en_ingreso, en_espera, finalizado o anulado.")
+        condiciones.append("s.estado = ?")
+        parametros.append(estado)
 
     desde, hasta = normalizar_rango(desde, hasta)
     if desde:
@@ -776,7 +784,8 @@ def buscar_episodios(
     try:
         # Consulta primero la cantidad total que coincide con los filtros.
         total = conexion.execute(
-            "SELECT COUNT(*) FROM episodios AS e" + filtro,
+            "SELECT COUNT(*) FROM episodios AS e "
+            "LEFT JOIN estados_episodio AS s ON s.codigo_episodio = e.codigo_episodio" + filtro,
             parametros
         ).fetchone()[0]
 

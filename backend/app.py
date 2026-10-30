@@ -226,6 +226,11 @@ app.register_blueprint(sala_bp)   # /api/sala/espera
 from src.api_hospital import bp as api_hospital_bp
 app.register_blueprint(api_hospital_bp)   # /api/cola-espera, /api/episodios/<codigo>/mediciones
 
+# [Propuesta Barby 30/10] API de auditoría para otro sistema: búsqueda de casos, historial y exportación.
+# Solo lectura, con token propio (HRRG_API_AUDITORIA_TOKEN). Ver docs/api_auditoria.md.
+from src.api_auditoria import bp as api_auditoria_bp
+app.register_blueprint(api_auditoria_bp)   # /api/auditoria/...
+
 
 #--------------------------------------------
 # Ruta para iniciar sesión desde el frontend.

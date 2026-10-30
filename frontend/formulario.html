@@ -43,9 +43,6 @@
       <div class="stepper" id="stepper">
         <span data-s="ingreso">1 Ingreso</span>›<span data-s="revision">2 Medición</span>›<span data-s="resumen">3 Sugerencia</span>
       </div>
-      <!-- [Barby 28/10] Cancelar el caso (pantallas 1 y 2): se arma desde formulario.js -->
-      <div class="cancelbox" id="cancelBox" hidden role="dialog" aria-labelledby="cancelTit"></div>
-      <div class="ok cancel-ok" id="cancelOk" hidden role="status"></div>
 
       <!-- 1 · INGRESO -->
       <div class="body" id="s-ingreso">
@@ -71,7 +68,6 @@
         <div class="row">
           <button type="button" class="btn primary" id="extraer">Extraer datos</button><span class="n">2</span>
           <button type="button" class="btn" id="borrar">Borrar texto</button>
-          <button type="button" class="btn cancelar" data-cancelar>Cancelar caso</button>
         </div>
         <div class="processing" id="proc" hidden>Simulando la extracción… El texto queda guardado.</div>
       </div>
@@ -99,7 +95,6 @@
           <button type="button" class="btn primary" id="confirmar">Pedir sugerencia</button><span class="n">4</span>
           <button type="button" class="btn" id="sinIA">Clasificar sin IA</button>
           <button type="button" class="btn" data-go="ingreso">Volver al relato</button>
-          <button type="button" class="btn cancelar" data-cancelar>Cancelar caso</button>
           <span class="hint err" id="badHint" hidden>Hay valores fuera de rango. Corregilos para continuar.</span>
           <button type="button" class="demo" id="demoVitals">Demo: completar con valores de ejemplo</button>
           <button type="button" class="demo" id="demoWorse" hidden>Demo: empeoró (SpO₂ 86 %, FC 125, disnea)</button>
