@@ -421,6 +421,10 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .ident-pac input{width:200px;max-width:100%;font-family:var(--f-mono);font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ident-pac input.bad{border:2px solid var(--err)}
 .dnitag{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:2px}
+/* DNI y condición especial en la misma fila; en pantallas chicas la condición baja sola */
+.ident-fila{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+.ident-col{display:flex;flex-direction:column;min-width:0}
+.ident-fila select{margin-top:0;min-width:200px;font-size:16px}
 
 /* Atenciones anteriores del paciente */
 .note.hist .prev{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
