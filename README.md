@@ -251,6 +251,7 @@ HRRG---PP2/
 | Documento | Ubicación |
 |---|---|
 | **Manual de usuario** | [`docs/manual_usuario.md`](docs/manual_usuario.md) |
+| Endpoints para otros sistemas (sala y auditoría) | [`docs/endpoints_externos.md`](docs/endpoints_externos.md) |
 | Contrato de API | [`docs/contrato_api.md`](docs/contrato_api.md) |
 | Diccionario de datos V2 | [`backend/docs/diccionario_datos_v2.md`](backend/docs/diccionario_datos_v2.md) |
 | Controles de validación | [`backend/docs/controles_validacion.md`](backend/docs/controles_validacion.md) |
