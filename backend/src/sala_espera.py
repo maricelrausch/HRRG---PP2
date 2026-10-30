@@ -11,14 +11,15 @@ from datetime import datetime, timezone
 from flask import Blueprint, current_app, jsonify
 
 from src.registro import listar_espera_demo
+from src.reglas_hospital import leer_tiempos
 
 bp = Blueprint("sala", __name__)
 logger = logging.getLogger(__name__)
 
-# Orden y tiempo objetivo (minutos) por color, igual que la pantalla En espera.
+# Orden por color, igual que la pantalla En espera.
 # Sin AZUL: el equipo lo sacó. Sin color = todavía no pasó por el triage: no entra en la lista.
+# [Dario 29/10 · Etapa C] El tiempo objetivo de cada color se lee de la configuración de reglas.
 PRIORIDAD = {"ROJO": 0, "NARANJA": 1, "AMARILLO": 2, "VERDE": 3}
-OBJETIVO_MIN = {"ROJO": 0, "NARANJA": 10, "AMARILLO": 60, "VERDE": 120}
 
 
 def codigo_corto(codigo_episodio):
@@ -49,6 +50,7 @@ def sala_espera():
         return jsonify({"ok": False, "mensaje": "No se pudo consultar la lista de espera."}), 500
 
     ahora = datetime.now(timezone.utc)
+    objetivo = leer_tiempos(current_app.config.get("BASE_REGLAS"))
     lista = []
     for ep in episodios:
         color = ep.get("color_final")
@@ -61,12 +63,15 @@ def sala_espera():
             "codigo": codigo_corto(ep["codigo_episodio"]),
             "color": color,
             "espera_seg": max(0, int((ahora - desde).total_seconds())),
-            "objetivo_min": OBJETIVO_MIN[color],
+"objetivo_min": objetivo[color],
+            # [Barby 30/10] Para pantallas externas de la sala: hora del triage y si superó el tiempo.
+            "en_espera_desde": desde.isoformat(),
+            "vencido": color != "ROJO" and (ahora - desde).total_seconds() / 60 > objetivo[color],
         })
 
     # Primero por color (ROJO arriba) y después por quien espera más.
     lista.sort(key=lambda x: (PRIORIDAD[x["color"]], -x["espera_seg"]))
 
-    respuesta = jsonify({"ok": True, "episodios": lista})
+    respuesta = jsonify({"ok": True, "episodios": lista, "tiempos": objetivo})
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200

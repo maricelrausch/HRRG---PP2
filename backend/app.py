@@ -39,6 +39,8 @@ from src.registro import (
     obtener_estado_demo,
     EpisodioNoEncontradoError,
     ConflictoEstadoError,
+    anular_episodio_demo,
+    EpisodioNoAnulableError,
 )
 from werkzeug.exceptions import BadRequest
 from src.identificacion import (
@@ -156,6 +158,16 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
 
+# [Propuesta Barby 28/10] Caducidad por INACTIVIDAD: si pasan estos minutos sin que la persona
+# use el sistema, la sesión se cierra (antes quedaba abierta para siempre porque las listas que
+# se actualizan solas renovaban la cookie). Las consultas automáticas mandan el encabezado
+# X-HRRG-Auto: 1 y no cuentan como actividad. Se cambia con HRRG_SESION_INACTIVIDAD_MIN.
+try:
+    INACTIVIDAD_MIN = max(1, int(os.environ.get("HRRG_SESION_INACTIVIDAD_MIN", "15")))
+except ValueError:
+    INACTIVIDAD_MIN = 15
+app.config["SESION_INACTIVIDAD_MIN"] = INACTIVIDAD_MIN
+
 def inicializar_usuarios():
     conexion = sqlite3.connect(BASE_USUARIOS)
 
@@ -196,6 +208,15 @@ migrar_usuarios(BASE_USUARIOS)
 app.config["BASE_USUARIOS"] = BASE_USUARIOS
 app.register_blueprint(admin_usuarios_bp)
 
+# [Propuesta Barby 28/10] Reglas del hospital (Jefatura de Guardia): base propia y rutas /api/reglas/...
+from src.reglas_hospital import bp as reglas_bp, inicializar_reglas, cargar_semilla
+BASE_REGLAS = CARPETA_DATOS / "reglas_hospital.db"
+inicializar_reglas(BASE_REGLAS)
+# [Dario 29/10 · Etapa B] Reglas de ejemplo del prototipo → base (una sola vez). Ver datos/reglas_semilla.json.
+cargar_semilla(BASE_REGLAS, CARPETA_BACKEND / "datos" / "reglas_semilla.json")
+app.config["BASE_REGLAS"] = BASE_REGLAS
+app.register_blueprint(reglas_bp)
+
 # Lista de espera para la sala y celulares (Darío): pública, solo lectura y sin datos personales.
 from src.sala_espera import bp as sala_bp
 app.config["BASE_REGISTRO_DEMO"] = BASE_REGISTRO_DEMO
@@ -204,6 +225,11 @@ app.register_blueprint(sala_bp)   # /api/sala/espera
 # Web service para el sistema del hospital (Darío): solo lectura, con token (HRRG_API_HOSPITAL_TOKEN).
 from src.api_hospital import bp as api_hospital_bp
 app.register_blueprint(api_hospital_bp)   # /api/cola-espera, /api/episodios/<codigo>/mediciones
+
+# [Propuesta Barby 30/10] API de auditoría para otro sistema: búsqueda de casos, historial y exportación.
+# Solo lectura, con token propio (HRRG_API_AUDITORIA_TOKEN). Ver docs/api_auditoria.md.
+from src.api_auditoria import bp as api_auditoria_bp
+app.register_blueprint(api_auditoria_bp)   # /api/auditoria/...
 
 
 #--------------------------------------------
@@ -289,6 +315,7 @@ def login():
     session.clear()
     session.permanent = True
     session["usuario"] = usuario
+    session["ultima_actividad"] = time.time()
     logger_sistema.info("LOGIN_CORRECTO")
 
     return jsonify({
@@ -332,7 +359,8 @@ def consultar_sesion():
         "nombre": profesional["nombre"],
         "rol": profesional["rol"],
         "debe_cambiar": g.requiere_cambio,
-        "modo_extraccion": app.config["MODO_EXTRACCION"]
+        "modo_extraccion": app.config["MODO_EXTRACCION"],
+        "inactividad_min": app.config["SESION_INACTIVIDAD_MIN"]
     })
 
     # Evita reutilizar información de sesión almacenada en caché.
@@ -346,6 +374,22 @@ def consultar_sesion():
 
 @app.before_request
 def verificar_acceso():
+    # [Propuesta Barby 28/10] Cierre de sesión por inactividad (ver SESION_INACTIVIDAD_MIN).
+    if session.get("usuario") and request.endpoint not in {"login", "logout", "static"}:
+        ahora = time.time()
+        ultima = session.get("ultima_actividad")
+        if ultima is not None and ahora - ultima > app.config["SESION_INACTIVIDAD_MIN"] * 60:
+            session.clear()
+            logger_sistema.info("SESION_VENCIDA_INACTIVIDAD")
+            if request.path.startswith("/api/"):
+                return respuesta_error(
+                    "La sesión se cerró por inactividad. Volvé a ingresar.",
+                    401,
+                    "SESION_VENCIDA"
+                )
+        elif request.headers.get("X-HRRG-Auto") != "1":
+            session["ultima_actividad"] = ahora
+
     if (
         request.endpoint in {"chat_api", "upload"}
         and not app.config["DEMO_DOCUMENTAL_HABILITADA"]
@@ -373,6 +417,7 @@ def verificar_acceso():
         "listar_episodios_demo",
         "consultar_estado_episodio_demo",
         "actualizar_estado_episodio_demo",
+        "anular_episodio_demo_ruta",
         "consultar_espera_demo",
         "iachat.estado",
         "iachat.consulta",
@@ -399,7 +444,7 @@ def verificar_acceso():
             "SESION_REQUERIDA"
         )
 
-    if profesional["rol"] not in {"enfermeria", "medico", "auditor", "admin"}:
+    if profesional["rol"] not in {"enfermeria", "medico", "auditor", "jefatura", "admin"}:
         return respuesta_error(
             "Tu cuenta todavía no tiene un perfil asignado.",
             403,
@@ -429,6 +474,14 @@ def verificar_acceso():
             "Tenés que cambiar tu contraseña antes de continuar.",
             403,
             "CAMBIO_PASSWORD_REQUERIDO"
+        )
+
+    # [Propuesta Barby 28/10] La Jefatura de Guardia administra reglas, no atiende pacientes.
+    if profesional["rol"] == "jefatura":
+        return respuesta_error(
+            "El perfil Jefatura de Guardia administra las reglas del hospital, no accede a la atención.",
+            403,
+            "PERMISO_DENEGADO"
         )
 
     if profesional["rol"] == "admin":
@@ -1004,7 +1057,7 @@ Pregunta:
 @click.option("--usuario", prompt="Usuario")
 @click.option(
     "--rol",
-    type=click.Choice(["enfermeria", "medico", "auditor", "admin"]),
+    type=click.Choice(["enfermeria", "medico", "auditor", "jefatura", "admin"]),
     prompt="Rol"
 )
 
@@ -1827,6 +1880,52 @@ def consultar_estado_episodio_demo(codigo_episodio):
 
 # Cambia el estado y registra el evento con el profesional autenticado.
 # El control de acceso bloquea esta operación para el auditor.
+# ------------------------------------------------
+# [Propuesta Barby 28/10 · a revisar por Maricel]
+# Cancelar un caso cargado por error, antes de que pase a la lista de espera.
+# Entrada: {"motivo": "...", "version_esperada": n}. Queda ANULADO (no se borra):
+# no aparece en En espera ni en la sala, y el auditor lo ve en el historial.
+# El auditor no puede usarla (verificar_acceso bloquea los POST del auditor).
+# ------------------------------------------------
+@app.route("/api/demo/episodios/<codigo_episodio>/anular", methods=["POST"])
+def anular_episodio_demo_ruta(codigo_episodio):
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or set(datos) != {"motivo", "version_esperada"}:
+        return respuesta_error(
+            "Enviá únicamente motivo y version_esperada.",
+            400,
+            "CAMPOS_INVALIDOS"
+        )
+    try:
+        resultado = anular_episodio_demo(
+            ruta_base=BASE_REGISTRO_DEMO,
+            codigo_episodio=codigo_episodio,
+            profesional_usuario=g.profesional["usuario"],
+            motivo=datos["motivo"],
+            version_esperada=datos["version_esperada"]
+        )
+    except EpisodioNoEncontradoError:
+        return respuesta_error("El episodio no existe.", 404, "EPISODIO_NO_ENCONTRADO")
+    except ConflictoEstadoError:
+        return respuesta_error(
+            "El estado cambió. Consultá la versión actual antes de volver a intentar.",
+            409,
+            "VERSION_DESACTUALIZADA"
+        )
+    except EpisodioNoAnulableError as error:
+        return respuesta_error(str(error), 409, "EPISODIO_NO_ANULABLE")
+    except ValueError as error:
+        return respuesta_error(str(error), 422, "ANULACION_INVALIDA")
+    except sqlite3.Error:
+        logger_sistema.error("ERROR_ANULAR_EPISODIO_DEMO")
+        return respuesta_error("No se pudo anular el caso.", 500, "ERROR_REGISTRO")
+
+    logger_sistema.info("EPISODIO_ANULADO | %s | %s", g.profesional["usuario"], codigo_episodio)
+    respuesta = jsonify({"ok": True, "modo": "demo", **resultado})
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+
 @app.route(
     "/api/demo/episodios/<codigo_episodio>/estado",
     methods=["POST"]

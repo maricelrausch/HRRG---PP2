@@ -23,6 +23,8 @@ KEEP_ALIVE = os.environ.get("MEDGEMMA_KEEP_ALIVE", "30m")   # cuánto queda carg
 HILOS = int(os.environ.get("MEDGEMMA_HILOS") or 0)
 NIVELES = {"ROJO": 0, "NARANJA": 1, "AMARILLO": 2, "VERDE": 3, "AZUL": 4}
 
+# [Dario 29/10 · D3] A propósito NO se agregan acá los motivos nuevos de src/esquemas.py: MedGemma
+# sigue eligiendo entre estas 8 (extracción ya evaluada); el profesional puede elegir las nuevas.
 CATEGORIAS = ["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
               "Cefalea", "Síntoma neurológico", "Otro"]
 ANTECEDENTES = ["ant_diabetes", "ant_cardio", "ant_resp", "ant_anticoag",

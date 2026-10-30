@@ -11,13 +11,15 @@ const SPECS={
   login:{t:'Pantalla 0 · Acceso',items:[
     ['1','Usuario individual por profesional: cada sugerencia y decisión queda registrada con su usuario (auditoría, Cuestionario §6).'],
     ['2','Roles: Enfermería y Médico/a usan el triage; Auditoría solo consulta En espera y el registro.'],
-    ['3','Credenciales locales y cifradas, sin nube (Ley 25.326). A futuro: credenciales del hospital.']],src:'Cuestionario HRRG §6 Trazabilidad · Clase docentes'},
+    ['3','Credenciales locales y cifradas, sin nube (Ley 25.326). A futuro: credenciales del hospital.'],
+    ['⏱','La sesión se cierra sola tras 15 minutos sin uso (aviso 1 minuto antes).']],src:'Cuestionario HRRG §6 Trazabilidad · Clase docentes'},
   ingreso:{t:'Pantalla 1 · Ingreso',items:[
     ['1','Relato del paciente o acompañante, en sus palabras. Caso ficticio.'],
     ['P','Si detecta un DNI o teléfono en el relato, avisa y no lo envía a la IA (§4).'],
     ['M','Dictado por voz: transcribe al cuadro y se puede editar.'],
     ['2','No envía texto vacío. Mientras procesa, botón bloqueado.'],
-    ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
+    ['S','Indica de dónde sale la extracción: MedGemma en esta computadora (IA local) o la simulación con casos de ejemplo.'],
+    ['↺','Después de registrar la decisión, volver a Ingreso o Medición deja la pantalla en blanco para el próximo paciente.']],src:'Cuestionario HRRG §2, §4 · A1, A2'},
   revision:{t:'Pantalla 2 · Medición',items:[
     ['1','Solo lo que se mide en el box. Nombre completo, unidad y referencia en cada campo. Enter pasa al siguiente.'],
     ['A','Aviso inmediato: fuera de lo normal (borde oscuro), crítico por regla de seguridad o valor imposible (rojo).'],
@@ -29,7 +31,7 @@ const SPECS={
     ['2','Por qué: explicación clínica comprensible. Agrupa las variables que van juntas y dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso respiratorio"), marcadas REGLA, GUÍA o IA. Las reglas fijan un piso: la IA no puede sugerir menos (no downgrade).'],
     ['3','Aceptar con un toque. Modificar o Rechazar piden motivo.'],
     ['4','Corregir datos del relato: lo que extrajo la IA se puede corregir acá. La decisión final es del profesional.'],
-    ['5','Reglas provisorias de ejemplo: los umbrales los aprueban Guardia y Enfermería.'],
+    ['5','Reglas del hospital (HRRG): las carga y activa la Jefatura de Guardia; intervienen desde el próximo paciente y fijan un piso. Las reglas de ejemplo del equipo se pueden apagar.'],
     ['↑','Qué lo haría subir: muestra los discriminadores del nivel siguiente. Los que no se miden se confirman con Sí/No, recalculan al instante y quedan guardados en la decisión del servidor (triage guiado por discriminadores).']],src:'Doc. técnico §9 Motor híbrido · Cuestionario §2 · Clase docentes'},
   espera:{t:'Pantalla 4 · En espera',items:[
     ['1','Pacientes ya clasificados que esperan, ordenados por color y tiempo.'],
@@ -45,7 +47,7 @@ const DESC=['Inmediato · atención inmediata','Muy urgente · 10 min','Urgente 
 const F=[
   {k:'edad',l:'Edad',u:'años',t:'num',hce:'58',min:0,max:120,req:1,box:'ident',ph:'años'},
   {k:'sexo',l:'Sexo',t:'sel',hce:'Femenino',opts:['Femenino','Masculino','No informado'],req:1,box:'ident'},
-  {k:'motivo_categoria',l:'Categoría',t:'sel',ia:'Dolor abdominal',opts:['Dolor torácico','Dolor abdominal','Disnea','Trauma','Fiebre','Cefalea','Síntoma neurológico','Otro'],req:1,box:'relato',w:'half'},
+  {k:'motivo_categoria',l:'Categoría',t:'sel',ia:'Dolor abdominal',opts:['Dolor torácico','Dolor abdominal','Disnea','Trauma','Fiebre','Cefalea','Síntoma neurológico','Alteración de conciencia','Convulsiones','Hemorragia','Intoxicación','Reacción alérgica','Embarazo / obstétrico','Salud mental','Otro'],req:1,box:'relato',w:'half'},
   {k:'tiempo_evolucion_valor',l:'Desde hace',t:'num',ia:'6',min:0,max:10000,req:1,box:'relato'},
   {k:'tiempo_evolucion_unidad',l:'Unidad',t:'sel',ia:'horas',opts:['minutos','horas','días'],req:1,box:'relato'},
   {k:'motivo_consulta',l:'Motivo (resumen del relato)',t:'text',ia:'Dolor abdominal alto con náuseas',req:1,box:'relato',w:'full'},
@@ -95,6 +97,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function go(s){
+  /* [Dario 29/10] Después de Aceptar/Modificar/Rechazar, volver a Ingreso o Medición blanquea las pantallas. */
+  if(st.cerrado&&(s==='ingreso'||s==='revision')){nuevoCaso();return}
   if(s!=='resumen'&&$('#chat'))abrirChat(false);
   st.screen=s;
   if(!st.user){location.href='index.html';return}
@@ -107,7 +111,7 @@ function go(s){
   const sp=SPECS[s];
   $('#specs').innerHTML='<div class="eyebrow">Especificaciones</div><h2>'+sp.t+'</h2><ol>'+sp.items.map(i=>'<li><span class="n">'+i[0]+'</span><span>'+i[1]+'</span></li>').join('')+'</ol><div class="src">Fuente: '+sp.src+'</div>';
   if(s==='revision'){$('#epCode').textContent=st.ep;$('#dniTag').textContent=st.dni?'DNI '+fmtDni(st.dni):'Sin DNI';$('#reBadge').hidden=!st.prev;if(st.prev)$('#reBadge').textContent='Reevaluación · antes '+LEVELS[st.prev.lv][0]+', hace '+fmtMin(st.prev.min);$('#demoWorse').hidden=!st.prev;$('#demoVitals').hidden=!!st.prev;renderForm();updOllama();setTimeout(()=>{const i=$('#r-ta_sistolica');i&&!i.value&&i.focus()},0)}
-  if(s==='resumen')renderResumen();
+  if(s==='resumen'){document.querySelectorAll('#s-resumen [data-go="revision"]').forEach(b=>b.hidden=!!st.cerrado);renderResumen()}
   if(s==='espera'){renderWait();if(TriageAPI.MODO_REAL)cargarEspera().then(renderWait)}
   window.scrollTo({top:0});
 }
@@ -196,6 +200,8 @@ $('#extraer').addEventListener('click', async () => {
     st.extraccion = resultado;
     /* A08: guarda el relato tal como se envió, aunque después se edite el Ingreso. */
     st.relatoOriginal = texto;
+    edadSexoDelRelato(texto);
+    respaldoPalabrasClave(texto);
     st.modoServidor = resultado.modo;
     renderSimbar();
     st.disc = {};
@@ -391,7 +397,7 @@ $('#rvForm').addEventListener('input',e=>{
   updField(f);updControl();
 });
 $('#rvForm').addEventListener('click',e=>{const k=e.target.dataset.restore;if(!k)return;e.preventDefault();const f=byK(k);st.rev[k]=base(f);renderForm()});
-$('#confirmar').addEventListener('click',async()=>{await guardarMediciones();st.manual=false;st.insuf=CORE.filter(k=>!st.rev[k]).length>=3;go('resumen')});
+$('#confirmar').addEventListener('click',async()=>{await guardarMediciones();await cargarReglasHospital();st.manual=false;st.insuf=CORE.filter(k=>!st.rev[k]).length>=3;go('resumen')});
 $('#sinIA').addEventListener('click',async()=>{await guardarMediciones();st.manual=true;st.insuf=false;go('resumen')});
 
 /* ===== Guardado en el servidor (episodio, mediciones, correcciones, historial) =====
@@ -440,8 +446,15 @@ function valoresMedidos(){
 const CAMPOS_INGRESO=['edad','sexo','motivo_categoria','tiempo_evolucion_valor','tiempo_evolucion_unidad','motivo_consulta',
   'dolor_localizacion','sintomas_asociados','dolor_caracteristicas','br_sangrado','br_convulsion','br_disnea','br_trauma',
   'ant_diabetes','ant_cardio','ant_resp','ant_anticoag','ant_inmuno','ant_embarazo','ant_medicacion','alergias','antecedentes_otros'];
+/* [Dario 29/10 · D4] Condición especial del episodio. Vive en st.condicion (NO en st.rev): así no va a la IA,
+   ni a las reglas, ni cambia el color. Se guarda con los datos de ingreso y se ve en En espera y en la API. */
+const CONDICIONES=['Policial','Judicial','Custodia policial','Violencia','Accidente laboral','Salud mental','Otra'];
+st.condicion=null;
+CONDICIONES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;$('#condEsp').appendChild(o)});
+$('#condEsp').addEventListener('change',e=>{st.condicion=e.target.value||null});
 function datosIngreso(){
   const d={};
+  if(st.condicion)d.condicion_especial=st.condicion;
   CAMPOS_INGRESO.forEach(k=>{const f=byK(k);if(!f)return;const v=st.rev[k];
     if(f.t==='chk'){d[k]=v===true;return}
     if(v==null||String(v).trim()==='')return;
@@ -477,8 +490,8 @@ async function guardarMediciones(){
   if(!r.ok){st.srv.aviso='No se pudo guardar la medición: '+(r.datos.mensaje||'error del servidor')+' El triage sigue; los datos quedan en pantalla.';return}
   st.srv.medicion={id:r.datos.evento.id,valores:v};st.srv.nuevaToma=false;
 }
-const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada',DATOS_INGRESO_REGISTRADOS:'Datos de ingreso registrados'};
-const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)'};
+const TIPO_EVENTO={EPISODIO_CREADO:'Episodio creado',MEDICION_REGISTRADA:'Medición registrada',MEDICION_CORREGIDA:'Medición corregida',ESTADO_CAMBIADO:'Cambio de estado',DECISION_REGISTRADA:'Decisión registrada',DATOS_INGRESO_REGISTRADOS:'Datos de ingreso registrados',EPISODIO_ANULADO:'Caso anulado'};
+const NOMBRE_ESTADO={en_ingreso:'en ingreso',en_espera:'en espera',finalizado:'finalizado (atendido)',anulado:'anulado (cargado por error)'};
 /* Atenciones anteriores del mismo paciente (mismo DNI). Cada una se puede abrir para ver su historial. */
 function htmlAnteriores(){
   const a=st.srv.anteriores;
@@ -493,7 +506,7 @@ const horaCorta=t=>new Date(t).toLocaleString('es-AR',{dateStyle:'short',timeSty
 function htmlEvento(e){
   const d=e.datos||{},val=d.valores?Object.entries(d.valores).filter(([k,x])=>x!==false).map(([k,x])=>(byK(k)?byK(k).l:k)+' '+(x===true?'Sí':x)).join(' · '):'';
   return '<li><b>'+esc(TIPO_EVENTO[e.tipo]||e.tipo)+'</b> · '+esc(horaCorta(e.ocurrido_en))+' · '+esc(e.profesional_usuario)+
-    (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>';
+    (d.estado_nuevo?' · '+esc(NOMBRE_ESTADO[d.estado_anterior]||'sin estado')+' → '+esc(NOMBRE_ESTADO[d.estado_nuevo]||d.estado_nuevo):'')+(d.decision?' · '+esc(d.decision)+(d.color_final?' · '+esc(d.color_final):'')+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(e.tipo==='EPISODIO_ANULADO'&&d.motivo?' · motivo: '+esc(d.motivo):'')+(d.evento_corregido_id?' · corrige #'+esc(d.evento_corregido_id)+(d.motivo?' ('+esc(d.motivo)+')':''):'')+(val?'<br><span class="old">'+esc(val)+'</span>':'')+'</li>';
 }
 const htmlEventos=evs=>'<ul>'+(evs||[]).map(htmlEvento).join('')+'</ul>';
 async function verAnterior(ep,btn){
@@ -535,6 +548,7 @@ function summaryRows(){
   return [
     ['Episodio',st.ep,''],
     ['Paciente (DNI)',st.dni?fmtDni(st.dni):'Sin identificar',''],
+    ['Condición especial',st.condicion||'Ninguna',''],
     ['Edad / sexo',[v('edad')?r.edad+' años':null,v('sexo')].filter(Boolean).join(' · ')||null,fx('edad','sexo')],
     ['Motivo',(v('motivo_categoria')||'')+(v('motivo_consulta')?' · '+r.motivo_consulta:''),fx('motivo_categoria','motivo_consulta')],
     ['Síntomas referidos',v('sintomas_asociados')||'No refiere',fx('sintomas_asociados')],
@@ -602,16 +616,20 @@ function refreshSummary(){
 }
 function renderReg(){
   const d=st.decision,l=st.level!=null?LEVELS[st.level][0]:null;
-  const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
+  const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' (simulación: '+LEVELS[c.M.lv][0]+(c.H.length?' · reglas HRRG: '+c.H.map(x=>x.codigo+' v'+x.version).join(', '):'')+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
   const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+LEVELS[SUG][0]:d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
   $('#reg').textContent='Episodio:  '+st.ep+'\nPaciente:  '+(st.dni?'DNI '+fmtDni(st.dni):'sin identificar')+'\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nGuía:      de ejemplo, no oficial\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nDiscrim.:  '+(Object.keys(st.disc).length?Object.entries(st.disc).map(([k,v])=>k.split('|')[1]+': '+v.toUpperCase()).join(' · '):'sin preguntas respondidas')+'\nFuente:    Guía '+GUIA_VER+' · «'+diagName()+'» · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
 }
 
-$('#nuevo').addEventListener('click',()=>{
+$('#nuevo').addEventListener('click',()=>nuevoCaso());
+const HINT_INGRESO=$('#hint').textContent;
+function nuevoCaso(){
+  st.cerrado=false;
+  $('#errBanner').hidden=true;$('#piiBanner').hidden=true;$('#hint').textContent=HINT_INGRESO;$('#hint').classList.remove('err');
   /* Restablece los originales para evitar restaurar datos de otro episodio. */
   st.extraccion=null;st.relatoOriginal=null;st.srv=nuevoSrv();renderSimbar();
-  st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');
-  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')});
+  st.dni=null;$('#dni').value='';$('#dni').classList.remove('bad');st.condicion=null;$('#condEsp').value='';
+  F.forEach((f,i)=>{f.ia=TriageAPI.MODO_REAL?(f.t==='chk'?false:null):ejemploOriginal[i].ia;});$('#caso').value='';st.rev=init();st.disc={};st.prev=null;st.manual=false;st.insuf=false;epN++;st.ep='EP-00'+epN;resetDecision();go('ingreso')}
 /* Sesión de DEMOSTRACIÓN: la crea index.html (login.js). No es autenticación real. */
 /* Sesión (A07): la consulta api.js. Modo real = Flask (/api/sesion); modo demo = login simulado. */
 async function salir() {
@@ -634,9 +652,10 @@ document.addEventListener('DOMContentLoaded',async function iniciarSesion(){
   if(!st.user){location.href='index.html';return}
   if(st.user.debeCambiar){location.href='cambiar_password.html';return}
   if(st.user.rol==='admin'){location.href='admin.html';return}
+  if(st.user.rol==='jefatura'){location.href='reglas.html';return}
   if(st.user.modoExtraccion){st.modoServidor=st.user.modoExtraccion;renderSimbar()}
   const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
-  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+' <button type="button" class="linkbtn" id="logout">Salir</button>';
+  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+(st.user.rol==='auditor'&&st.user.modo==='real'?' · <a href="reglas.html">Reglas del hospital</a>':'')+' <button type="button" class="linkbtn" id="logout">Salir</button>';
   $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});
   go(st.user.rol==='auditor'?'espera':'ingreso');
 });
@@ -673,3 +692,58 @@ function leerDni(){
   el.classList.remove('bad');st.dni=d;el.value=fmtDni(d);return true;
 }
 $('#dni').addEventListener('blur',()=>{if($('#dni').value.trim())leerDni()});
+/* [Dario 29/10] Enter en el DNI valida y pasa al relato. */
+$('#dni').addEventListener('keydown',e=>{if(e.key!=='Enter')return;e.preventDefault();if(leerDni())$('#caso').focus()});
+
+/* [Dario 29/10] Edad y sexo desde el relato, sin MedGemma (regex local: no suma latencia).
+   Edad: "27 años", "de 27 años", "tengo 27 años", "8 meses" (bebé = 0). Se descarta si es una
+   duración ("hace 3 años", "desde hace 2 años", "durante 5 años").
+   Sexo: solo palabras explícitas (masculino, hombre, mujer, embarazada…), no el género de otras.
+   No pisa lo ya cargado y queda marcado como IA para revisar. */
+function edadSexoDelRelato(texto){
+  const t=' '+String(texto||'').toLowerCase()+' ';
+  const marcar=(k,v)=>{const f=F.find(x=>x.k===k);if(f)f.ia=v;st.rev[k]=v};
+  if(!st.rev.edad){
+    const re=/(\d{1,3})\s*(años|anos|meses)\b/g;let m;
+    while((m=re.exec(t))){
+      const antes=t.slice(Math.max(0,m.index-14),m.index);
+      if(/(hace|durante|por|desde|cada|hasta|en)\s+$/.test(antes))continue;
+      const n=+m[1];if(n>120)continue;
+      marcar('edad',String(m[2]==='meses'?0:n));break;
+    }
+  }
+  if(!st.rev.sexo){
+    const F_=/[^a-záéíóúñ](femenino|mujer|señora|nena|niña|embarazada|gestante)[^a-záéíóúñ]/,
+          M_=/[^a-záéíóúñ](masculino|hombre|varón|varon|señor|nene|niño)[^a-záéíóúñ]/;
+    const v=F_.test(t)&&!M_.test(t)?'Femenino':M_.test(t)&&!F_.test(t)?'Masculino':null;
+    if(v)marcar('sexo',v);
+  }
+}
+
+/* [Dario 29/10] Respaldo por palabras clave para banderas rojas y antecedentes (sin MedGemma,
+   no suma latencia). Solo MARCA lo que MedGemma no marcó; nunca desmarca. Ignora menciones
+   negadas ("sin sangrado", "niega convulsiones", "no tiene asma"). Queda como IA para revisar. */
+const CLAVES_RELATO={
+  br_sangrado:/sangr\w*|hemorrag\w*/,
+  br_convulsion:/convuls\w*/,
+  br_disnea:/falta (de|el) aire|no (puede|puedo|podia|podía) respirar|(le|me) cuesta respirar|dificultad para respirar|ahog\w*|disnea/,
+  br_trauma:/golpe\w*|caida|se cayo|me cai|choque|chocó|choco|accidente|atropell\w*|fractur\w*|traumat\w*/,
+  ant_diabetes:/diabet\w*|insulin\w*/,
+  ant_cardio:/hipertens\w*|presion alta|cardiac\w*|cardiopat\w*|infarto|marcapaso\w*|arritmi\w*|del corazon/,
+  ant_resp:/asma\w*|epoc|enfisema|bronquitis cronica/,
+  ant_anticoag:/anticoagul\w*|warfarina|acenocumarol|sintrom|apixaban|rivaroxaban|heparina/,
+  ant_inmuno:/inmunosupr\w*|quimioterapia|\bvih\b|\bhiv\b|trasplant\w*/,
+  ant_embarazo:/embarazad\w*|gestante|semanas de embarazo/
+};
+function respaldoPalabrasClave(texto){
+  const t=String(texto||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  Object.entries(CLAVES_RELATO).forEach(([k,re])=>{
+    if(st.rev[k]===true)return;
+    const g=new RegExp(re.source,'g');let m;
+    while((m=g.exec(t))){
+      const antes=t.slice(Math.max(0,m.index-25),m.index);
+      if(/\b(no|sin|niega|nunca|tampoco|descarta)\b[^.,;]*$/.test(antes))continue;
+      const f=F.find(x=>x.k===k);if(f)f.ia=true;st.rev[k]=true;break;
+    }
+  });
+}

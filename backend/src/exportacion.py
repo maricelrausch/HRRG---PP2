@@ -37,12 +37,14 @@ TIPOS_EVENTO = {
     "MEDICION_CORREGIDA": "Corrección de medición",
     "ESTADO_CAMBIADO": "Cambio de estado",
     "DECISION_REGISTRADA": "Decisión profesional",
+    "EPISODIO_ANULADO": "Caso anulado (cargado por error)",
 }
 
 ESTADOS = {
     "en_ingreso": "En ingreso",
     "en_espera": "En espera",
     "finalizado": "Finalizado",
+    "anulado": "Anulado",
 }
 
 # Traduce los nombres internos y agrega las unidades de las mediciones.
@@ -156,6 +158,13 @@ def _detalle_legible(evento):
             f"{ESTADOS.get(despues, despues or 'Sin informar')}"
         )
 
+    elif tipo == "EPISODIO_ANULADO":
+        antes = detalle.get("estado_anterior")
+        lineas.append(
+            f"{ESTADOS.get(antes, antes or 'Sin estado previo')} → Anulado. "
+            "El caso no pasó a la lista de espera."
+        )
+
     elif tipo == "DECISION_REGISTRADA":
         decision = detalle.get("decision") or "Sin informar"
         color = detalle.get("color_final") or "Sin color asignado"
@@ -253,7 +262,13 @@ def generar_csv(filas):
     return salida.getvalue().encode("utf-8-sig")
 
 
-def generar_pdf(filas, filtros_texto, usuario):
+# [Barby 30/10] Texto de identificación del archivo. El auditor exporta con DNI enmascarado y su
+# contraseña; la API de auditoría (otro sistema, con token) exporta con DNI completo y la clave que envía.
+TEXTO_IDENTIFICACION = "DNI enmascarado (solo los últimos 3 números) · Archivo protegido con la contraseña de quien exportó"
+TEXTO_IDENTIFICACION_API = "DNI completo · Archivo protegido con la clave enviada por el sistema que lo pidió"
+
+
+def generar_pdf(filas, filtros_texto, usuario, identificacion=TEXTO_IDENTIFICACION):
     # Import diferido: si falta reportlab, solo falla el PDF (el Excel sigue andando).
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -277,7 +292,7 @@ def generar_pdf(filas, filtros_texto, usuario):
         Paragraph("Historial de casos · Triage asistido HRRG", estilos["Title"]),
         Paragraph(
             f"Exportado por <b>{usuario}</b> el {ahora} · {filtros_texto} · {len(filas)} episodios · "
-                        "<b>DNI enmascarado</b> (solo los últimos 3 números) · Archivo protegido con la contraseña de quien exportó · Datos ficticios del prototipo.",
+                        f"<b>{identificacion}</b> · Datos ficticios del prototipo.",
             chico,
         ),
         Spacer(1, 0.3 * cm),
@@ -383,7 +398,7 @@ def _fecha_excel(valor):
     return fecha.astimezone(ZONA_INFORME).replace(tzinfo=None)
 
 
-def generar_xlsx(filas, filtros_texto, usuario):
+def generar_xlsx(filas, filtros_texto, usuario, identificacion=TEXTO_IDENTIFICACION):
     # Import diferido: si falta openpyxl, solo falla el Excel (el PDF sigue andando).
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -489,7 +504,7 @@ def generar_xlsx(filas, filtros_texto, usuario):
         ("Episodios", len(filas)),
         ("Eventos", n - 2),
         ("Horas", "Todas las fechas están en UTC-03:00 (hora de Argentina)."),
-        ("Identificación", "DNI enmascarado: solo se ven los últimos 3 números. El archivo se abre con la contraseña de quien exportó."
+        ("Identificación", identificacion + "."
                            if con_dni else "Sin DNI: el paciente figura con su código interno."),
         ("Datos", "Datos ficticios del prototipo (no son pacientes reales)."),
     ]

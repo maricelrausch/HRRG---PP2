@@ -86,6 +86,9 @@ td input.bad{border:2px solid var(--err)}
 .st.none{border-style:dashed;color:var(--muted)}
 .st.fix{background:var(--accent-soft);color:var(--accent-text);border-color:transparent}
 .st.bad{color:var(--err);border-color:var(--err)}
+/* [Dario 29/10 · D4] Condición especial del episodio (no es prioridad clínica) */
+.st.cond{background:var(--panel-2);border-style:dashed}
+.ident-pac select{display:block;margin-top:4px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-size:15px}
 .restore{display:block;margin-top:4px;font-size:12px;background:none;border:0;padding:0;color:var(--accent-text);text-decoration:underline;cursor:pointer}
 .miss{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
 .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -418,6 +421,10 @@ ul.why li{display:flex;gap:8px;align-items:baseline}
 .ident-pac input{width:200px;max-width:100%;font-family:var(--f-mono);font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
 .ident-pac input.bad{border:2px solid var(--err)}
 .dnitag{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:2px}
+/* DNI y condición especial en la misma fila; en pantallas chicas la condición baja sola */
+.ident-fila{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+.ident-col{display:flex;flex-direction:column;min-width:0}
+.ident-fila select{margin-top:0;min-width:200px;font-size:16px}
 
 /* Atenciones anteriores del paciente */
 .note.hist .prev{margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
@@ -439,3 +446,72 @@ html.cargando,html.cargando *{cursor:progress}
 .ver-clave{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .ver-clave:hover{background:var(--panel)}
 .ver-clave[aria-pressed=true]{border-color:var(--ink)}
+
+/* [Barby 28/10] Botón de peligro */
+.btn.danger{background:var(--err);border-color:var(--err);color:#fff}
+.btn.danger:disabled{opacity:.5;cursor:not-allowed}
+.src.h{background:#0B5CAD;color:#fff}
+
+/* [Propuesta Barby 28/10] Pantalla de reglas del hospital (reglas.html) */
+.reglas-app .brand h2{margin:0;font-family:var(--f-display);font-size:20px;font-weight:600}
+.reglas-app .brand .sep{width:1px;align-self:stretch;background:var(--line)}
+.rg-intro{display:flex;flex-wrap:wrap;gap:14px;align-items:stretch}
+.rg-intro .note{flex:1 1 480px;font-size:15px;display:flex;align-items:center}
+.rg-intro .btn.big{min-height:54px;padding:0 24px;font-size:17px}
+.rg-resumen{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rg-resumen div{padding:14px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.rg-resumen div:last-child{border-right:0}
+.rg-resumen span{font-size:13px;color:var(--muted)}
+.rg-resumen b{font-family:var(--f-display);font-size:26px;line-height:1}
+.rg-ejemplo{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.rg-ejemplo>div{flex:1 1 420px}
+/* [Dario 29/10 · Etapa C] Tiempos objetivo por color */
+.rg-tiempos{border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;display:flex;flex-direction:column;gap:10px}
+.rg-tiempos .rg-tgrid{display:flex;flex-wrap:wrap;gap:10px}
+.rg-tiempos label{display:flex;align-items:center;gap:8px}
+.rg-tiempos input{width:80px}
+.rg-lista{display:flex;flex-direction:column;gap:12px}
+.rg-vacio{border:1px dashed var(--line);border-radius:10px;padding:28px;text-align:center;color:var(--muted)}
+.rg-card{border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--panel)}
+.rg-card.inactiva{opacity:.7}
+.rg-card header{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.rg-card header b{font-size:16px}
+.rg-cod{font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--muted)}
+.rg-card .chipc,.rg-frase .chipc,.rg-prueba .chipc{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.rg-est{font-family:var(--f-mono);font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.rg-est.activa{background:var(--m-verde);color:#fff;border-color:transparent}
+.rg-est.borrador{background:var(--panel-2)}
+/* [Dario 29/10] Origen de la regla: Manchester / adaptación local HRRG / provisoria */
+.rg-org{font-family:var(--f-mono);font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.rg-org.manchester{background:#0B5CAD;color:#fff;border-color:transparent}
+.rg-org.local{background:var(--panel-2)}
+.rg-org.provisoria{border-style:dashed}
+.rg-si{font-size:14px}.rg-si ul{margin:4px 0 0;padding-left:20px}
+.rg-pq{font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.rg-card footer{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rg-hist{margin:0;padding-left:20px;font-size:13px;color:var(--muted)}
+.rg-editor{border:2px solid var(--accent);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:14px;background:var(--panel)}
+.rg-editor h3{margin:0;font-family:var(--f-display);font-size:20px}
+.rg-editor label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.rg-editor input,.rg-editor select,.rg-editor textarea{min-height:40px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel);color:var(--ink);font:inherit;font-weight:400}
+.rg-editor .lbl{font-size:13px;font-weight:600}
+.rg-grid{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.rg-grid>label{flex:1 1 260px}
+.rg-colores{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rg-colores .lvl{min-width:96px}
+.rg-conds{display:flex;flex-direction:column;gap:8px}
+.rg-comb{display:flex;flex-wrap:wrap;gap:6px 18px}
+.rg-comb label{flex-direction:row;align-items:center;gap:6px;font-weight:400}
+.rg-comb input{min-height:auto}
+.rg-cond{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2)}
+.rg-cond select:first-child{flex:1 1 220px}
+.rg-cond input{width:110px}
+.rg-frase{font-size:15px;background:var(--panel-2);border-radius:8px;padding:10px 12px}
+.rg-prueba{border:1px dashed var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.rg-pcampos{display:flex;flex-wrap:wrap;gap:10px}
+.rg-pcampos label{flex:0 1 200px}
+.rg-pchk{flex-direction:row!important;align-items:center;gap:6px!important}
+.rg-pchk input{min-height:auto}
+.rg-si-ok{color:var(--m-verde);font-weight:600}
+.rg-no{color:var(--muted)}
+@media (max-width:640px){.rg-resumen{grid-template-columns:1fr}.rg-resumen div{border-right:0;border-bottom:1px solid var(--line)}}

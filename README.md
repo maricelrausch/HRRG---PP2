@@ -91,6 +91,7 @@ En el box de triage de la Guardia Central, enfermería escucha el motivo de cons
 | **Enfermería** | Cargar casos, ver sugerencias, decidir y reevaluar | Gestionar cuentas |
 | **Médico** | Lo mismo que enfermería | Gestionar cuentas |
 | **Auditor** | Consultar historial, DNI y exportar (pide su contraseña) | Modificar datos |
+| **Jefatura de Guardia** | Cargar, probar, activar y desactivar las reglas del hospital (`reglas.html`) | Atender pacientes |
 | **Administrador** | Gestionar cuentas y contraseñas | Atender pacientes |
 
 ---
@@ -249,6 +250,8 @@ HRRG---PP2/
 
 | Documento | Ubicación |
 |---|---|
+| **Manual de usuario** | [`docs/manual_usuario.md`](docs/manual_usuario.md) |
+| Endpoints para otros sistemas (sala y auditoría) | [`docs/endpoints_externos.md`](docs/endpoints_externos.md) |
 | Contrato de API | [`docs/contrato_api.md`](docs/contrato_api.md) |
 | Diccionario de datos V2 | [`backend/docs/diccionario_datos_v2.md`](backend/docs/diccionario_datos_v2.md) |
 | Controles de validación | [`backend/docs/controles_validacion.md`](backend/docs/controles_validacion.md) |

@@ -28,7 +28,8 @@ from src.auth import obtener_profesional
 
 bp = Blueprint("admin_usuarios", __name__)
 
-ROLES = ("enfermeria", "medico", "auditor", "admin")
+# [Propuesta Barby 28/10] "jefatura": Jefatura de Guardia, administra las reglas del hospital.
+ROLES = ("enfermeria", "medico", "auditor", "jefatura", "admin")
 MAX_INTENTOS = 5
 VENCE_DIAS = 90
 HISTORIAL = 5

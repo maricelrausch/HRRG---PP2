@@ -68,7 +68,9 @@ const PERSONAL = new URLSearchParams(location.search).get('personal') === '1';
 document.body.classList.add(PERSONAL ? 'personal' : 'publico');
 document.getElementById('modo').textContent = PERSONAL ? 'PERSONAL · SOLO LECTURA' : '';
 
-/* Mismos colores y tiempos que la pantalla En espera (formulario.js / espera.js). */
+/* Mismos colores que la pantalla En espera (formulario.js / espera.js).
+   [Dario 29/10 · Etapa C] obj = tiempos de referencia; en cada carga se reemplazan por los que
+   configuró la Jefatura (vienen del servidor). Si no llegan, quedan estos. */
 const COLORES = {
   ROJO:     {v:'--m-rojo',     t:'#FFFFFF', obj:0},
   NARANJA:  {v:'--m-naranja',  t:'#1A1D26', obj:10},
@@ -76,6 +78,13 @@ const COLORES = {
   VERDE:    {v:'--m-verde',    t:'#FFFFFF', obj:120},
 };
 const ORDEN = ['ROJO','NARANJA','AMARILLO','VERDE'];   // sin AZUL
+function aplicarTiempos(t) { if (t) ORDEN.forEach(c => { if (Number.isFinite(t[c])) COLORES[c].obj = t[c]; }); }
+async function tiemposPersonal() {
+  try {
+    const r = await fetch('/api/reglas/tiempos', {cache:'no-store', credentials:'same-origin', headers:{'X-HRRG-Auto':'1'}});
+    return r.ok ? (await r.json()).tiempos : null;
+  } catch (e) { return null; }
+}
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtMin = m => m < 60 ? m + ' min' : Math.floor(m/60) + ' h' + (m%60 ? ' ' + m%60 + ' min' : '');
 const dniOculto = d => d ? 'DNI ***.' + String(d).slice(-3) : '';
@@ -150,19 +159,22 @@ document.getElementById('resumen').addEventListener('click', e => {
 /* Normaliza las dos fuentes al mismo formato: {codigo, color, seg, motivo, dni}. */
 async function cargar() {
   try {
+    /* [Barby 28/10] X-HRRG-Auto: la recarga automática no cuenta como actividad, así la sesión del
+       personal se cierra igual tras 15 min sin uso (después pide volver a iniciar sesión). */
     const r = await fetch(PERSONAL ? '/api/demo/espera?limite=100' : '/api/sala/espera',
-                          {cache:'no-store', credentials:'same-origin'});
+                          {cache:'no-store', credentials:'same-origin', headers:{'X-HRRG-Auto':'1'}});
     if (PERSONAL && r.status === 401) { error = 'sesion'; return pintar(); }
     if (PERSONAL && r.status === 403) { error = 'permiso'; return pintar(); }
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
+    aplicarTiempos(PERSONAL ? await tiemposPersonal() : d.tiempos);
     /* El reloj del servidor manda: el del celular puede estar corrido. */
     const ahoraSrv = Date.parse(r.headers.get('Date')) || Date.now();
     lista = PERSONAL
       ? d.episodios.filter(e => COLORES[e.color_final]).map(e => ({
           codigo: e.codigo_episodio, color: e.color_final,
           seg: Math.max(0, (ahoraSrv - Date.parse(e.en_espera_desde)) / 1000),
-          motivo: e.motivo_categoria, dni: e.dni }))
+          motivo: e.motivo_categoria, dni: e.dni, cond: e.condicion_especial }))   // [D4] solo personal
           .sort((a,b) => (ORDEN.indexOf(a.color)+1||9) - (ORDEN.indexOf(b.color)+1||9) || b.seg - a.seg)
       : d.episodios.filter(e => COLORES[e.color]).map(e => ({codigo: e.codigo, color: e.color, seg: e.espera_seg}));
     recibido = Date.now(); error = null;
@@ -199,7 +211,7 @@ function pintar() {
     const vencido = p.color !== 'ROJO' && min > C.obj;
     const chip = '<span class="cc" style="background:var('+C.v+');color:'+C.t+'">'+p.color+'</span>';
     const obj = p.color === 'ROJO' ? 'atención inmediata' : 'máx. ' + fmtMin(C.obj);
-    const det = PERSONAL ? [dniOculto(p.dni), p.motivo].filter(Boolean).map(esc).join(' · ') : '';
+    const det = PERSONAL ? [dniOculto(p.dni), p.motivo, p.cond && 'Condición: ' + p.cond].filter(Boolean).map(esc).join(' · ') : '';
     const esAbierto = PERSONAL && abierto === p.codigo;
     return '<div class="card'+(vencido?' vencido':'')+'" style="--c:var('+C.v+')"'+(PERSONAL ? ' data-cod="'+esc(p.codigo)+'"' : '')+'>'
       + '<span class="pos">'+(i+1)+'</span>'

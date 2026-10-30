@@ -15,8 +15,18 @@
   /* A dónde va cada perfil: cambio de contraseña pendiente, administración o formulario. */
   function destino(u) {
     if (u.debeCambiar) return 'cambiar_password.html';
+    if (u.rol === 'jefatura') return 'reglas.html';
     return u.rol === 'admin' ? 'admin.html' : 'formulario.html';
   }
+
+  /* [Barby 28/10] Aviso cuando la sesión se cerró por inactividad. */
+  try {
+    if (sessionStorage.getItem('hrrg_sesion_vencida')) {
+      sessionStorage.removeItem('hrrg_sesion_vencida');
+      mostrarError('La sesión se cerró por inactividad.');
+      err.querySelector('span').textContent = 'Por seguridad, se cierra sola después de 15 minutos sin uso. Volvé a ingresar.';
+    }
+  } catch (e) {}
 
   // Si ya hay sesión abierta, pasa directo a su pantalla
   api.sesion().then(u => { if (u) location.href = destino(u); });
@@ -36,6 +46,7 @@
 
   function mostrarError(msg) {
     err.querySelector('b').textContent = msg;
+    err.querySelector('span').textContent = 'Revisá los datos e intentá de nuevo.';
     err.hidden = false;
   }
 })();

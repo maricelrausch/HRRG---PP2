@@ -1,12 +1,46 @@
 import sqlite3
 import json
 from datetime import datetime, timezone
-from src.esquemas import Mediciones, ExtraccionIA, Identificacion
+from src.esquemas import Mediciones, ExtraccionIA, Identificacion, ContextoEpisodio
 
 def conectar_registro(ruta_base):
     conexion = sqlite3.connect(ruta_base)
     conexion.execute("PRAGMA foreign_keys = ON")
     return conexion
+
+
+def _migrar_estado_anulado(conexion):
+    fila = conexion.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'estados_episodio'"
+    ).fetchone()
+    if fila is None or "'anulado'" in fila[0]:
+        return
+    conexion.execute("ALTER TABLE estados_episodio RENAME TO estados_episodio_viejo")
+    conexion.execute("""
+        CREATE TABLE estados_episodio (
+            codigo_episodio TEXT PRIMARY KEY,
+            estado TEXT NOT NULL
+                CHECK (
+                    estado IN (
+                        'en_ingreso',
+                        'en_espera',
+                        'finalizado',
+                        'anulado'
+                    )
+                ),
+            actualizado_en TEXT NOT NULL,
+            profesional_usuario TEXT NOT NULL,
+            version INTEGER NOT NULL
+                CHECK (version >= 1),
+            FOREIGN KEY (codigo_episodio)
+                REFERENCES episodios (codigo_episodio)
+        )
+    """)
+    conexion.execute(
+        "INSERT INTO estados_episodio SELECT * FROM estados_episodio_viejo"
+    )
+    conexion.execute("DROP TABLE estados_episodio_viejo")
+    conexion.execute("DROP INDEX IF EXISTS idx_estados_episodio")
 
 
 # Prepara las tablas del registro de demostración.
@@ -57,7 +91,8 @@ def inicializar_registro(ruta_base):
                             estado IN (
                                 'en_ingreso',
                                 'en_espera',
-                                'finalizado'
+                                'finalizado',
+                                'anulado'
                             )
                         ),
                     actualizado_en TEXT NOT NULL,
@@ -68,6 +103,10 @@ def inicializar_registro(ruta_base):
                         REFERENCES episodios (codigo_episodio)
                 )
             """)
+
+            # [Propuesta Barby 28/10] Bases creadas antes del estado 'anulado':
+            # SQLite no permite cambiar un CHECK, así que se rehace la tabla copiando los datos.
+            _migrar_estado_anulado(conexion)
 
             # Facilita la búsqueda de episodios según su estado.
             conexion.execute("""
@@ -328,7 +367,8 @@ def registrar_extraccion_demo(
 # Datos de ingreso revisados por el profesional: edad, sexo y lo extraído del relato
 # (categoría, motivo, tiempo, localización, síntomas, banderas rojas, antecedentes).
 # NO guarda el relato completo. Se valida con los esquemas de Darío (Identificacion + ExtraccionIA).
-class _DatosIngreso(ExtraccionIA, Identificacion):
+class _DatosIngreso(ExtraccionIA, Identificacion, ContextoEpisodio):
+    # [Dario 29/10 · D4] + condición especial del episodio (policial, judicial…), aparte del color.
     pass
 
 
@@ -703,10 +743,18 @@ def buscar_episodios(
     limite=50,
     desplazamiento=0,
     desde=None,
-    hasta=None
+    hasta=None,
+    estado=None
 ):
     condiciones = []
     parametros = []
+
+    # [Barby 30/10] Filtro opcional por estado (lo usa la API de auditoría).
+    if estado is not None:
+        if estado not in ("en_ingreso", "en_espera", "finalizado", "anulado"):
+            raise ValueError("Estado inválido. Usá en_ingreso, en_espera, finalizado o anulado.")
+        condiciones.append("s.estado = ?")
+        parametros.append(estado)
 
     desde, hasta = normalizar_rango(desde, hasta)
     if desde:
@@ -736,7 +784,8 @@ def buscar_episodios(
     try:
         # Consulta primero la cantidad total que coincide con los filtros.
         total = conexion.execute(
-            "SELECT COUNT(*) FROM episodios AS e" + filtro,
+            "SELECT COUNT(*) FROM episodios AS e "
+            "LEFT JOIN estados_episodio AS s ON s.codigo_episodio = e.codigo_episodio" + filtro,
             parametros
         ).fetchone()[0]
 
@@ -871,6 +920,10 @@ def cambiar_estado_demo(
                     "El estado cambió. Actualizá el episodio "
                     "antes de volver a guardar."
                 )
+
+            # [Propuesta Barby 28/10] Un caso anulado no vuelve a ninguna lista.
+            if estado_anterior == "anulado":
+                raise ValueError("El caso está anulado: no se puede cambiar su estado.")
 
             # Evita crear eventos que no representan ningún cambio.
             if nuevo_estado == estado_anterior:
@@ -1102,10 +1155,10 @@ def listar_espera_demo(ruta_base, limite=50, desplazamiento=0):
 
                 # [Propuesta Barby] Motivo del último ingreso revisado (para la columna de la lista).
                 ingreso = episodio.pop("ingreso_json")
-                episodio["motivo_categoria"] = (
-                    json.loads(ingreso)["valores"].get("motivo_categoria")
-                    if ingreso else None
-                )
+                valores_ingreso = json.loads(ingreso)["valores"] if ingreso else {}
+                episodio["motivo_categoria"] = valores_ingreso.get("motivo_categoria")
+                # [D4] Condición especial (policial, judicial…): se informa aparte del color.
+                episodio["condicion_especial"] = valores_ingreso.get("condicion_especial")
 
                 # Sin decisión previa, informa ausencia de color.
                 # No inventa una clasificación ni reutiliza otra atención.
@@ -1216,6 +1269,14 @@ def registrar_decision_demo(
             if episodio is None:
                 raise EpisodioNoEncontradoError("El episodio no existe.")
 
+            # [Propuesta Barby 28/10] Un caso anulado no recibe decisiones.
+            anulado = conexion.execute(
+                "SELECT 1 FROM estados_episodio WHERE codigo_episodio = ? AND estado = 'anulado'",
+                (codigo_episodio,)
+            ).fetchone()
+            if anulado is not None:
+                raise ValueError("El caso está anulado: no se puede registrar una decisión.")
+
             # Recupera la última decisión sin alterar su contenido.
             anterior = conexion.execute(
                 """
@@ -1303,6 +1364,7 @@ COLUMNAS_EXPORTACION = [
     ("sexo", "Sexo"),
     ("motivo_categoria", "Categoría"),
     ("motivo_consulta", "Motivo de consulta"),
+    ("condicion_especial", "Condición especial"),
     ("tiempo_evolucion", "Tiempo de evolución"),
     ("banderas_rojas", "Banderas rojas"),
     ("antecedentes", "Antecedentes"),
@@ -1390,7 +1452,7 @@ def _ultima_medicion_exportable(eventos):
 
 def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, hasta=None,
                             codigo_paciente=None):
-    if estado not in (None, "en_ingreso", "en_espera", "finalizado"):
+    if estado not in (None, "en_ingreso", "en_espera", "finalizado", "anulado"):
         raise ValueError("El estado no es válido.")
     desde, hasta = normalizar_rango(desde, hasta)
 
@@ -1446,7 +1508,8 @@ def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, has
                     "codigo_paciente": ep["codigo_paciente"],
                     "profesional_ingreso": ep["profesional_usuario"],
                     "estado": {"en_ingreso": "En ingreso", "en_espera": "En espera",
-                               "finalizado": "Finalizado"}.get(ep["estado"], ep["estado"]),
+                               "finalizado": "Finalizado",
+                               "anulado": "Anulado"}.get(ep["estado"], ep["estado"]),
                     "mediciones": 0, "correcciones": 0, "decisiones": 0,
                     "escalado_rojo": "No",
                 }
@@ -1459,6 +1522,7 @@ def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, has
                         v = datos.get("valores", {})
                         for campo in ("edad", "sexo", "motivo_categoria", "motivo_consulta"):
                             fila[campo] = v.get(campo)
+                        fila["condicion_especial"] = v.get("condicion_especial") or "Ninguna"
                         if v.get("tiempo_evolucion_valor") is not None:
                             fila["tiempo_evolucion"] = f'{v["tiempo_evolucion_valor"]:g} {v.get("tiempo_evolucion_unidad") or ""}'.strip()
                         fila["banderas_rojas"] = ", ".join(t for k, t in _BANDERAS.items() if v.get(k)) or "Ninguna"
@@ -1487,6 +1551,11 @@ def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, has
 
                     elif tipo == "ESTADO_CAMBIADO" and datos.get("estado_nuevo") == "finalizado":
                         fila["fecha_finalizacion"] = ev["ocurrido_en"]
+
+                    elif tipo == "EPISODIO_ANULADO":
+                        fila["motivo_decision"] = "Caso anulado: " + (datos.get("motivo") or "")
+                        fila["profesional_decision"] = ev["profesional_usuario"]
+                        fila["fecha_decision"] = ev["ocurrido_en"]
 
                                 # Completa el resumen con la última toma y sus correcciones.
                 # Este resumen no reemplaza el historial detallado.
@@ -1544,5 +1613,123 @@ def exportar_episodios_demo(ruta_base, estado=None, limite=5000, desde=None, has
                 
 
         return filas
+    finally:
+        conexion.close()
+
+
+# ------------------------------------------------
+# [Propuesta Barby 28/10 · a revisar por Maricel]
+# Anular (cancelar) un caso que se cargó por error, ANTES de que pase a la lista de espera.
+# No borra nada: el episodio queda en estado 'anulado' con un evento EPISODIO_ANULADO
+# (motivo, quién y cuándo). No aparece en En espera ni en la sala; el auditor lo ve.
+# Solo se puede anular si el episodio está "en ingreso" (o sin estado) y no tiene decisión.
+# ------------------------------------------------
+class EpisodioNoAnulableError(ValueError):
+    pass
+
+
+def anular_episodio_demo(ruta_base, codigo_episodio, profesional_usuario, motivo, version_esperada):
+    for valor in (codigo_episodio, profesional_usuario):
+        if not isinstance(valor, str) or not valor.strip():
+            raise ValueError("El episodio y el profesional son obligatorios.")
+    if not isinstance(motivo, str) or not motivo.strip():
+        raise ValueError("El motivo de la anulación es obligatorio.")
+    motivo = motivo.strip()
+    if len(motivo) > 500:
+        raise ValueError("El motivo no puede superar los 500 caracteres.")
+    if type(version_esperada) is not int or version_esperada < 0:
+        raise ValueError("La versión esperada debe ser un entero no negativo.")
+
+    codigo_episodio = codigo_episodio.strip()
+    profesional_usuario = profesional_usuario.strip()
+
+    conexion = conectar_registro(ruta_base)
+    conexion.row_factory = sqlite3.Row
+    try:
+        with conexion:
+            conexion.execute("BEGIN IMMEDIATE")
+            existe = conexion.execute(
+                "SELECT 1 FROM episodios WHERE codigo_episodio = ?", (codigo_episodio,)
+            ).fetchone()
+            if existe is None:
+                raise EpisodioNoEncontradoError("El episodio no existe.")
+
+            anterior = conexion.execute(
+                "SELECT estado, version FROM estados_episodio WHERE codigo_episodio = ?",
+                (codigo_episodio,)
+            ).fetchone()
+            estado_anterior = anterior["estado"] if anterior else None
+            version_actual = anterior["version"] if anterior else 0
+
+            if version_esperada != version_actual:
+                raise ConflictoEstadoError(
+                    "El estado cambió. Actualizá el episodio antes de volver a intentar."
+                )
+            if estado_anterior not in (None, "en_ingreso"):
+                raise EpisodioNoAnulableError(
+                    "Solo se puede cancelar un caso que todavía no pasó a la lista de espera."
+                )
+            decision = conexion.execute(
+                "SELECT 1 FROM eventos WHERE codigo_episodio = ? AND tipo = 'DECISION_REGISTRADA' LIMIT 1",
+                (codigo_episodio,)
+            ).fetchone()
+            if decision is not None:
+                raise EpisodioNoAnulableError(
+                    "El caso ya tiene una decisión registrada: no se puede cancelar."
+                )
+
+            fecha = datetime.now(timezone.utc).isoformat()
+            nueva_version = version_actual + 1
+            conexion.execute(
+                """
+                INSERT INTO estados_episodio (
+                    codigo_episodio, estado, actualizado_en, profesional_usuario, version
+                )
+                VALUES (?, 'anulado', ?, ?, ?)
+                ON CONFLICT(codigo_episodio) DO UPDATE SET
+                    estado = excluded.estado,
+                    actualizado_en = excluded.actualizado_en,
+                    profesional_usuario = excluded.profesional_usuario,
+                    version = excluded.version
+                """,
+                (codigo_episodio, fecha, profesional_usuario, nueva_version)
+            )
+            contenido = {
+                "version_evento": 1,
+                "modo": "demo",
+                "origen": "anulacion_profesional",
+                "motivo": motivo,
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": "anulado",
+                "version_anterior": version_actual,
+                "version": nueva_version,
+            }
+            cursor = conexion.execute(
+                """
+                INSERT INTO eventos (
+                    codigo_episodio, tipo, ocurrido_en, profesional_usuario, datos_json
+                )
+                VALUES (?, 'EPISODIO_ANULADO', ?, ?, ?)
+                """,
+                (codigo_episodio, fecha, profesional_usuario,
+                 json.dumps(contenido, ensure_ascii=False, allow_nan=False))
+            )
+        return {
+            "estado": {
+                "codigo_episodio": codigo_episodio,
+                "estado": "anulado",
+                "actualizado_en": fecha,
+                "profesional_usuario": profesional_usuario,
+                "version": nueva_version,
+            },
+            "evento": {
+                "id": cursor.lastrowid,
+                "codigo_episodio": codigo_episodio,
+                "tipo": "EPISODIO_ANULADO",
+                "ocurrido_en": fecha,
+                "profesional_usuario": profesional_usuario,
+                "datos": contenido,
+            },
+        }
     finally:
         conexion.close()

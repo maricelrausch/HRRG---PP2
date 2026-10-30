@@ -1,0 +1,113 @@
+{
+  "version": 2,
+  "aviso": "Reglas de seguridad de EJEMPLO del prototipo, pasadas del código (frontend/sugerencia.js, reglas()) a la base para que la Jefatura de Guardia las pueda revisar, editar o desactivar. Los umbrales son PROVISORIOS: hay que validarlos con Enfermería y Guardia del HRRG (mail de Francisco Navoni, 29/10/2026). Cada tanda se carga UNA sola vez; después se administran desde reglas.html. Tanda 1: las 9 reglas que ya usaba el prototipo (activas). Tanda 2: las que propone el mail de Navoni, en BORRADOR, con valores y colores a validar (no intervienen hasta que la Jefatura las complete y las active).",
+  "reglas": [
+    {
+      "nombre": "Convulsión activa",
+      "explicacion": "Convulsión activa: compromiso neurológico agudo",
+      "color": "ROJO", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "br_convulsion", "operador": "si", "valor": null}]
+    },
+    {
+      "nombre": "Glasgow muy bajo",
+      "explicacion": "Glasgow 8 o menos: conciencia muy deprimida, riesgo para la vía aérea",
+      "color": "ROJO", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "glasgow", "operador": "<=", "valor": 8}]
+    },
+    {
+      "nombre": "Alteración de la conciencia",
+      "explicacion": "Alteración del nivel de conciencia (no está alerta o Glasgow menor a 15): posible compromiso neurológico",
+      "color": "NARANJA", "combinacion": "alguna", "origen": "manchester",
+      "condiciones": [
+        {"campo": "estado_conciencia", "operador": "no_es", "valor": "Alerta"},
+        {"campo": "glasgow", "operador": "<", "valor": 15}
+      ]
+    },
+    {
+      "nombre": "Compromiso respiratorio",
+      "explicacion": "SpO₂ menor a 90 %, frecuencia respiratoria alterada o dificultad para respirar: posible compromiso respiratorio",
+      "color": "NARANJA", "combinacion": "alguna", "origen": "manchester",
+      "condiciones": [
+        {"campo": "saturacion_o2", "operador": "<", "valor": 90},
+        {"campo": "frecuencia_respiratoria", "operador": ">", "valor": 30},
+        {"campo": "frecuencia_respiratoria", "operador": "<", "valor": 8},
+        {"campo": "br_disnea", "operador": "si", "valor": null}
+      ]
+    },
+    {
+      "nombre": "Sangrado con hipotensión",
+      "explicacion": "Sangrado con hipotensión (TA sistólica menor a 90): posible shock por pérdida de sangre",
+      "color": "ROJO", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [
+        {"campo": "br_sangrado", "operador": "si", "valor": null},
+        {"campo": "ta_sistolica", "operador": "<", "valor": 90}
+      ]
+    },
+    {
+      "nombre": "Sangrado evidente",
+      "explicacion": "Sangrado evidente: riesgo de pérdida de volumen",
+      "color": "NARANJA", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "br_sangrado", "operador": "si", "valor": null}]
+    },
+    {
+      "nombre": "Compromiso circulatorio",
+      "explicacion": "Hipotensión (TA sistólica menor a 90) o frecuencia cardíaca mayor a 130 o menor a 40: posible compromiso circulatorio",
+      "color": "NARANJA", "combinacion": "alguna", "origen": "manchester",
+      "condiciones": [
+        {"campo": "ta_sistolica", "operador": "<", "valor": 90},
+        {"campo": "frecuencia_cardiaca", "operador": ">", "valor": 130},
+        {"campo": "frecuencia_cardiaca", "operador": "<", "valor": 40}
+      ]
+    },
+    {
+      "nombre": "Fiebre en inmunosuprimido",
+      "explicacion": "Fiebre (38 °C o más) en paciente inmunosuprimido: riesgo de infección grave",
+      "color": "NARANJA", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [
+        {"campo": "ant_inmuno", "operador": "si", "valor": null},
+        {"campo": "temperatura", "operador": ">=", "valor": 38}
+      ]
+    },
+    {
+      "nombre": "Dolor intenso",
+      "explicacion": "Dolor intenso (8 o más sobre 10)",
+      "color": "NARANJA", "combinacion": "todas", "origen": "manchester",
+      "condiciones": [{"campo": "dolor_intensidad", "operador": ">=", "valor": 8}]
+    },
+    {
+      "tanda": 2, "estado_inicial": "borrador",
+      "nombre": "Fiebre (adaptación local, a validar)",
+      "explicacion": "Fiebre: adaptación local de la Guardia HRRG (A VALIDAR la temperatura, el color y las condiciones de edad, estado general y signos de alarma)",
+      "color": "AMARILLO", "combinacion": "todas", "origen": "local",
+      "discriminador": "Fiebre clasificada localmente como amarillo (visita del 19/10/2026); no programar solo «fiebre = amarillo» sin validar",
+      "condiciones": [{"campo": "temperatura", "operador": ">=", "valor": 38}]
+    },
+    {
+      "tanda": 2, "estado_inicial": "borrador",
+      "nombre": "Cefalea (adaptación local, a validar)",
+      "explicacion": "Cefalea: adaptación local de la Guardia HRRG (A VALIDAR el color y las condiciones adicionales)",
+      "color": "AMARILLO", "combinacion": "todas", "origen": "local",
+      "discriminador": "Cefalea clasificada localmente como amarillo (visita del 19/10/2026)",
+      "condiciones": [{"campo": "motivo_categoria", "operador": "es", "valor": "Cefalea"}]
+    },
+    {
+      "tanda": 2, "estado_inicial": "borrador",
+      "nombre": "Fiebre en lactante (a validar)",
+      "explicacion": "Fiebre en lactante: los umbrales pediátricos son distintos de los del adulto (A VALIDAR temperatura y color con Triage pediátrico)",
+      "color": "NARANJA", "combinacion": "todas", "origen": "provisoria",
+      "discriminador": "Ejemplo de la tabla del mail: temperatura + edad / signos asociados",
+      "condiciones": [
+        {"campo": "grupo_etario", "operador": "es", "valor": "Lactante"},
+        {"campo": "temperatura", "operador": ">=", "valor": 38}
+      ]
+    },
+    {
+      "tanda": 2, "estado_inicial": "borrador",
+      "nombre": "Dolor torácico (a validar)",
+      "explicacion": "Dolor torácico: motivo que puede subir la prioridad aunque los signos vitales sean normales (A VALIDAR color y discriminadores)",
+      "color": "NARANJA", "combinacion": "todas", "origen": "provisoria",
+      "discriminador": "Manchester, diagrama Dolor torácico: dolor de características cardíacas (a confirmar)",
+      "condiciones": [{"campo": "motivo_categoria", "operador": "es", "valor": "Dolor torácico"}]
+    }
+  ]
+}
