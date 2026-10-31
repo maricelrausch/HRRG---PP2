@@ -217,6 +217,13 @@ cargar_semilla(BASE_REGLAS, CARPETA_BACKEND / "datos" / "reglas_semilla.json")
 app.config["BASE_REGLAS"] = BASE_REGLAS
 app.register_blueprint(reglas_bp)
 
+# [Dario 30/10 · pedido de Francisco Navoni] Rangos de los signos vitales en la base (antes estaban en el código).
+# Misma base que las reglas; tabla parametros_signos, por grupo etario. Ver src/parametros_signos.py.
+from src.parametros_signos import bp as signos_bp, inicializar_parametros, cargar_parametros_semilla
+inicializar_parametros(BASE_REGLAS)
+cargar_parametros_semilla(BASE_REGLAS, CARPETA_BACKEND / "datos" / "parametros_signos_semilla.json")
+app.register_blueprint(signos_bp)   # /api/signos
+
 # Lista de espera para la sala y celulares (Darío): pública, solo lectura y sin datos personales.
 from src.sala_espera import bp as sala_bp
 app.config["BASE_REGISTRO_DEMO"] = BASE_REGISTRO_DEMO
@@ -414,6 +421,7 @@ def verificar_acceso():
         "agregar_datos_ingreso_demo",
         "exportar_episodios_demo_archivo",
         "analizar_paciente",
+        "sugerir_color",
         "listar_episodios_demo",
         "consultar_estado_episodio_demo",
         "actualizar_estado_episodio_demo",
@@ -1509,6 +1517,26 @@ def ejecutar_extraccion_ia(entrada):
     })
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
+
+
+# [Dario 30/10] MedGemma sugiere el color en la tarjeta (antes era una simulación en sugerencia.js).
+# Usa la misma función que ia/rutas.py (ia.medgemma.sugerir). No se registra ese blueprint entero porque
+# pisaría /api/analizar y /api/estado de la app y arrancaría la precarga. Si Ollama no está, responde 503
+# y la pantalla sigue con las reglas del hospital («Sin IA · reglas del hospital»).
+@app.route("/api/sugerir", methods=["POST"])
+def sugerir_color():
+    from ia import medgemma as ia_medgemma
+    cuerpo = request.get_json(silent=True) or {}
+    datos = cuerpo.get("datos") if isinstance(cuerpo.get("datos"), dict) else {}
+    relato = str(cuerpo.get("relato") or "")[:4000]
+    inicio = time.time()
+    try:
+        resultado = ia_medgemma.sugerir(datos, relato)
+    except Exception as error:  # noqa: BLE001  (sin IA la atención sigue con las reglas)
+        logger_sistema.warning("SUGERENCIA_IA_NO_DISPONIBLE | %s", str(error)[:200])
+        return respuesta_error("MedGemma no respondió. Se usan las reglas del hospital.", 503, "IA_NO_DISPONIBLE")
+    logger_sistema.info("SUGERENCIA_IA | %s | %.1f s", resultado.get("color"), time.time() - inicio)
+    return jsonify(resultado)
 
 
 # Conserva la ruta experimental de BETO protegida por sesión y rol.

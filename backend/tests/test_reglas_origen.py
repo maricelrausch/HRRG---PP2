@@ -68,10 +68,10 @@ def test_crear_con_origen_y_validacion(cliente):  # noqa: F811
     regla = r.get_json()["regla"]
     assert regla["origen"] == "local" and regla["validada_por"] == "Jefatura de Enfermería"
 
-    # Editar el origen funciona como cualquier edición: vuelve a borrador y sube la versión.
+    # Editar el origen funciona como cualquier edición: sube la versión y la regla sigue activa.
     c.post(f"/api/reglas/{regla['id']}/activar", json={})
     e = c.post(f"/api/reglas/{regla['id']}", json=dict(REGLA, origen="manchester")).get_json()["regla"]
-    assert e["origen"] == "manchester" and e["validada_por"] == "" and e["estado"] == "borrador"
+    assert e["origen"] == "manchester" and e["validada_por"] == "" and e["estado"] == "activa"
 
 
 def test_sin_origen_queda_provisoria(cliente):  # noqa: F811

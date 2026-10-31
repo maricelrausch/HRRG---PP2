@@ -4,12 +4,14 @@ Las carga la Jefatura de Guardia (perfil "jefatura") desde reglas.html. Cada reg
 "si se cumplen (todas | alguna de) estas condiciones, el color no puede ser menor que X",
 con una explicación que se muestra en el "Por qué" de la sugerencia.
 
-Ciclo de vida:
-    borrador  -> se crea o se edita; NO interviene en la sugerencia.
+Ciclo de vida (en pantalla se muestran solo dos estados: ACTIVA e INACTIVA):
+    borrador  -> recién creada, nunca activada; NO interviene (en pantalla: «Inactiva»).
     activa    -> la usa el motor desde la próxima sugerencia (no hace falta reiniciar nada).
-    inactiva  -> deja de intervenir; se conserva para la trazabilidad.
-Editar una regla activa la vuelve a borrador (hay que activarla de nuevo) y sube su versión.
-Solo se pueden eliminar los borradores que nunca estuvieron activos; el resto se desactiva.
+    inactiva  -> estuvo activa y se apagó; se conserva para la trazabilidad.
+[Dario 30/10] Editar una regla ya NO la apaga: conserva su estado y sube la versión (antes, guardar una
+regla activa la pasaba a borrador aunque no se cambiara nada, y dejaba de intervenir sin que se notara).
+Guardar sin cambios no crea una versión nueva.
+Solo se pueden eliminar las reglas que nunca estuvieron activas; el resto se desactiva.
 Cada cambio queda en reglas_eventos (quién, cuándo, qué versión y el contenido).
 
 Rutas:
@@ -21,7 +23,6 @@ Rutas:
     POST /api/reglas/<id>/activar      (jefatura)
     POST /api/reglas/<id>/desactivar   (jefatura)
     POST /api/reglas/<id>/eliminar     solo borradores nunca activados (jefatura)
-    POST /api/reglas/config            {"usar_ejemplo": bool} (jefatura)
 """
 import json
 import shutil
@@ -243,6 +244,9 @@ def cargar_semilla(ruta_base, ruta_semilla):
       como adaptación local, fiebre en lactante, dolor torácico), con valores y colores A VALIDAR.
       Se cargan siempre como BORRADOR: se ven en la pantalla pero NO intervienen hasta que la
       Jefatura, con Enfermería y Guardia, complete los valores y las active.
+    Tanda 3 [Dario 30/10]: los umbrales que usaba la simulación de MedGemma en sugerencia.js (dolor moderado
+      5–7, febrícula y fiebre → AMARILLO). Al conectar MedGemma real salen del código y pasan a reglas;
+      quedan ACTIVAS ("estado_inicial": "activa") porque ya intervenían en el color.
     Cada regla del JSON dice a qué tanda pertenece ("tanda") y, si corresponde, "estado_inicial": "borrador".
     reglas_config.semilla_cargada guarda la última tanda cargada: si después la Jefatura edita,
     desactiva o elimina alguna, no se vuelve a cargar. Devuelve la cantidad de reglas cargadas."""
@@ -267,7 +271,9 @@ def cargar_semilla(ruta_base, ruta_semilla):
             regla, error = validar_regla(datos)
             if error:
                 raise ValueError(f"Regla {i} de la semilla inválida: {error}")
-            if inicial == "borrador" or not estaban_en_uso:
+            if inicial == "activa":          # [Dario 30/10] tanda 3: ya intervenían en el color, quedan activas
+                estado, fue_activada = "activa", 1
+            elif inicial == "borrador" or not estaban_en_uso:
                 estado, fue_activada = "borrador", 0
             else:
                 estado, fue_activada = "activa", 1
@@ -354,6 +360,7 @@ def leer_tiempos(ruta_base):
 
 
 def _usar_ejemplo(conexion):
+    # [30/10] Ya no hay interruptor en la pantalla: solo se lee para respetar bases viejas al cargar la semilla.
     fila = conexion.execute("SELECT valor FROM reglas_config WHERE clave = 'usar_ejemplo'").fetchone()
     return True if fila is None else fila["valor"] == "1"
 
@@ -565,10 +572,9 @@ def activas():
         filas = conexion.execute(
             "SELECT * FROM reglas WHERE estado = 'activa' ORDER BY id"
         ).fetchall()
-        usar = _usar_ejemplo(conexion)
     finally:
         conexion.close()
-    return _ok(reglas=[_a_dict(f) for f in filas], usar_ejemplo=usar)
+    return _ok(reglas=[_a_dict(f) for f in filas])
 
 
 @bp.get("/api/reglas")
@@ -583,16 +589,11 @@ def listar():
             eventos.setdefault(ev["regla_id"], []).append(
                 {"fecha": ev["fecha"], "usuario": ev["usuario"], "accion": ev["accion"], "version": ev["version"]}
             )
-        config = conexion.execute(
-            "SELECT valor, actualizado_por, actualizado_en FROM reglas_config WHERE clave = 'usar_ejemplo'"
-        ).fetchone()
     finally:
         conexion.close()
-    return _ok(
-        reglas=[_a_dict(f, eventos.get(f["id"], [])) for f in filas],
-        usar_ejemplo=True if config is None else config["valor"] == "1",
-        config_actualizada=None if config is None else {"por": config["actualizado_por"], "en": config["actualizado_en"]},
-    )
+    # [30/10] historial_general: cambios que no son de una regla (tiempos por color, carga de ejemplos…).
+    return _ok(reglas=[_a_dict(f, eventos.get(f["id"], [])) for f in filas],
+               historial_general=eventos.get(None, []))
 
 
 @bp.post("/api/reglas")
@@ -638,17 +639,24 @@ def editar(regla_id):
             fila = _buscar(conexion, regla_id)
             if fila is None:
                 return _error("La regla no existe.", 404, "REGLA_NO_ENCONTRADA")
+            # Guardar sin cambios: no hay versión nueva ni evento (y la regla sigue como estaba).
+            actual = {"nombre": fila["nombre"], "explicacion": fila["explicacion"], "color": fila["color"],
+                      "combinacion": fila["combinacion"], "condiciones": json.loads(fila["condiciones_json"]),
+                      "origen": fila["origen"], "validada_por": fila["validada_por"],
+                      "discriminador": fila["discriminador"]}
+            if actual == regla:
+                return _ok(regla=_a_dict(fila), sin_cambios=True)
             version = fila["version"] + 1
             conexion.execute(
                 """UPDATE reglas SET nombre = ?, explicacion = ?, color = ?, combinacion = ?, condiciones_json = ?,
-                       origen = ?, validada_por = ?, validada_en = ?, discriminador = ?, estado = 'borrador',
+                       origen = ?, validada_por = ?, validada_en = ?, discriminador = ?,
                        version = ?, actualizada_por = ?, actualizada_en = ? WHERE id = ?""",
                 (regla["nombre"], regla["explicacion"], regla["color"], regla["combinacion"],
                  json.dumps(regla["condiciones"], ensure_ascii=False), regla["origen"], regla["validada_por"],
                  _validada_en(regla, fila), regla["discriminador"],
                  version, g.profesional["usuario"], _ahora(), regla_id)
             )
-            accion = "EDITADA (pasó a borrador)" if fila["estado"] == "activa" else "EDITADA"
+            accion = "EDITADA (sigue activa)" if fila["estado"] == "activa" else "EDITADA"
             _evento(conexion, regla_id, accion, version, regla)
             fila = _buscar(conexion, regla_id)
     finally:
@@ -746,26 +754,3 @@ def guardar_tiempos():
     logger.info("TIEMPOS_OBJETIVO | %s | %s", g.profesional["usuario"], tiempos_nuevos)
     return _ok(tiempos=tiempos_nuevos)
 
-
-@bp.post("/api/reglas/config")
-def configurar():
-    datos = request.get_json(silent=True)
-    if not isinstance(datos, dict) or set(datos) != {"usar_ejemplo"} or not isinstance(datos["usar_ejemplo"], bool):
-        return _error("Enviá únicamente usar_ejemplo (true o false).", 400, "CAMPOS_INVALIDOS")
-    conexion = _conectar()
-    try:
-        with conexion:
-            conexion.execute(
-                """INSERT INTO reglas_config (clave, valor, actualizado_por, actualizado_en)
-                   VALUES ('usar_ejemplo', ?, ?, ?)
-                   ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
-                       actualizado_por = excluded.actualizado_por, actualizado_en = excluded.actualizado_en""",
-                ("1" if datos["usar_ejemplo"] else "0", g.profesional["usuario"], _ahora())
-            )
-            _evento(conexion, None,
-                    "REGLAS DE EJEMPLO " + ("ACTIVADAS" if datos["usar_ejemplo"] else "DESACTIVADAS"),
-                    None, datos)
-    finally:
-        conexion.close()
-    logger.info("REGLAS_EJEMPLO | %s | %s", g.profesional["usuario"], datos["usar_ejemplo"])
-    return _ok(usar_ejemplo=datos["usar_ejemplo"])

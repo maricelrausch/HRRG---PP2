@@ -85,15 +85,18 @@ def test_ciclo_completo_borrador_activa_inactiva(cliente):
 
     assert c.post(f"/api/reglas/{regla['id']}/activar", json={}).status_code == 200
     activas = c.get("/api/reglas/activas").get_json()
-    assert [x["codigo"] for x in activas["reglas"]] == ["R-001"] and activas["usar_ejemplo"] is True
+    assert [x["codigo"] for x in activas["reglas"]] == ["R-001"]
 
-    # Editar una regla activa la vuelve a borrador y sube la versión.
+    # [Dario 30/10] Editar una regla activa NO la apaga: sigue activa y sube la versión.
     cambio = dict(REGLA, color="ROJO")
     r = c.post(f"/api/reglas/{regla['id']}", json=cambio).get_json()["regla"]
-    assert r["estado"] == "borrador" and r["version"] == 2 and r["color"] == "ROJO"
-    assert c.get("/api/reglas/activas").get_json()["reglas"] == []
+    assert r["estado"] == "activa" and r["version"] == 2 and r["color"] == "ROJO"
+    assert [x["color"] for x in c.get("/api/reglas/activas").get_json()["reglas"]] == ["ROJO"]
 
-    c.post(f"/api/reglas/{regla['id']}/activar", json={})
+    # Guardar sin cambios no crea versión nueva ni evento.
+    d = c.post(f"/api/reglas/{regla['id']}", json=cambio).get_json()
+    assert d["sin_cambios"] is True and d["regla"]["version"] == 2 and d["regla"]["estado"] == "activa"
+
     assert c.post(f"/api/reglas/{regla['id']}/desactivar", json={}).status_code == 200
 
     # Ya estuvo activa: no se puede eliminar, solo desactivar.
@@ -101,7 +104,7 @@ def test_ciclo_completo_borrador_activa_inactiva(cliente):
 
     hist = c.get("/api/reglas").get_json()["reglas"][0]["historial"]
     assert [h["accion"] for h in hist] == [
-        "CREADA (borrador)", "ACTIVADA", "EDITADA (pasó a borrador)", "ACTIVADA", "DESACTIVADA"]
+        "CREADA (borrador)", "ACTIVADA", "EDITADA (sigue activa)", "DESACTIVADA"]
     assert all(h["usuario"] == "jefa" for h in hist)
 
 
@@ -149,7 +152,6 @@ def test_bool_y_opcion_validos(cliente):
     ("aud", "/api/reglas", "post", 403),
     ("adm", "/api/reglas/activas", "get", 403),
     ("adm", "/api/reglas", "post", 403),
-    ("med", "/api/reglas/config", "post", 403),
 ])
 def test_permisos(cliente, usuario, ruta, metodo, esperado):
     c = cliente.como(usuario)
@@ -157,13 +159,11 @@ def test_permisos(cliente, usuario, ruta, metodo, esperado):
     assert r.status_code == esperado
 
 
-def test_config_reglas_de_ejemplo(cliente):
+def test_ya_no_existe_el_interruptor_de_reglas_de_ejemplo(cliente):
+    # [Dario 30/10] Se sacó la "copia de respaldo" de las reglas escritas en el código: ahora todas están en la base.
     c = cliente.como("jefa")
-    assert c.post("/api/reglas/config", json={"usar_ejemplo": "no"}).status_code == 400
-    assert c.post("/api/reglas/config", json={"usar_ejemplo": False}).get_json()["usar_ejemplo"] is False
-    assert c.get("/api/reglas/activas").get_json()["usar_ejemplo"] is False
-    datos = c.get("/api/reglas").get_json()
-    assert datos["config_actualizada"]["por"] == "jefa"
+    assert c.post("/api/reglas/config", json={"usar_ejemplo": True}).status_code in (404, 405)
+    assert "usar_ejemplo" not in c.get("/api/reglas/activas").get_json()
 
 
 def test_post_sin_json_rechazado(cliente):

@@ -57,4 +57,10 @@ t('grupo etario calculado con la edad (mismos casos que backend/tests/test_regla
   assert.strictEqual(M.evaluar(r, { edad: 30, temperatura: '38,2' }).length, 0);
   assert.strictEqual(M.evaluar(r, { temperatura: '38,2' }).length, 0);   // sin edad no se adivina
 });
+t('etiqueta corta del origen (Dario 30/10)', () => {
+  assert.strictEqual(M.etiqueta('manchester'), 'MANCHESTER');
+  assert.strictEqual(M.etiqueta('local'), 'HRRG');
+  assert.strictEqual(M.etiqueta('provisoria'), 'PROVISORIA');
+  assert.strictEqual(M.etiqueta(undefined), 'PROVISORIA');
+});
 console.log('motor_reglas: ' + n + ' pruebas OK');

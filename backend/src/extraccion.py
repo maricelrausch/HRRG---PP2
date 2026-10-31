@@ -126,16 +126,59 @@ def _norm(s):
     return s.encode("ascii", "ignore").decode()
 
 
-# Palabras del relato que fijan la categoría (orden = prioridad).
+# Palabras del relato que fijan la categoría (orden = prioridad: de lo más grave a lo menos).
+# [Dario 30/10] Lista ÚNICA: ia/medgemma.py la importa de acá (antes había dos copias distintas).
+#   - Cubre los 15 motivos del mail de Navoni (antes solo 7 tenían palabras clave).
+#   - Lo negado no cuenta: «no tuve ningún golpe», «no me duele la cabeza» (ver _sin_negaciones).
+#   - Si hay un golpe o una caída, gana Trauma sobre Cefalea, Dolor torácico y Dolor abdominal.
+# Se comparan con el relato en minúsculas y sin tildes. «nox» marca frases que empiezan con «no» pero
+# describen un síntoma («no responde», «no puede respirar»): no son negaciones.
 CLAVES_CATEGORIA = [
+    ("Convulsiones", r"\b(convulsi\w*|epilep\w*|ataque epileptico)\b"),
+    ("Alteración de conciencia", r"(\bconfundid\w*|\bdesorientad\w*|\bnox (responde|reacciona|se despierta)\b|\bsomnolient\w*|"
+                                 r"\binconscien\w*|perdio (el conocimiento|la conciencia)|\bdesvari\w*)"),
+    ("Hemorragia", r"\b(sangr\w*|hemorrag\w*)\b"),
     ("Dolor torácico", r"\b(pecho|torax|toracic\w*|precordi\w*)\b"),
+    ("Disnea", r"(falta (de |el |la )?(aire|respiracion)|\bahog\w*|\bdisnea\b|\bnox (puede|puedo) respirar|cuesta respirar|"
+               r"\brespir\w* mal\b)"),
+    ("Trauma", r"\b(golpe\w*|golpi\w*|caida|cai|caiste|caimos|caer\w*|caigo|cayo|cayeron|cayendo|tropec\w*|tropez\w*|"
+               r"resbal\w*|choque\w*|choco|accidente|fractur\w*|torci|torcio|torcido|torcedura|torcer\w*|esguince|herida|corte|cortad\w*|quemadura\w*|"
+               r"me queme|se quemo|quemad[oa])\b"),
+    ("Intoxicación", r"(muchas pastillas|pastillas de mas|frasco de pastillas|todas las pastillas|\bsobredosis\b|\bintoxic\w*|"
+                     r"\benvenen\w*|\bveneno\b|\blavandina\b|\binsecticida\b|\braticida\b|\bmonoxido\b|\bbrasero\b)"),
+    ("Reacción alérgica", r"(\balergi\w*|\balergic\w*|\bpicadura\b|\b(me|le|lo|la) pico\b|\bronchas\b|\burticaria\b|\banafila\w*|"
+                          r"hinch\w* (la |los |el |las )?(cara|lengua|labios|garganta|ojos|parpados))"),
+    ("Embarazo / obstétrico", r"\b(embarazad\w*|embarazo|contracciones|gestacion|rompi bolsa|rompio bolsa|bolsa rota|"
+                              r"perdi liquido|perdida de liquido|trabajo de parto)\b"),
+    ("Salud mental", r"(\bvoces\b|\bmatarme\b|\bmatarse\b|\bsuicid\w*|quitarme la vida|hacerme dano|hacerse dano|\blastimarme\b|"
+                     r"ataque de panico|crisis de (angustia|ansiedad|nervios)|\bangustiad\w*|\balucin\w*|\bpsicotic\w*)"),
+    ("Dolor abdominal", r"\b(panza|abdomen|abdominal|estomago|barriga|epigastr\w*|vientre|flanco|colico)\b"),
     ("Cefalea", r"\b(cabeza|cefalea|migran\w*|jaqueca)\b"),
-    ("Dolor abdominal", r"\b(panza|abdomen|abdominal|estomago|barriga|epigastr\w*|vientre|flanco)\b"),
-    ("Disnea", r"(falta (de|el) aire|\bahog\w*|\bdisnea\b|no puede respirar|cuesta respirar)"),
-    ("Trauma", r"\b(golpe\w*|caida|cayo|choque|accidente|fractur\w*|torc\w*|herida|corte)\b"),
-    ("Síntoma neurológico", r"(convulsi\w*|desmay\w*|paralisis|no puede hablar|hormigueo|perdida de fuerza)"),
-    ("Fiebre", r"\b(fiebre|afiebrad\w*|febril)\b"),
+    ("Fiebre", r"\b(fiebre|afiebrad\w*|febril|calentura|escalofrio\w*)\b"),
+    ("Síntoma neurológico", r"(\bdesmay\w*|\bparalisis\b|\bnox (puede|puedo) hablar|\bhabla mal\b|\bhormigueo\b|perdida de fuerza|"
+                            r"boca torcida|\bmare\w*|\bvertigo\b)"),
 ]
+# Frases con «no» que describen un síntoma: se protegen antes de borrar lo negado.
+_NO_SINTOMA = re.compile(r"\bno (responde|reacciona|se despierta|puede respirar|puedo respirar|puede hablar|puedo hablar)\b")
+# Negación: desde la palabra hasta la próxima coma, punto, «y» o «pero».
+_NEGACION = re.compile(r"\b(no|sin|niega|ningun|ninguna|nunca)\b.*?(?=[,.;]|\by\b|\bpero\b|$)")
+_TRAUMA_GANA_A = ("Cefalea", "Dolor torácico", "Dolor abdominal")
+
+
+def _sin_negaciones(texto_normalizado):
+    """«me duele la cabeza, no tuve ningún golpe» -> «me duele la cabeza, »."""
+    t = _NO_SINTOMA.sub(lambda m: "nox " + m.group(1), texto_normalizado)
+    return _NEGACION.sub(" ", t)
+
+
+def categorias_del_relato(texto_normalizado):
+    """Categorías cuyas palabras aparecen en el relato (sin contar lo negado), en orden de prioridad."""
+    t = _sin_negaciones(texto_normalizado)
+    halladas = [c for c, rx in CLAVES_CATEGORIA if re.search(rx, t)]
+    if "Trauma" in halladas:
+        halladas = [c for c in halladas if c not in _TRAUMA_GANA_A]
+    return halladas
+
 
 # Localización por defecto y términos aceptados aunque no estén literales en el relato.
 LOCALIZACION = {
@@ -230,7 +273,7 @@ def anclar(datos, relato):
     t = _norm(relato)
 
     # Categoría: si el relato tiene palabras clave, manda el relato.
-    halladas = [c for c, rx in CLAVES_CATEGORIA if re.search(rx, t)]
+    halladas = categorias_del_relato(t)
     if halladas and datos.get("motivo_categoria") not in halladas:
         datos["motivo_categoria"] = halladas[0]
 

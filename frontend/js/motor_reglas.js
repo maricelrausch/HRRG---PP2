@@ -77,5 +77,10 @@
     });
     return out.sort((a, b) => a.lv - b.lv);
   }
-  root.MotorReglas = { evaluar: evaluar, cumple: cumple, describir: describir, NIVEL: NIVEL, ORIGEN: ORIGEN, grupoEtario: grupoEtario };
+  /* [Dario 30/10] Etiqueta corta del «Por qué» según el origen (quién la validó va en el texto de al lado). */
+  const ETIQUETA = { manchester: 'MANCHESTER', local: 'HRRG', provisoria: 'PROVISORIA' };
+  function etiqueta(origen) {
+    return ETIQUETA[origen] || 'PROVISORIA';
+  }
+  root.MotorReglas = { evaluar: evaluar, cumple: cumple, describir: describir, NIVEL: NIVEL, ORIGEN: ORIGEN, grupoEtario: grupoEtario, etiqueta: etiqueta };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
