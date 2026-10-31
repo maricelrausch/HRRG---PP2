@@ -1,10 +1,10 @@
 # Manual de usuario · Triage asistido por IA
 
 **Hospital Regional Río Grande (HRRG) · Equipo 1 · Prácticas Profesionalizantes II**
-**Versión:** prototipo local · **Actualizado:** 30/10/2026
+**Versión:** prototipo local · **Actualizado:** 31/10/2026
 
 > **Importante.** Es un **prototipo**. Usá solo **datos ficticios**: nada de nombres, domicilios, teléfonos ni casos reales.
-> El color que propone el sistema sale de **reglas de referencia del Sistema Manchester y adaptaciones locales, todavía sin validar** por Enfermería y Guardia del HRRG.
+> El color lo sugiere **MedGemma** junto con las **reglas del hospital** (de referencia del Sistema Manchester y adaptaciones locales, **todavía sin validar** por Enfermería y Guardia del HRRG).
 > **La decisión final es siempre del profesional.**
 
 ---
@@ -32,7 +32,7 @@ Ayuda a ordenar la atención en la guardia:
 1. El profesional escribe o dicta **lo que cuenta el paciente**.
 2. La IA, que corre en la misma computadora (MedGemma), **saca los datos del relato**: motivo, desde cuándo, dónde duele y síntomas.
 3. El profesional **revisa esos datos** y **carga los signos vitales**.
-4. El sistema **sugiere un color de prioridad** y explica por qué.
+4. **MedGemma sugiere un color de prioridad** y explica por qué. Las **reglas del hospital** fijan el color mínimo: la IA nunca puede sugerir uno más bajo.
 5. El profesional **acepta, modifica o rechaza** la sugerencia. Todo queda registrado a su nombre.
 6. El paciente pasa a **En espera**, con un reloj que avisa cuándo hay que reevaluarlo.
 
@@ -53,7 +53,7 @@ Ayuda a ordenar la atención en la guardia:
 | **Enfermería** | Cargar casos, pedir la sugerencia, decidir el color, reevaluar, escalar a ROJO, finalizar | Exportar ni administrar usuarios |
 | **Médico/a** | Lo mismo que Enfermería | Exportar ni administrar usuarios |
 | **Auditoría** | Ver En espera, el historial completo de cada caso y el DNI; buscar por DNI; ver todos los casos (incluidos los finalizados); **exportar** a Excel o PDF; ver las reglas del hospital | Cargar, modificar ni decidir nada (**solo lectura**) |
-| **Jefatura de Guardia** | Cargar, probar, activar, desactivar y editar las **reglas del hospital** | Atender pacientes ni ver casos |
+| **Jefatura de Guardia** | Cargar, probar, activar, desactivar y editar las **reglas del hospital**; ajustar los **tiempos por color** y los **rangos de los signos vitales** | Atender pacientes ni ver casos |
 | **Administración** | Crear usuarios, asignar perfiles, desbloquear cuentas, generar claves temporales | Ver casos de pacientes |
 
 ---
@@ -111,6 +111,7 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
 4. Tocá **Extraer datos**.
    - Mientras procesa, el botón queda bloqueado y arriba aparece **"Consultando al servidor…"**.
    - Con MedGemma, la primera vez puede tardar **1 o 2 minutos**.
+   - La **categoría del motivo** (dolor torácico, fiebre, trauma, etc.) sale de palabras del relato. Lo que el paciente **niega** no cuenta: *"no me golpeé"* no lo pone como trauma.
    - Si algo falla, **el texto no se pierde**.
 5. **Borrar texto** limpia solo el cuadro del relato.
 
@@ -131,8 +132,9 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
 3. **Signos vitales** (①): TA, FC, FR, SpO₂, temperatura y glucemia (opcional).
    - **Enter** pasa al campo siguiente.
    - La **PAM** se calcula sola.
-   - Debajo de cada campo está el valor normal de referencia para adultos.
-   - **Borde oscuro** = valor fuera de lo normal. **Rojo** = valor crítico o imposible: hay que corregirlo para seguir.
+   - Debajo de cada campo está el **valor normal de referencia según la edad** del paciente (lactante, niño, adolescente, adulto o adulto mayor). Esos rangos los configura la Jefatura de Guardia (sección 8).
+   - **Borde oscuro** = valor fuera de lo normal.
+   - **Rojo** = el dato solo ya cumple una **regla del hospital** ROJA o NARANJA; abajo aparece su nombre y código (por ejemplo *"Compromiso respiratorio · regla de seguridad (R-004)"*). También se marca en rojo un valor **imposible** (un error de tipeo): hay que corregirlo para seguir.
 4. **Conciencia, dolor y aspecto:**
    - Para la conciencia, alcanza con el **nivel de conciencia** *o* el **Glasgow**.
    - El **dolor** va de 0 a 10.
@@ -151,22 +153,25 @@ Una vez que registraste la decisión (**Aceptar**, **Modificar** o **Rechazar**)
 
 ![Paso 3: sugerencia de color](img/manual/04_sugerencia.png)
 
-1. **Color sugerido** (①), con su tiempo de referencia.
-2. **Por qué** (②): la explicación en palabras clínicas. Cada línea dice de dónde sale:
-   - **HRRG**: una regla de la lista que administra la Jefatura de Guardia, con su código (por ejemplo R-001) y su origen: Sistema Manchester, adaptación local o provisoria.
-   - **REGLA**: la copia de respaldo de las reglas de ejemplo (solo si la Jefatura la encendió).
-   - **GUÍA**: una pregunta de la guía que confirmaste.
-   - **IA**: lo que interpretó la IA del relato.
+1. **Color sugerido** (①), con su tiempo de referencia. Arriba dice de dónde sale: *Prioridad sugerida · MedGemma y reglas*.
+   - Mientras MedGemma responde (unos segundos), la tarjeta queda gris con **"Analizando…"** y **Aceptar** está desactivado. Si una regla ya se cumple, avisa el color mínimo.
+   - Si la IA no responde o está apagada, el color sale **solo de las reglas del hospital** (*Sin IA · reglas del hospital*). El triage sigue igual.
+2. **Por qué** (②): la explicación en palabras clínicas. Cada línea tiene una etiqueta que dice de dónde sale:
+   - **MANCHESTER**, **HRRG** o **PROVISORIA**: una **regla del hospital** que se cumplió, con su código (por ejemplo R-014), su color y si está validada. La etiqueta indica el origen de la regla: Sistema Manchester, adaptación local del HRRG o provisoria (en revisión).
+   - **IA · RELATO**: un motivo de MedGemma que sale de lo que contó el paciente.
+   - **IA · MEDIDO**: un motivo de MedGemma que sale de lo que midió enfermería.
+   - **IA**: un motivo que es criterio del propio modelo.
+   - **ANTES**: en una reevaluación, el color que tenía antes.
 
-   Las reglas fijan un piso: la IA no puede sugerir un color más bajo. Las reglas del hospital que intervinieron quedan guardadas junto con tu decisión.
-3. **Pasaría a [color siguiente] si se cumple alguno:** son las preguntas de la guía que podrían subir la prioridad.
-   - Respondé **Sí** o **No**. El color se recalcula al instante y la respuesta queda registrada.
-   - Las que dicen *"se evalúa con lo medido"* salen solas de los signos vitales.
-4. **Consultar a la IA:** abre un chat con preguntas rápidas: *¿Por qué este color?*, *¿Qué datos faltan?*, *¿Qué lo haría subir?*, *¿De dónde sale?* No diagnostica ni indica tratamientos.
+   Las reglas fijan un piso: la IA no puede sugerir un color más bajo. Si una regla subió el color, la tarjeta lo dice (*"Color fijado por regla del hospital (R-…)"*). Las reglas que intervinieron quedan guardadas junto con tu decisión.
+3. **Falta:** si hay datos sin cargar, aparecen al lado del *Por qué*.
+4. **Consultar a la IA:** abre un chat con preguntas rápidas: *¿Por qué este color?*, *¿Qué datos faltan?*, *¿Qué lo haría subir?* (muestra las reglas del hospital que pondrían un color más urgente), *¿De dónde sale?* No diagnostica ni indica tratamientos.
 5. **Tu decisión** (③):
    - **Aceptar:** con un toque queda registrado el color sugerido.
-   - **Modificar** o **Rechazar:** elegís otro color y un **motivo (obligatorio)**, con un detalle opcional. Después tocás **Registrar decisión**.
+   - **Modificar** o **Rechazar:** elegís otro color (ROJO, NARANJA, AMARILLO o VERDE) y un **motivo (obligatorio)**, con un detalle opcional. Después tocás **Registrar decisión**.
      - Si elegís un color **más bajo** que el sugerido, hay que tildar la confirmación y queda registrado como **discrepancia**.
+     - Si ya registraste un color más urgente (por ejemplo, lo subiste a ROJO), **Aceptar** no lo vuelve a bajar: para bajarlo usá **Modificar** con motivo.
+     - El motivo no pasa de un paciente a otro: cada caso empieza con el motivo vacío.
      - Los casos **policiales, judiciales o con custodia** no cambian el color: se registran en **Condición especial** (paso 1).
 
    ![Modificar la sugerencia](img/manual/05_modificar.png)
@@ -302,63 +307,82 @@ Tocá **Historial de casos**. El título cambia y la lista de espera se oculta. 
 
 ## 8. Reglas del hospital (Jefatura de Guardia)
 
-Los criterios clínicos **no están escritos en el programa**: son reglas guardadas en la base de datos que administra la **Jefatura de Guardia** (perfil *Jefatura de Guardia*) en la pantalla **Reglas del hospital**. Auditoría las puede ver en solo lectura, desde el enlace *Reglas del hospital* del encabezado.
+Los criterios clínicos **no están escritos en el programa**: las reglas, los tiempos por color y los rangos de los signos vitales están guardados en la base de datos y los administra la **Jefatura de Guardia** (perfil *Jefatura de Guardia*) en la pantalla **Reglas del hospital**. Auditoría la puede ver en solo lectura, desde el enlace *Reglas del hospital* del encabezado.
+
+La pantalla tiene cinco pestañas: **Reglas**, **Tiempos por color**, **Signos vitales**, **Historial de cambios** y **Cómo funcionan**.
+
+### Pestaña Reglas
 
 ![Reglas del hospital](img/manual/15_reglas.png)
 
 **Qué hay en la pantalla, de arriba hacia abajo:**
-- **Contadores:** reglas activas, borradores e inactivas.
-- **Copia de respaldo de las reglas de ejemplo:** las reglas de seguridad del prototipo ya están cargadas en la lista. Esta copia escrita en el programa queda **apagada** y solo se enciende como respaldo.
-- **Tiempo objetivo máximo de atención por color** (ver abajo).
-- **La lista de reglas.**
+- **Contadores:** reglas activas (intervienen), inactivas (no intervienen), **sin validar por la Guardia** y total.
+- **Filtros:** Todas / Activas / Inactivas y por origen (Manchester, HRRG, Provisoria, Sin validar). El **buscador** encuentra una regla por su nombre o por el dato que usa (por ejemplo *"saturación"*).
+- **+ Nueva regla.**
+- **La lista**, agrupada por color (ROJO, NARANJA, AMARILLO, VERDE). Cada fila muestra:
+  - el **código** (R-001…), el nombre y la regla en una frase;
+  - **Sube a:** el color mínimo que fija;
+  - **Origen:** MANCHESTER (Sistema Manchester), HRRG (adaptación local) o PROVISORIA (en revisión);
+  - **Validación:** quién la validó y cuándo, o *Sin validar*;
+  - **Estado:** un **interruptor** Activa / Inactiva;
+  - **Editar**, **Detalle** (cómo se ve en el *Por qué*, el discriminador, la versión y su historial) y **Eliminar** (solo si nunca estuvo activa).
 
-**Las reglas que vienen cargadas:**
-- **9 reglas activas** de origen *Sistema Manchester* (convulsión, Glasgow bajo, compromiso respiratorio, sangrado, dolor intenso, etc.), **sin validar**.
-- **4 reglas en borrador** propuestas por el HRRG (fiebre, cefalea, fiebre en lactante y dolor torácico). **No intervienen** hasta que la Jefatura complete sus valores y las active.
+**Las reglas que vienen cargadas** (de ejemplo, sin validar):
+- **12 activas:** 9 de origen *Sistema Manchester* (convulsión, Glasgow bajo, compromiso respiratorio, sangrado, dolor intenso, etc.) y 3 *provisorias* (dolor moderado, febrícula y fiebre).
+- **4 inactivas** propuestas por el HRRG (fiebre, cefalea, fiebre en lactante y dolor torácico). **No intervienen** hasta que la Jefatura complete sus valores y las active.
 
 **Cómo funciona una regla:**
-- Dice: *si se cumplen estas condiciones, la sugerencia no puede ser de un color menor que este*. Por ejemplo: *si SpO₂ < 94 % y tiene antecedente respiratorio → como mínimo NARANJA*.
+- Dice: *si se cumplen estas condiciones, la sugerencia no puede ser de un color menor que este*. Por ejemplo: *si SpO₂ < 90 % → como mínimo NARANJA*.
 - Un dato que **no se midió nunca cumple** una condición: la regla no adivina.
 - Las reglas activas intervienen **desde el próximo paciente**, sin reiniciar nada.
 - La decisión final sigue siendo del profesional, que puede modificar el color con un motivo.
 
-**Cada regla muestra:**
-- su **código** (R-001…), color mínimo y estado;
-- su **origen**: *Sistema Manchester*, *Adaptación local HRRG* o *Provisoria / en revisión*;
-- **quién la validó y cuándo**, o *sin validar*;
-- el **discriminador** o criterio clínico que la respalda, si se cargó.
+**Activar y desactivar:**
+- Se hace con el **interruptor** de cada fila. Activar es inmediato.
+- **Desactivar una regla ROJA pide confirmación** (*"¿Desactivar esta regla ROJA?"* → **Sí, desactivar**).
+- **Editar una regla activa no la apaga:** sigue activa, sube su versión (v1, v2…) y los cambios valen desde el próximo paciente.
+- Una regla que **ya estuvo activa no se puede eliminar**, solo desactivar, para que quede en el registro.
+
+![Confirmación para desactivar una regla ROJA](img/manual/21_desactivar_rojo.png)
 
 **Crear una regla:**
-1. Tocá **Nueva regla**.
+1. Tocá **+ Nueva regla**.
 2. Escribí un **nombre corto** y elegí el **color mínimo**.
-3. Completá el **origen**, **validada por** (el profesional o servicio que la aprobó; la fecha se registra sola) y, si querés, el **discriminador** que la respalda.
+3. Completá el **origen**, **validada por** (el profesional o servicio que la aprobó; la fecha se registra sola) y, si querés, el **discriminador** o criterio clínico que la respalda.
 4. Agregá las **condiciones** (hasta 8): el dato, la comparación y el valor.
    - Datos disponibles: signos vitales, conciencia, dolor, edad, **grupo etario** (lactante, niño, adolescente, adulto, adulto mayor: se calcula solo con la edad), sexo, categoría del motivo, banderas rojas y antecedentes.
    - Con más de una condición, elegí si se tienen que cumplir **todas** o alcanza con **alguna**.
-5. Escribí la **explicación para el profesional**: es lo que va a leer en el «Por qué».
+5. Escribí la **explicación para el profesional**: es lo que va a leer en el *Por qué*.
 6. Debajo se lee la regla en una frase. En **Probar con un caso de ejemplo** cargá valores y fijate si la regla se cumple.
-7. Tocá **Guardar como borrador**. Un borrador **todavía no interviene**.
+7. Tocá **Guardar**. La regla nueva se guarda **inactiva**: cuando esté lista, activala con el interruptor.
 
 ![Crear o editar una regla](img/manual/16_regla_editor.png)
 
-**Estados de una regla:**
-
-| Estado | Qué significa | Qué se puede hacer |
-|---|---|---|
-| **Borrador** | Está guardada pero no interviene | Editar, **Activar**, Eliminar (si nunca estuvo activa) |
-| **Activa** | Interviene en la sugerencia | Editar (vuelve a borrador), **Desactivar** |
-| **Inactiva** | Ya no interviene; se conserva para el registro | Editar, **Activar** |
-
-- **Activar**, **Desactivar** y **Eliminar** piden un segundo toque para confirmar.
-- **Editar una regla activa la vuelve a borrador** y sube su versión (v1, v2…). Hay que activarla de nuevo.
-- **Ver historial** muestra quién la creó, editó, activó o desactivó, y cuándo.
-
-### Tiempos objetivo por color
+### Pestaña Tiempos por color
 
 ![Tiempos objetivo por color](img/manual/17_tiempos.png)
 
 - Son los minutos máximos de espera de cada color. Los usan **En espera**, la **sala de espera** y la **API del hospital**.
 - Vienen con los valores de **referencia del Sistema Manchester**. La Jefatura los revisa y toca **Confirmar o guardar tiempos**; desde ahí figura quién los guardó y cuándo.
+
+### Pestaña Signos vitales
+
+![Rangos de los signos vitales](img/manual/20_signos.png)
+
+Son los rangos que ve Enfermería en el paso 2 (Medición), **según el grupo etario** del paciente.
+- **Normal:** si el valor queda afuera, el campo se pinta con borde oscuro y se le informa a MedGemma.
+- **Posible:** frena los errores de tipeo (por ejemplo, una FC de 980).
+- **Texto si está bajo / alto:** lo que se lee debajo del campo (*Bradicardia*, *Fiebre*…).
+- **Oblig.:** si el dato es obligatorio; si falta, la pantalla lo pide.
+- Arriba se elige el grupo: **Lactante, Niño, Adolescente, Adulto, Adulto mayor**. Los grupos que dicen *usa Adulto* todavía no tienen valores propios: con **Usar valores propios** se copian los de Adulto para editarlos, y con **volver a Adulto** se quitan.
+- Cada fila se guarda con su botón **Guardar**.
+- La **marca roja** de la Medición no se configura acá: sale de las **reglas activas**.
+- Los valores iniciales son los que tenía el programa y **no son oficiales** del HRRG.
+
+### Pestañas Historial de cambios y Cómo funcionan
+
+- **Historial de cambios:** todos los cambios de reglas, tiempos y signos vitales, del más nuevo al más viejo: fecha, usuario, qué cambió y versión. **No se borra nunca.**
+- **Cómo funcionan:** un resumen de esta sección para tener a mano.
 
 ## 9. Administración de usuarios
 
@@ -409,7 +433,9 @@ Los criterios clínicos **no están escritos en el programa**: son reglas guarda
 | Me sacó al inicio de sesión | Si dice *"La sesión se cerró por inactividad"*, pasaron 15 minutos sin uso. Volvé a ingresar. |
 | Volví a Ingreso y la pantalla está en blanco | Es así a propósito después de registrar la decisión: el caso ya está en **En espera**. Para cambiarlo, usá **Reevaluar**. |
 | Un paciente con custodia no pasó adelante en la fila | Es así a propósito: la condición especial no cambia la prioridad clínica. La fila se ordena por color y tiempo de espera. |
-| Activé una regla y no cambió la sugerencia | La regla se aplica desde el **próximo** "Pedir sugerencia". Revisá que esté **Activa** (no en borrador) y que el caso tenga cargados todos los datos de sus condiciones. |
+| Activé una regla y no cambió la sugerencia | La regla se aplica desde el **próximo** "Pedir sugerencia". Revisá que el interruptor diga **Activa** y que el caso tenga cargados todos los datos de sus condiciones. |
+| La sugerencia queda en "Analizando…" | MedGemma está respondiendo: tarda unos segundos. Si no responde, el color sale solo de las reglas del hospital y aparece *"MedGemma no respondió"*. |
+| No puedo tocar Aceptar | Esperá que termine "Analizando…". Si ya registraste un color más urgente, para bajarlo usá **Modificar** con motivo. |
 
 ---
 
