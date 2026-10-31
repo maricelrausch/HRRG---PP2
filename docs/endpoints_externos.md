@@ -46,6 +46,16 @@ Es la misma fuente que usa la pantalla del celular de Darío (`sala.html`). La p
 Invoke-RestMethod http://127.0.0.1:5000/api/sala/espera | ConvertTo-Json -Depth 4
 ```
 
+**Código QR** (propuesta Barby 30/10): la página `qr_sala.html` (botón **QR de la sala** en En espera) muestra un QR para abrir la lista desde un celular de la misma red. El servidor arma el QR con la IP de la PC, aunque la página se haya abierto como `127.0.0.1`.
+
+| Ruta | Qué devuelve |
+|---|---|
+| `GET /api/sala/qr` | `{"direcciones": {"sala": "http://IP:5000/sala.html", "datos": "http://IP:5000/api/sala/espera"}}` |
+| `GET /api/sala/qr.svg?destino=sala` | Imagen SVG del QR de la pantalla de sala |
+| `GET /api/sala/qr.svg?destino=datos` | Imagen SVG del QR del endpoint en JSON |
+
+Son públicas como la lista (sin datos de pacientes) y se apagan junto con ella (`HRRG_SALA_PUBLICA=0`). Necesitan la librería `segno` (está en `requirements.txt`).
+
 ---
 
 ## 2. API de auditoría · `/api/auditoria/...`

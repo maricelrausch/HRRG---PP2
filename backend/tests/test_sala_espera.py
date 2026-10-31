@@ -45,3 +45,13 @@ def test_publico_sin_datos_personales(cliente):
     assert all(set(e) == {"codigo", "color", "espera_seg", "objetivo_min", "en_espera_desde", "vencido"} for e in eps)
     assert all(len(e["codigo"]) == 4 for e in eps)
     assert [e["vencido"] for e in eps] == [False, True, False]
+
+
+def test_qr_svg_y_direcciones(cliente):
+    pytest.importorskip("segno")
+    r = cliente.get("/api/sala/qr.svg?destino=sala", base_url="http://192.168.1.35:5000")
+    assert r.status_code == 200 and r.mimetype == "image/svg+xml" and b"<svg" in r.data
+    d = cliente.get("/api/sala/qr", base_url="http://192.168.1.35:5000").get_json()
+    assert d["direcciones"] == {"sala": "http://192.168.1.35:5000/sala.html",
+                                "datos": "http://192.168.1.35:5000/api/sala/espera"}
+    assert cliente.get("/api/sala/qr.svg?destino=otro").status_code == 400

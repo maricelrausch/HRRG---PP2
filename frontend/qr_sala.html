@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR de la lista de espera · Guardia HRRG</title>
+<!-- frontend/qr_sala.html · Código QR para abrir la lista de espera desde un celular (propuesta Barby 30/10).
+     Público como la lista: no muestra datos de pacientes. El QR lo arma el servidor (/api/sala/qr.svg)
+     con la IP de la PC en la red local, así el celular puede entrar aunque la PC esté en 127.0.0.1.
+     Se puede imprimir y pegar en la sala. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilos.css">
+<style>
+  .qr-app{max-width:640px;margin:24px auto}
+  .qr-tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .qr-tabs .btn[aria-pressed="true"]{background:var(--tab);color:var(--bg);border-color:var(--tab)}
+  .qr-caja{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+  .qr-caja img{width:min(320px,80vw);height:auto;background:#fff;border-radius:12px;padding:8px;border:1px solid var(--line)}
+  .qr-url{font-family:var(--f-mono);font-size:15px;word-break:break-all;background:var(--panel-2);border-radius:8px;padding:8px 12px}
+  .qr-titulo{font-family:var(--f-display);font-size:24px;font-weight:600;margin:0}
+  @media print{.no-print{display:none!important}.app{border:0}.qr-caja img{width:90mm}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="app qr-app">
+    <div class="app-head">
+      <div class="brand"><img class="logo" src="img/logo-hrrg.png" alt="HRRG · Hospital Regional Río Grande"></div>
+      <div class="chips no-print"><span class="chip">Sin datos de pacientes</span></div>
+    </div>
+    <div class="body">
+      <div class="qr-tabs no-print" role="group" aria-label="Qué abre el QR">
+        <button type="button" class="btn sm" data-destino="sala" aria-pressed="true">Pantalla de la sala</button>
+        <button type="button" class="btn sm" data-destino="datos" aria-pressed="false">Datos (JSON, para sistemas)</button>
+      </div>
+      <div class="banner" id="qrAviso" hidden role="alert"><b></b></div>
+      <div class="qr-caja">
+        <p class="qr-titulo" id="qrTitulo">Lista de espera de la Guardia</p>
+        <img id="qrImg" alt="Código QR de la lista de espera">
+        <div class="qr-url" id="qrUrl">Cargando…</div>
+        <div class="hint" id="qrAyuda"></div>
+      </div>
+      <div class="row no-print" style="justify-content:center">
+        <button type="button" class="btn primary" onclick="window.print()">Imprimir</button>
+        <a class="btn" id="qrAbrir" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none">Abrir acá</a>
+      </div>
+      <div class="note no-print">
+        <b>Cómo se usa:</b> el celular tiene que estar en el <b>mismo Wi-Fi</b> que esta PC. Abrí la cámara, apuntá al código y tocá el enlace.
+        Si no abre, revisá que la red de la PC esté como <i>Privada</i> y que el firewall permita el puerto (ver el manual, sección 6).
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const TEXTOS = {
+    sala: ['Lista de espera de la Guardia', 'Muestra la fila por color y tiempo de espera. Se actualiza sola.'],
+    datos: ['Lista de espera en JSON', 'Para pantallas o sistemas que dibujan la fila por su cuenta (GET /api/sala/espera).']
+  };
+  let direcciones = null, destino = 'sala';
+  function pintar() {
+    document.querySelectorAll('[data-destino]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.destino === destino)));
+    $('qrTitulo').textContent = TEXTOS[destino][0];
+    $('qrAyuda').textContent = TEXTOS[destino][1];
+    $('qrImg').src = '/api/sala/qr.svg?destino=' + destino + '&t=' + Date.now();
+    if (direcciones) { $('qrUrl').textContent = direcciones[destino]; $('qrAbrir').href = direcciones[destino]; }
+  }
+  document.querySelector('.qr-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-destino]'); if (!b) return;
+    destino = b.dataset.destino; pintar();
+  });
+  if (location.protocol === 'file:') {
+    $('qrUrl').textContent = 'Esta pantalla necesita el servidor: abrila desde http://127.0.0.1:5000/qr_sala.html';
+    return;
+  }
+  fetch('/api/sala/qr', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+    if (!d.ok) throw new Error(d.mensaje || 'error');
+    direcciones = d.direcciones;
+    if (d.aviso) { $('qrAviso').hidden = false; $('qrAviso').querySelector('b').textContent = d.aviso; }
+    pintar();
+  }).catch((e) => { $('qrUrl').textContent = 'No se pudo armar el QR: ' + e.message; });
+})();
+</script>
+</body>
+</html>

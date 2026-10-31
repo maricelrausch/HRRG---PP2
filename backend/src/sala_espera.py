@@ -75,3 +75,79 @@ def sala_espera():
     respuesta = jsonify({"ok": True, "episodios": lista, "tiempos": objetivo})
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta, 200
+
+
+# ------------------------------------------------
+# [Propuesta Barby 30/10] Código QR para abrir la lista de espera desde un celular.
+#   GET /api/sala/qr                    → las direcciones (JSON)
+#   GET /api/sala/qr.svg?destino=sala   → QR de la pantalla de sala (sala.html)
+#   GET /api/sala/qr.svg?destino=datos  → QR del endpoint en JSON (/api/sala/espera)
+# Es público como la lista (no tiene datos personales). Si la PC se abrió como 127.0.0.1
+# (localhost), el celular no podría entrar: se usa la IP de la PC en la red local.
+# ------------------------------------------------
+import io
+import socket
+
+from flask import request
+
+DESTINOS_QR = {"sala": "/sala.html", "datos": "/api/sala/espera"}
+
+
+def _ip_local():
+    """IP de la PC en la red local. No envía nada: solo pregunta qué interfaz usaría."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except OSError:
+        return None
+
+
+def direccion_base():
+    """Dirección con la que un celular de la misma red llega al sistema (http://IP:puerto)."""
+    host = request.headers.get("X-Forwarded-Host") or request.host
+    esquema = request.headers.get("X-Forwarded-Proto") or request.scheme
+    nombre, _, puerto = host.rpartition(":") if host.count(":") == 1 else (host, "", "")
+    if nombre in ("127.0.0.1", "localhost"):
+        ip = _ip_local()
+        if ip and not ip.startswith("127."):
+            host = ip + (":" + puerto if puerto else "")
+    return f"{esquema}://{host}"
+
+
+@bp.route("/api/sala/qr", methods=["GET"])
+def sala_qr_datos():
+    if os.environ.get("HRRG_SALA_PUBLICA", "1") == "0":
+        return jsonify({"ok": False, "mensaje": "La lista pública está deshabilitada."}), 404
+    base = direccion_base()
+    local = any(x in base for x in ("://127.", "://localhost"))
+    respuesta = jsonify({
+        "ok": True,
+        "direcciones": {k: base + v for k, v in DESTINOS_QR.items()},
+        "aviso": ("No se encontró la IP de la PC en la red: el celular no va a poder entrar. "
+                  "Conectá la PC al Wi-Fi.") if local else None,
+    })
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
+
+
+@bp.route("/api/sala/qr.svg", methods=["GET"])
+def sala_qr_svg():
+    if os.environ.get("HRRG_SALA_PUBLICA", "1") == "0":
+        return jsonify({"ok": False, "mensaje": "La lista pública está deshabilitada."}), 404
+    destino = request.args.get("destino", "sala")
+    if destino not in DESTINOS_QR or set(request.args) - {"destino", "t"}:   # t = evita caché del navegador
+        return jsonify({"ok": False, "mensaje": "Usá ?destino=sala o ?destino=datos."}), 400
+    try:
+        import segno
+    except ImportError:
+        return jsonify({"ok": False, "mensaje": "Falta instalar segno: python -m pip install -r requirements.txt"}), 503
+    salida = io.BytesIO()
+    segno.make(direccion_base() + DESTINOS_QR[destino], error="m").save(
+        salida, kind="svg", scale=10, border=2, dark="#1B2030", light="#FFFFFF")
+    respuesta = current_app.response_class(salida.getvalue(), mimetype="image/svg+xml")
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta, 200
