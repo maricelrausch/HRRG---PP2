@@ -81,7 +81,7 @@ def sala_espera():
 # [Propuesta Barby 30/10] Código QR para abrir la lista de espera desde un celular.
 #   GET /api/sala/qr                    → las direcciones (JSON)
 #   GET /api/sala/qr.svg?destino=sala   → QR de la pantalla de sala (sala.html)
-#   GET /api/sala/qr.svg?destino=datos  → QR del endpoint en JSON (/api/sala/espera)
+#   [31/10] Se sacó el QR al JSON (destino=datos): el equipo acordó que no hacía falta.
 # Es público como la lista (no tiene datos personales). Si la PC se abrió como 127.0.0.1
 # (localhost), el celular no podría entrar: se usa la IP de la PC en la red local.
 # ------------------------------------------------
@@ -90,7 +90,7 @@ import socket
 
 from flask import request
 
-DESTINOS_QR = {"sala": "/sala.html", "datos": "/api/sala/espera"}
+DESTINOS_QR = {"sala": "/sala.html"}
 
 
 def _ip_local():
@@ -140,7 +140,7 @@ def sala_qr_svg():
         return jsonify({"ok": False, "mensaje": "La lista pública está deshabilitada."}), 404
     destino = request.args.get("destino", "sala")
     if destino not in DESTINOS_QR or set(request.args) - {"destino", "t"}:   # t = evita caché del navegador
-        return jsonify({"ok": False, "mensaje": "Usá ?destino=sala o ?destino=datos."}), 400
+        return jsonify({"ok": False, "mensaje": "Usá ?destino=sala."}), 400
     try:
         import segno
     except ImportError:
