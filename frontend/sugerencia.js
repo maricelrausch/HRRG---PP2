@@ -86,7 +86,7 @@ function renderCard(){
     $('#tcName').textContent='Analizando…';$('#tcDesc').textContent=c.hl<9?'MedGemma revisando · reglas: al menos '+LEVELS[c.hl][0]:'MedGemma revisando el caso';}
   const FUENTE={ia:'Sugerencia de MedGemma con las reglas del hospital.',cargando:'Consultando a MedGemma… (color provisorio con las reglas del hospital)',insuf:'MedGemma: datos insuficientes · color con las reglas del hospital.',sin:'Sin IA · reglas del hospital.'};
   $('#tcOrigin').innerHTML='<b>'+FUENTE[c.M.fuente]+'</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+'</span>';
-  const ac=document.querySelector('[data-d="aceptar"]');if(ac){ac.disabled=c.M.fuente==='cargando';ac.title=ac.disabled?'Esperá la respuesta de MedGemma':''}
+  const ac=document.querySelector('[data-d="aceptar"]');if(ac){ac.disabled=c.M.fuente==='cargando';ac.title=c.M.fuente==='cargando'?'Esperá la respuesta de MedGemma':''}
   if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv&&c.M.fuente!=='ia')$('#tcOrigin').innerHTML='<b>'+FUENTE[c.M.fuente]+'</b><span class="old">Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</span>';
   else if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Se administra en la pantalla de reglas (Jefatura de Guardia).</span>';
   if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
@@ -100,16 +100,18 @@ function renderCard(){
    La sugerencia original queda escrita debajo (trazabilidad). */
 function pintarDecision(){
   const ceja=$('#triageCard .eyebrow'),tag=$('#triageCard .ia-tag'),n=ceja.querySelector('.n'),nH=n?' '+n.outerHTML:'';
-  const fl=(st.decision==='modificar'||st.decision==='rechazar')&&st.level!=null?st.level:null;
+  /* [Dario 30/10] La tarjeta muestra la decisión REGISTRADA (st.decReg) hasta que se registre otra: tocar Modificar
+     para cambiarla ya no vuelve a mostrar la sugerencia mientras se elige. */
+  const R=st.decReg,fl=R&&R.d!=='aceptar'?R.lv:null;
   if(fl==null){
     ceja.innerHTML=(medgemma().fuente==='ia'?'Prioridad sugerida · MedGemma y reglas':'Prioridad sugerida · reglas del hospital')+nH;   /* [Dario 30/10] */
-    tag.textContent=st.decision==='aceptar'?'Sugerencia aceptada':'Sugerencia · requiere validación';return}
-  const L=LEVELS[fl],acc=st.decision==='modificar'?'modificada':'rechazada';
+    tag.textContent=R&&R.d==='aceptar'?'Sugerencia aceptada':'Sugerencia · requiere validación';return}
+  const L=LEVELS[fl],acc=R.d==='modificar'?'modificada':'rechazada';
   $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
   $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[fl]+' [tiempo de ejemplo]';
   ceja.innerHTML='Clasificación final · decidida por el profesional'+nH;tag.textContent='Decisión registrada';
   if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
-  $('#tcOrigin').innerHTML='<b>Sugerencia '+LEVELS[SUG][0]+' '+acc+' a '+L[0]+' por el profesional.</b><span class="old">Motivo: '+esc(textoMotivo()||'—')+'</span>';
+  $('#tcOrigin').innerHTML='<b>Sugerencia '+LEVELS[SUG][0]+' '+acc+' a '+L[0]+' por el profesional.</b><span class="old">Motivo: '+esc(R.motivo||'—')+'</span>';
 }
 /* [Barby 30/10] Solo los 4 colores clínicos. El AZUL se dejó de ofrecer (recomendación de Navoni, HRRG):
    los casos policiales, judiciales o con custodia van como "Condición especial" en el Ingreso.
@@ -118,6 +120,12 @@ $('#levels').innerHTML=LEVELS.slice(0,4).map((L,i)=>'<button type="button" class
 /* [Dario 30/10] Si ya se registró un color MÁS urgente (p. ej. se modificó a ROJO), «Aceptar» no puede volver a la
    sugerencia (NARANJA) sin motivo: bajar la prioridad se hace con Modificar, que pide motivo y queda como discrepancia. */
 const refBajar=()=>st.registrado!=null?Math.min(SUG,st.registrado):SUG;
+/* [Dario 30/10] Estado de la decisión en los botones (como un selector): el botón de la decisión registrada queda
+   marcado con ✓ («✓ Aceptada», «✓ Modificada», «✓ Rechazada»). Tocar otro cambia la elección; nada se pisa sin
+   pasar por su paso: Modificar y Rechazar piden motivo, y Aceptar no puede bajar un color más urgente ya registrado. */
+const TXT_BTN={aceptar:['Aceptar','✓ Aceptada'],modificar:['Modificar','✓ Modificada'],rechazar:['Rechazar','✓ Rechazada']};
+function marcarRegistrado(d){document.querySelectorAll('[data-d]').forEach(x=>{const t=TXT_BTN[x.dataset.d];if(!t)return;
+  x.textContent=x.dataset.d===d?t[1]:t[0];x.classList.toggle('hecho',x.dataset.d===d)})}
 document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
   const d=b.dataset.d;
   if(d==='aceptar'&&st.registrado!=null&&SUG>st.registrado){
@@ -128,7 +136,7 @@ document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#modForm').hidden=d==='aceptar';$('#motivoForm').hidden=d==='aceptar';$('#lowerBox').hidden=true;
   $('#motivo').value='';$('#detalle').value='';$('#lowerOk').checked=false;
-  if(d==='aceptar'){st.decision='aceptar';commit(SUG);$('#okMsg').hidden=false;$('#okMsg').innerHTML='<b>Registrado.</b> Clasificación '+LEVELS[SUG][0]+' aceptada por el profesional.'+(st.prev?' Actualizado en En espera.':'');renderReg()}
+  if(d==='aceptar'){st.decision='aceptar';commit(SUG);$('#okMsg').hidden=false;$('#okMsg').innerHTML='<b>Registrado.</b> Clasificación '+LEVELS[SUG][0]+' aceptada por el profesional.'+(st.prev?' Actualizado en En espera.':'');st.decReg={d:'aceptar',lv:SUG};marcarRegistrado('aceptar');renderCard();renderReg()}
   else{$('#registrar').dataset.d=d;updReg()}
 }));
 $('#levels').addEventListener('click',e=>{const b=e.target.closest('.lvl');if(!b)return;st.level=+b.dataset.l;
@@ -147,10 +155,11 @@ const notaMenor=()=>st.level>refBajar()?' · Discrepancia registrada.':'';
 $('#registrar').addEventListener('click',()=>{
   const d=$('#registrar').dataset.d,nota=notaMenor(),antes=st.registrado;st.decision=d;commit(st.level);   /* nota antes de commit: compara con lo registrado antes */$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#okMsg').hidden=false;
   $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> '+(antes!=null&&antes!==st.level?'Clasificación cambiada de '+LEVELS[antes][0]+' a '+LEVELS[st.level][0]:'Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0])+'. Motivo: '+esc(textoMotivo())+nota:'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc(textoMotivo())+nota;
+  st.decReg={d,lv:st.level,motivo:textoMotivo()};marcarRegistrado(d);
   renderCard();renderReg();
 });
 $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderResumen()});
-function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
+function resetDecision(){st.decision=null;st.level=null;st.mlv=null;st.decReg=null;marcarRegistrado(null);
   $('#motivo').value='';$('#detalle').value='';$('#lowerOk').checked=false;   /* [Dario 30/10] el motivo no pasa de un caso a otro */
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed','false'));document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
