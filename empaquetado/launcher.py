@@ -12,6 +12,7 @@ Comandos de administración (desde una consola):
   IngenIA.exe crear-profesional
   IngenIA.exe cambiar-password
   IngenIA.exe asignar-rol
+  IngenIA.exe crear-admin        (crea un usuario con rol admin)
 
 Variables de entorno opcionales:
   HRRG_HOST    127.0.0.1 (por defecto, solo esta PC) | 0.0.0.0 (otras PCs de la red)
@@ -112,7 +113,18 @@ def asegurar_ollama():
         print("[OK] Ollama está corriendo.")
     else:
         ejecutables = buscar_ollama()
-        if not ejecutables:
+        if not ejecutables and os.environ.get("HRRG_EN_DOCKER") == "1":
+            # En Docker, Ollama es otro contenedor: solo hay que esperarlo.
+            print(f"[..] Esperando a Ollama en {OLLAMA}...")
+            for _ in range(90):
+                if ollama_responde():
+                    break
+                time.sleep(1)
+            if not ollama_responde():
+                print("[AVISO] Ollama no respondió. La app abre igual, pero sin IA.")
+                return
+            print("[OK] Ollama está corriendo.")
+        elif not ejecutables:
             print("[AVISO] No se encontró Ollama. La app abre igual, pero sin IA.")
             print("        Reinstale IngenIA Salud – Triage o instale Ollama.")
             return
@@ -161,7 +173,7 @@ def ejecutar_cli(app, args, standalone=True):
                         standalone_mode=standalone)
 
 
-def asegurar_administrador(modulo_app):
+def asegurar_administrador(modulo_app, forzar=False):
     import click
     try:
         con = sqlite3.connect(modulo_app.BASE_USUARIOS)
@@ -169,7 +181,12 @@ def asegurar_administrador(modulo_app):
         con.close()
     except sqlite3.Error:
         cantidad = 0
-    if cantidad:
+    if cantidad and not forzar:
+        return
+    if not forzar and not (sys.stdin and sys.stdin.isatty()):
+        print("[AVISO] No hay usuarios. Cree el administrador con:")
+        print("        docker compose exec app python empaquetado/launcher.py crear-admin")
+        print("        (o doble clic en crear_admin.bat)")
         return
 
     print()
@@ -193,6 +210,8 @@ def asegurar_administrador(modulo_app):
 
 
 def abrir_navegador_cuando_este_listo():
+    if os.environ.get("HRRG_ABRIR_NAVEGADOR", "1") == "0":
+        return
     def esperar():
         for _ in range(120):
             if puerto_ocupado(PUERTO):
@@ -218,6 +237,9 @@ def main():
 
     import app as modulo_app   # importa Flask, rutas y bases locales
 
+    if comando == ["crear-admin"]:   # alta del administrador (también en Docker)
+        asegurar_administrador(modulo_app, forzar=True)
+        return
     if comando:                # comandos de administración
         ejecutar_cli(modulo_app.app, comando)
         return

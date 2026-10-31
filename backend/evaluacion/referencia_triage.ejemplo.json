@@ -1,0 +1,11 @@
+[
+  {
+    "id": "HRRG-001",
+    "origen": "referencia HRRG (enfermera de triage)",
+    "relato": "Varón de 62 años con dolor opresivo en el pecho de 40 minutos de evolución.",
+    "datos": {"edad": 62, "sexo": "Masculino", "motivo_categoria": "Dolor torácico",
+              "frecuencia_cardiaca": 112, "saturacion_o2": 91, "dolor_intensidad": 9,
+              "estado_conciencia": "Alerta"},
+    "color_referencia": "NARANJA"
+  }
+]

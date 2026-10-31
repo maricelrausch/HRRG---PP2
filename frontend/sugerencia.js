@@ -1,179 +1,170 @@
 /* frontend/sugerencia.js · Tarjeta de sugerencia (A09) · Pantalla 3.
-   - Color SIMULADO con reglas de seguridad y de ejemplo (no es la guía del HRRG): reglas(), medgemma(), calcSug().
+   - Color: el más urgente entre las reglas de la base (motor_reglas.js), MedGemma y la clasificación anterior: calcSug().
+     [Dario 30/10] Ya no hay reglas escritas en este archivo: se administran en reglas.html.
      Cuando estén las guías aprobadas (D09) y la autorización del HRRG, acá se reemplaza por la respuesta validada del backend.
-   - "Por qué", fuente, qué lo haría subir, decisión del profesional (aceptar / modificar / rechazar / manual)
+   - "Por qué", decisión del profesional (aceptar / modificar / rechazar / manual)
      y su guardado en el servidor.
    - Chat "Consultar a la IA" (simulado sin servidor; con servidor lo reemplaza js/chat_ia.js).
    Se carga DESPUÉS de formulario.js (usa st, $, esc, LEVELS…) y antes de espera.js. */
-/* Guía Manchester de EJEMPLO (a reemplazar por la guía oficial del HRRG vía ETL).
-   Por diagrama y nivel: discriminadores. 'q' = se confirma con Sí/No; 'm' = se mide en Medición. */
-const GUIA_VER='de ejemplo, no oficial (no es del HRRG)';
-const DISC={
-  'Dolor abdominal':{0:[['Compromiso de la vía aérea','q'],['Shock (palidez, sudoración fría, pulso débil)','q']],
-                     1:[['Dolor intenso (8–10)','m'],['Vómitos con sangre','q'],['Signos de shock incipiente','q']],
-                     2:[['Dolor moderado (5–7)','m'],['Vómitos persistentes','q'],['Fiebre (≥ 38,5 °C)','m']],
-                     3:[['Dolor leve reciente (1–4)','m'],['Vómitos','q']]},
-  'Dolor torácico':{0:[['Compromiso de la vía aérea','q'],['Shock','q']],
-                    1:[['Dolor de características cardíacas (opresivo, irradiado)','q'],['Dolor intenso (8–10)','m'],['Disnea aguda','q']],
-                    2:[['Dolor moderado (5–7)','m'],['Antecedente cardiovascular','q']],
-                    3:[['Dolor leve reciente','m']]},
-  '_':{0:[['Compromiso de la vía aérea','q'],['Respiración inadecuada','q'],['Shock','q']],
-       1:[['Dolor intenso (8–10)','m'],['Alteración de conciencia','m'],['SpO₂ < 90 %','m']],
-       2:[['Dolor moderado (5–7)','m'],['Fiebre (≥ 38,5 °C)','m'],['Vómitos persistentes','q']],
-       3:[['Dolor leve reciente','m'],['Febrícula','m']]}
-};
-const PAGE={'Dolor abdominal':'[pág. —]','Dolor torácico':'[pág. —]','_':'[pág. —]'};
-const diag=()=>DISC[st.rev.motivo_categoria]?st.rev.motivo_categoria:'_';
-const diagName=()=>diag()==='_'?'Malestar en adulto (general)':diag();
-/* Reglas de seguridad PROVISORIAS (ejemplo para el prototipo; umbrales a aprobar por Guardia y Enfermería del HRRG) */
-/* Explicación clínica comprensible (pedido del documento del proyecto): en vez de listar valores sueltos,
-   agrupa los que van juntos en una frase que dice qué indican (p. ej. "SpO₂ 88 % y taquipnea: posible compromiso
-   respiratorio"). Los umbrales y niveles son los mismos de antes: solo cambia cómo se explica. */
-function reglas(){
-  const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),out=[];
-  const add=(lv,t)=>out.push({lv,t});
-  const lista=a=>a.length<2?a[0]:a.slice(0,-1).join(', ')+' y '+a[a.length-1];
-  /* Neurológico */
-  if(r.br_convulsion)add(0,'Convulsión activa: compromiso neurológico agudo');
-  if(n('glasgow')!=null&&n('glasgow')<=8)add(0,'Glasgow '+r.glasgow+': conciencia muy deprimida, riesgo para la vía aérea');
-  else if((r.estado_conciencia&&r.estado_conciencia!=='Alerta')||(n('glasgow')!=null&&n('glasgow')<15))
-    add(1,'Alteración del nivel de conciencia ('+(n('glasgow')!=null&&n('glasgow')<15?'Glasgow '+r.glasgow:r.estado_conciencia)+'): posible compromiso neurológico');
-  /* Respiratorio: SpO₂ baja, FR alterada y disnea se explican juntas */
-  const resp=[];
-  if(n('saturacion_o2')!=null&&n('saturacion_o2')<90)resp.push('SpO₂ '+r.saturacion_o2+' %');
-  if(n('frecuencia_respiratoria')!=null&&n('frecuencia_respiratoria')>30)resp.push('taquipnea (FR '+r.frecuencia_respiratoria+' rpm)');
-  if(n('frecuencia_respiratoria')!=null&&n('frecuencia_respiratoria')<8)resp.push('bradipnea (FR '+r.frecuencia_respiratoria+' rpm)');
-  if(r.br_disnea)resp.push('dificultad para respirar');
-  if(resp.length){const t=lista(resp);add(1,t.charAt(0).toUpperCase()+t.slice(1)+': posible compromiso respiratorio')}
-  /* Circulatorio: sangrado, hipotensión y FC alterada */
-  const hipo=n('ta_sistolica')!=null&&n('ta_sistolica')<90,ta='TA '+r.ta_sistolica+'/'+(r.ta_diastolica||'—');
-  const fc=n('frecuencia_cardiaca')!=null&&(n('frecuencia_cardiaca')>130||n('frecuencia_cardiaca')<40)?(n('frecuencia_cardiaca')>130?'taquicardia':'bradicardia')+' (FC '+r.frecuencia_cardiaca+' lpm)':null;
-  if(r.br_sangrado&&hipo)add(0,'Sangrado con hipotensión ('+ta+(fc?', FC '+r.frecuencia_cardiaca+' lpm':'')+'): posible shock por pérdida de sangre');
-  else{
-    if(r.br_sangrado)add(1,'Sangrado evidente: riesgo de pérdida de volumen');
-    const circ=[];if(hipo)circ.push('hipotensión ('+ta+')');if(fc)circ.push(fc);
-    if(circ.length){const t=lista(circ);add(1,t.charAt(0).toUpperCase()+t.slice(1)+(hipo?': posible compromiso circulatorio (shock)':': alteración del ritmo o compromiso circulatorio'))}
-  }
-  /* Otros */
-  if(r.ant_inmuno&&n('temperatura')!=null&&n('temperatura')>=38)add(1,'Fiebre ('+r.temperatura+' °C) en paciente inmunosuprimido: riesgo de infección grave');
-  if(n('dolor_intensidad')!=null&&n('dolor_intensidad')>=8)add(1,'Dolor intenso ('+r.dolor_intensidad+'/10)');
-  return out;
+/* [Dario 30/10] Se sacó la «guía Manchester de EJEMPLO» (lista DISC: discriminadores por diagrama inventados
+   por el equipo, escritos en el código). Sin la guía del HRRG no había forma de validarlos y, al tocar «Sí»,
+   cambiaban el color. Cuando el hospital mande su adaptación de Manchester se cargan en una tabla, como las
+   reglas y los signos vitales. El color sale de: reglas del hospital, MedGemma y la clasificación anterior. */
+/* [Dario 30/10] Sugerencia de MedGemma REAL (POST /api/sugerir, backend/ia/medgemma.py → sugerir()).
+   Antes era una simulación con umbrales escritos acá (dolor 5–7, febrícula, fiebre): esos umbrales pasaron
+   a reglas del hospital (tanda 3 de datos/reglas_semilla.json) y ahora se administran en reglas.html.
+   - La respuesta se guarda por caso (datos + relato): si el profesional cambia un dato, se vuelve a consultar.
+   - Mientras responde: «Consultando a MedGemma…» y Aceptar desactivado; el color provisorio es el de las reglas.
+   - Sin servidor, con la IA apagada o si MedGemma no responde: VERDE de base + reglas del hospital
+     (fuente «Sin IA · reglas del hospital»). Las reglas siempre fijan el piso: la IA nunca baja el color. */
+const IA_SUG={clave:null,res:null,cargando:null,fallida:null,error:null};
+const relatoIA=()=>st.relatoOriginal||($('#caso')?$('#caso').value:'')||'';
+const claveIA=()=>JSON.stringify(st.rev)+'|'+relatoIA();
+async function pedirSugerenciaIA(clave){
+  IA_SUG.cargando=clave;
+  try{
+    const r=await TriageAPI.pedir('/api/sugerir',{method:'POST',body:JSON.stringify({datos:st.rev,relato:relatoIA(),
+      traza:window.HRRGTraza?HRRGTraza.paraPedido(false):null})});
+    if(!r.ok)throw new Error((r.datos&&(r.datos.error||r.datos.mensaje))||('HTTP '+r.estado));
+    IA_SUG.res=r.datos;IA_SUG.clave=clave;IA_SUG.error=null;
+  }catch(e){IA_SUG.fallida=clave;IA_SUG.error=e.message;console.warn('[MedGemma] no respondió:',e.message)}
+  finally{IA_SUG.cargando=null;if(st.screen==='resumen')renderCard()}
 }
-/* Sugerencia simulada de MedGemma (en el sistema real: JSON validado del modelo con RAG sobre la guía) */
+function motivoTexto(){
+  const r=st.rev,cat=(r.motivo_categoria||'').trim(),mc=(r.motivo_consulta||'').trim();
+  if(!cat&&!mc)return null;
+  const det=mc&&mc.toLowerCase()!==cat.toLowerCase()?mc.toLowerCase():'';
+  const tpo=r.tiempo_evolucion_valor?' (hace '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad+')':'';
+  return 'Motivo: '+(cat&&det?cat+' — '+det:(cat||mc))+tpo;
+}
+/* Devuelve {lv, why, fuente}: fuente = 'ia' | 'cargando' | 'insuf' | 'sin'. lv 3 (VERDE) es la base sin IA. */
 function medgemma(){
-  const r=st.rev,n=k=>r[k]===''||r[k]==null?null:num(r[k]),why=[];let lv=3;
-  const d=n('dolor_intensidad');
-  /* El motivo va siempre primero: categoría + lo que dijo el paciente + tiempo de evolución */
-  const cat=(r.motivo_categoria||'').trim(),mc=(r.motivo_consulta||'').trim();
-  if(cat||mc){
-    const det=mc&&mc.toLowerCase()!==cat.toLowerCase()?mc.toLowerCase():'';
-    const tpo=r.tiempo_evolucion_valor?' (hace '+r.tiempo_evolucion_valor+' '+r.tiempo_evolucion_unidad+')':'';
-    why.push('Motivo: '+(cat&&det?cat+' — '+det:(cat||mc))+tpo);
+  const sinIA=why=>({lv:3,why:[motivoTexto(),...why].filter(Boolean),fuente:'sin'});
+  if(!TriageAPI.MODO_REAL||!st.ollama||st.manual)return sinIA(['Sin IA: el color sale de las reglas del hospital y del criterio del profesional']);
+  const clave=claveIA();
+  if(IA_SUG.res&&IA_SUG.clave===clave){
+    const j=IA_SUG.res;
+    if(j.insuficiente)return {lv:3,why:['MedGemma: datos insuficientes para sugerir un color'],fuente:'insuf'};
+    return {lv:Number.isInteger(j.nivel)?j.nivel:2,why:(j.motivos&&j.motivos.length?j.motivos:['MedGemma no detalló motivos']),fuente:'ia',fuentes:j.fuentes||[]};
   }
-  const base=why.length;
-  if(d!=null&&d>=5&&d<8){lv=2;why.push('Dolor moderado ('+d+'/10)')}
-  const t=n('temperatura');if(t!=null&&t>=37.5&&t<38.5){lv=Math.min(lv,2);why.push('Febrícula ('+r.temperatura+' °C)')}
-  if(t!=null&&t>=38.5){lv=Math.min(lv,2);why.push('Fiebre ('+r.temperatura+' °C)')}
-  if(r.ant_diabetes)why.push('Diabetes'+(n('glucemia')>=250?' con glucemia '+r.glucemia+' mg/dL':''));
-  if(r.sintomas_asociados)why.push('Refiere: '+r.sintomas_asociados.toLowerCase());
-  /* AZUL: la simulación ya no lo sugiere (reunión 21/10: en el HRRG el Azul se usa para casos como presos o
-     policiales, no por dolor leve). Queda solo como elección manual del profesional hasta confirmar el criterio. */
-  if(why.length===base)why.push('Sin discriminadores de mayor urgencia en los datos');
-  return {lv,why};
+  if(IA_SUG.fallida===clave)return sinIA(['MedGemma no respondió'+(IA_SUG.error?' ('+IA_SUG.error+')':'')+': se usan solo las reglas del hospital']);
+  if(!IA_SUG.cargando)pedirSugerenciaIA(clave);
+  return {lv:3,why:['Consultando a MedGemma… (color provisorio con las reglas del hospital)'],fuente:'cargando'};
+}
+/* ===== Reglas del hospital (propuesta Barby 28/10) =====
+   Las carga la Jefatura de Guardia en reglas.html. Se piden al servidor cada vez que se pide una
+   sugerencia, así una regla recién activada interviene en el próximo paciente sin recargar nada.
+   Fijan un piso (no se puede sugerir menos) y aparecen en el "Por qué" con la marca HRRG.
+   Si la Jefatura apaga las "reglas de ejemplo", quedan solo las del hospital (más la IA). */
+const REGLAS_HRRG={lista:[],error:null};
+async function cargarReglasHospital(){
+  if(!TriageAPI.MODO_REAL)return;
+  if(typeof cargarTiempos==='function')cargarTiempos();   /* [Dario 29/10 · Etapa C] tiempos por color al día */
+  const r=await TriageAPI.reglasActivas();
+  if(r.estado===401){location.href='index.html';return}
+  if(r.ok){REGLAS_HRRG.lista=r.datos.reglas||[];REGLAS_HRRG.error=null}
+  else REGLAS_HRRG.error='No se pudieron leer las reglas del hospital: se usan las últimas conocidas.';
 }
 function calcSug(){
-  const R=reglas(),M=medgemma(),rl=R.length?Math.min(...R.map(x=>x.lv)):9;
-  const C=Object.entries(st.disc).filter(([k,v])=>v==='si').map(([k])=>{const [lv,t]=k.split('|');return {lv:+lv,t}});
-  const cl=C.length?Math.min(...C.map(x=>x.lv)):9;
+  const H=window.MotorReglas?MotorReglas.evaluar(REGLAS_HRRG.lista,st.rev):[],hl=H.length?H[0].lv:9;
+  /* R y rl quedan vacíos (antes: reglas escritas en el código); se conservan para no cambiar quien los lee. */
+  const R=[],M=medgemma(),rl=9;   /* M: MedGemma real (o VERDE de base sin IA) */
+  const C=[],cl=9;   /* [Dario 30/10] antes: discriminadores de la guía de ejemplo (se sacaron) */
   /* Reevaluación: el color anterior (aceptado o modificado por el profesional) es un piso, como las reglas.
      Para bajar la prioridad hay que usar Modificar con motivo. */
-  const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl);
-  return {R,M,C,rl,cl,pl,fin};
+  const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl,hl);
+  return {R,M,C,H,rl,cl,pl,hl,fin};
 }
 function renderCard(){
   const c=calcSug();SUG=c.fin;const L=LEVELS[SUG];
   $('#tcPrev').hidden=!st.prev;if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
   $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
   $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[SUG]+' [tiempo de ejemplo]';
-  $('#tcOrigin').innerHTML=c.rl<c.M.lv?'<b>Color fijado por regla de seguridad.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'; la regla no permite bajar.</span><span class="prov">Reglas provisorias</span>'
-    :(c.R.length?'<b>Simulación con reglas de ejemplo.</b><span class="old">Coincide o supera las reglas de seguridad.</span>':'<b>Simulación con reglas de ejemplo.</b><span class="old">Reglas de seguridad: sin alertas.</span>');
-  if(c.cl<=c.rl&&c.cl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por discriminador confirmado por el profesional.</b><span class="old">La simulación sugería '+LEVELS[c.M.lv][0]+'.</span>';
-  if(c.pl<Math.min(c.rl,c.M.lv,c.cl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
-  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.C.map(x=>'<li><span class="src g">GUÍA</span><span>Confirmado: '+esc(x.t)+'</span></li>').join('')+c.M.why.map(t=>'<li><span class="src ia">IA</span><span>'+esc(t)+'</span></li>').join('');
-  renderFuente();renderSubir();pintarDecision();
+  /* [Dario 30/10] Mientras MedGemma responde (unos segundos) no se muestra un color grande que después cambia:
+     tarjeta gris «Analizando…» y, si una regla ya fija un piso, se avisa. Aceptar queda desactivado. */
+  if(c.M.fuente==='cargando'){$('#triageCard').style.setProperty('--mc','var(--muted)');$('#triageCard').style.setProperty('--mi','#FFFFFF');
+    $('#tcName').textContent='Analizando…';$('#tcDesc').textContent=c.hl<9?'MedGemma revisando · reglas: al menos '+LEVELS[c.hl][0]:'MedGemma revisando el caso';}
+  const FUENTE={ia:'Sugerencia de MedGemma con las reglas del hospital.',cargando:'Consultando a MedGemma… (color provisorio con las reglas del hospital)',insuf:'MedGemma: datos insuficientes · color con las reglas del hospital.',sin:'Sin IA · reglas del hospital.'};
+  $('#tcOrigin').innerHTML='<b>'+FUENTE[c.M.fuente]+'</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+'</span>';
+  const ac=document.querySelector('[data-d="aceptar"]');if(ac){ac.disabled=c.M.fuente==='cargando';ac.title=c.M.fuente==='cargando'?'Esperá la respuesta de MedGemma':''}
+  if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv&&c.M.fuente!=='ia')$('#tcOrigin').innerHTML='<b>'+FUENTE[c.M.fuente]+'</b><span class="old">Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</span>';
+  else if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Se administra en la pantalla de reglas (Jefatura de Guardia).</span>';
+  if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
+  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h'+(x.origen==='provisoria'?' prov':'')+'" title="Regla '+esc(x.codigo)+' v'+x.version+'">'+esc(MotorReglas.etiqueta(x.origen,x.validada_por))+'</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+' · '+esc(MotorReglas.ORIGEN[x.origen]||x.origen)+' · '+(x.validada_por?'validada por '+esc(x.validada_por):'sin validar')+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.M.why.map((t,i)=>{if(c.M.fuente!=='ia')return '<li><span class="src g">INFO</span><span>'+esc(t)+'</span></li>';
+    /* MedGemma dice de dónde sale cada motivo: lo contó el paciente, lo midió enfermería o es criterio del modelo. */
+    const f=(c.M.fuentes||[])[i],et=f==='relato'?'IA · RELATO':f==='medido'?'IA · MEDIDO':'IA';
+    return '<li><span class="src ia">'+et+'</span><span>'+esc(t)+'</span></li>'}).join('');
+  pintarDecision();
 }
 /* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
    La sugerencia original queda escrita debajo (trazabilidad). */
 function pintarDecision(){
   const ceja=$('#triageCard .eyebrow'),tag=$('#triageCard .ia-tag'),n=ceja.querySelector('.n'),nH=n?' '+n.outerHTML:'';
-  const fl=(st.decision==='modificar'||st.decision==='rechazar')&&st.level!=null?st.level:null;
+  /* [Dario 30/10] La tarjeta muestra la decisión REGISTRADA (st.decReg) hasta que se registre otra: tocar Modificar
+     para cambiarla ya no vuelve a mostrar la sugerencia mientras se elige. */
+  const R=st.decReg,fl=R&&R.d!=='aceptar'?R.lv:null;
   if(fl==null){
-    if(!/Prioridad|MedGemma|Sin IA/.test(ceja.textContent))ceja.innerHTML='Prioridad de ejemplo · simulada'+nH;
-    tag.textContent=st.decision==='aceptar'?'Sugerencia aceptada':'Sugerencia · requiere validación';return}
-  const L=LEVELS[fl],acc=st.decision==='modificar'?'modificada':'rechazada';
+    ceja.innerHTML=(medgemma().fuente==='ia'?'Prioridad sugerida · MedGemma y reglas':'Prioridad sugerida · reglas del hospital')+nH;   /* [Dario 30/10] */
+    tag.textContent=R&&R.d==='aceptar'?'Sugerencia aceptada':'Sugerencia · requiere validación';return}
+  const L=LEVELS[fl],acc=R.d==='modificar'?'modificada':'rechazada';
   $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
   $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[fl]+' [tiempo de ejemplo]';
   ceja.innerHTML='Clasificación final · decidida por el profesional'+nH;tag.textContent='Decisión registrada';
   if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
-  $('#tcOrigin').innerHTML='<b>Sugerencia '+LEVELS[SUG][0]+' '+acc+' a '+L[0]+' por el profesional.</b><span class="old">Motivo: '+esc($('#motivo').value||'—')+'</span>';
+  $('#tcOrigin').innerHTML='<b>Sugerencia '+LEVELS[SUG][0]+' '+acc+' a '+L[0]+' por el profesional.</b><span class="old">Motivo: '+esc(R.motivo||'—')+'</span>';
 }
-/* Trazabilidad: fragmento de la guía que respalda el color */
-function renderFuente(){
-  const d=diag(),lvD=DISC[d][SUG]||[],L=LEVELS[SUG];
-  $('#fuenteTxt').innerHTML='<b>Guía '+esc(GUIA_VER)+'</b> · Diagrama «'+esc(diagName())+'» · Nivel '+L[0]+' · '+PAGE[d];
-  $('#fuenteFrag').textContent='DIAGRAMA: '+diagName()+'   (guía de EJEMPLO, no oficial)\n\n'+LEVELS.map((x,i)=>(i===SUG?'▶ ':'  ')+x[0].padEnd(9)+'  '+((DISC[d][i]||[['Ningún discriminador anterior']]).map(z=>z[0]).join(' · '))).join('\n')+'\n\nEl color surge del primer nivel, de arriba hacia abajo, cuyo discriminador se cumple.';
-  $('#fuente').style.setProperty('--mc','var('+L[1]+')');
-}
-/* Qué lo haría subir + preguntas Sí/No de discriminador */
-function renderSubir(){
-  const box=$('#subir');
-  if(SUG===0){box.hidden=true;return}box.hidden=false;
-  const up=SUG-1,U=LEVELS[up],items=DISC[diag()][up]||[];
-  box.innerHTML='<h4>Pasaría a <span class="chipc" style="background:var('+U[1]+');color:'+U[2]+'">'+U[0]+'</span> si se cumple alguno <span class="prov">· discriminadores de la guía</span></h4><ul>'+items.map(([t,kind])=>{
-    const key=up+'|'+t,a=st.disc[key];
-    return '<li><span class="q">'+esc(t)+'</span>'+(kind==='q'?'<span class="yn" data-key="'+esc(key)+'"><button type="button" data-a="si" aria-pressed="'+(a==='si')+'">Sí</button><button type="button" data-a="no" aria-pressed="'+(a==='no')+'">No</button></span>':'<span class="meas">se evalúa con lo medido</span>')+'</li>'}).join('')+'</ul><div class="hint">Tocar <b>Sí</b> recalcula el color al instante y queda registrado. Es el recorrido de la guía: se pregunta solo lo que podría subir la prioridad.</div>';
-}
-$('#subir').addEventListener('click',e=>{const b=e.target.closest('.yn button');if(!b)return;const k=b.parentElement.dataset.key;
-  st.disc[k]=st.disc[k]===b.dataset.a?undefined:b.dataset.a;if(st.disc[k]===undefined)delete st.disc[k];resetDecision();renderCard();renderReg()});
-$('#levels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-l="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'" title="'+L[3]+'">'+L[0]+'</button>').join('');
+/* [Barby 30/10] Solo los 4 colores clínicos. El AZUL se dejó de ofrecer (recomendación de Navoni, HRRG):
+   los casos policiales, judiciales o con custodia van como "Condición especial" en el Ingreso.
+   LEVELS conserva el AZUL solo para mostrar decisiones viejas que lo tengan. */
+$('#levels').innerHTML=LEVELS.slice(0,4).map((L,i)=>'<button type="button" class="lvl" data-l="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'" title="'+L[3]+'">'+L[0]+'</button>').join('');
+/* [Dario 30/10] Si ya se registró un color MÁS urgente (p. ej. se modificó a ROJO), «Aceptar» no puede volver a la
+   sugerencia (NARANJA) sin motivo: bajar la prioridad se hace con Modificar, que pide motivo y queda como discrepancia. */
+const refBajar=()=>st.registrado!=null?Math.min(SUG,st.registrado):SUG;
+/* [Dario 30/10] Estado de la decisión en los botones (como un selector): el botón de la decisión registrada queda
+   marcado con ✓ («✓ Aceptada», «✓ Modificada», «✓ Rechazada»). Tocar otro cambia la elección; nada se pisa sin
+   pasar por su paso: Modificar y Rechazar piden motivo, y Aceptar no puede bajar un color más urgente ya registrado. */
+const TXT_BTN={aceptar:['Aceptar','✓ Aceptada'],modificar:['Modificar','✓ Modificada'],rechazar:['Rechazar','✓ Rechazada']};
+function marcarRegistrado(d){document.querySelectorAll('[data-d]').forEach(x=>{const t=TXT_BTN[x.dataset.d];if(!t)return;
+  x.textContent=x.dataset.d===d?t[1]:t[0];x.classList.toggle('hecho',x.dataset.d===d)})}
 document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
-  const d=b.dataset.d;st.decision=null;st.level=null;renderCard();
+  const d=b.dataset.d;
+  if(d==='aceptar'&&st.registrado!=null&&SUG>st.registrado){
+    $('#okMsg').hidden=false;$('#okMsg').innerHTML='<b>Ya registraste '+LEVELS[st.registrado][0]+'.</b> Para bajar a '+LEVELS[SUG][0]+' usá <b>Modificar</b> e indicá el motivo: queda registrado como discrepancia.';
+    return}
+  st.decision=null;st.level=null;renderCard();
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed',x===b));
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#modForm').hidden=d==='aceptar';$('#motivoForm').hidden=d==='aceptar';$('#lowerBox').hidden=true;
-  $('#motivo').value='';$('#lowerOk').checked=false;
-  if(d==='aceptar'){st.decision='aceptar';commit(SUG);$('#okMsg').hidden=false;$('#okMsg').innerHTML='<b>Registrado.</b> Clasificación '+LEVELS[SUG][0]+' aceptada por el profesional.'+(st.prev?' Actualizado en En espera.':'');renderReg()}
+  $('#motivo').value='';$('#detalle').value='';$('#lowerOk').checked=false;
+  if(d==='aceptar'){st.decision='aceptar';commit(SUG);$('#okMsg').hidden=false;$('#okMsg').innerHTML='<b>Registrado.</b> Clasificación '+LEVELS[SUG][0]+' aceptada por el profesional.'+(st.prev?' Actualizado en En espera.':'');st.decReg={d:'aceptar',lv:SUG};marcarRegistrado('aceptar');renderCard();renderReg()}
   else{$('#registrar').dataset.d=d;updReg()}
 }));
 $('#levels').addEventListener('click',e=>{const b=e.target.closest('.lvl');if(!b)return;st.level=+b.dataset.l;
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));
-  /* AZUL no es "menos grave": en el HRRG es una categoría especial (p. ej. casos policiales o judiciales).
-     Se confirma igual, pero con su propio texto y sin registrarlo como discrepancia de gravedad. */
-  const azul=st.level===4;
-  $('#lowerTxt').textContent=azul?'Confirmo asignar AZUL: categoría especial del HRRG (p. ej. caso policial o judicial), no una prioridad menor por gravedad. Criterio a confirmar con el hospital.'
-    :'Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.';
-  if(azul&&!$('#motivo').value)$('#motivo').value='Caso policial o judicial (categoría AZUL)';
-  $('#lowerOk').checked=false;$('#lowerBox').hidden=!(st.level>SUG);updReg()});
+  $('#lowerTxt').textContent='Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.';
+  $('#lowerOk').checked=false;$('#lowerBox').hidden=!(st.level>refBajar());updReg()});
 function updReg(){
   const d=$('#registrar').dataset.d;let ok=!!$('#motivo').value;
-  if(d==='modificar')ok=ok&&st.level!=null&&st.level!==SUG;
+  if(d==='modificar')ok=ok&&st.level!=null&&(st.level!==SUG||(st.registrado!=null&&st.level!==st.registrado));
   if(d==='rechazar')ok=ok&&st.level!=null;
-  if(st.level>SUG)ok=ok&&$('#lowerOk').checked;
+  if(st.level>refBajar())ok=ok&&$('#lowerOk').checked;
   $('#registrar').disabled=!ok;
 }
 $('#motivo').addEventListener('change',updReg);$('#lowerOk').addEventListener('change',updReg);
-const notaMenor=()=>st.level===4?' · Categoría AZUL (caso especial).':st.level>SUG?' · Discrepancia registrada.':'';
+const notaMenor=()=>st.level>refBajar()?' · Discrepancia registrada.':'';
 $('#registrar').addEventListener('click',()=>{
-  const d=$('#registrar').dataset.d;st.decision=d;commit(st.level);$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#okMsg').hidden=false;
-  $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+notaMenor():'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc($('#motivo').value)+notaMenor();
+  const d=$('#registrar').dataset.d,nota=notaMenor(),antes=st.registrado;st.decision=d;commit(st.level);   /* nota antes de commit: compara con lo registrado antes */$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#okMsg').hidden=false;
+  $('#okMsg').innerHTML=d==='modificar'?'<b>Registrado.</b> '+(antes!=null&&antes!==st.level?'Clasificación cambiada de '+LEVELS[antes][0]+' a '+LEVELS[st.level][0]:'Sugerencia '+LEVELS[SUG][0]+' modificada a '+LEVELS[st.level][0])+'. Motivo: '+esc(textoMotivo())+nota:'<b>Registrado.</b> Sugerencia rechazada. Clasificación manual: '+LEVELS[st.level][0]+'. Motivo: '+esc(textoMotivo())+nota;
+  st.decReg={d,lv:st.level,motivo:textoMotivo()};marcarRegistrado(d);
   renderCard();renderReg();
 });
 $('#manual').addEventListener('click',()=>{st.insuf=false;st.manual=true;renderResumen()});
-function resetDecision(){st.decision=null;st.level=null;st.mlv=null;
+function resetDecision(){st.decision=null;st.level=null;st.mlv=null;st.decReg=null;marcarRegistrado(null);
+  $('#motivo').value='';$('#detalle').value='';$('#lowerOk').checked=false;   /* [Dario 30/10] el motivo no pasa de un caso a otro */
   document.querySelectorAll('[data-d]').forEach(x=>x.setAttribute('aria-pressed','false'));document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed','false'));
   $('#okMsg').hidden=true;$('#motivoForm').hidden=true;$('#modForm').hidden=true;$('#mOk').hidden=true;$('#mReg').disabled=true;}
 /* Clasificación manual sin IA */
-$('#mLevels').innerHTML=LEVELS.map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
+$('#mLevels').innerHTML=LEVELS.slice(0,4).map((L,i)=>'<button type="button" class="lvl" data-m="'+i+'" aria-pressed="false" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</button>').join('');
 $('#mLevels').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;st.mlv=+b.dataset.m;$('#mLevels').querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#mReg').disabled=false});
 $('#mReg').addEventListener('click',()=>{commit(st.mlv);$('#mOk').hidden=false;$('#mOk').innerHTML='<b>Registrado.</b> Clasificación manual '+LEVELS[st.mlv][0]+', sin asistencia IA.';renderReg()});
 /* Chat "Consultar a la IA": con servidor responde MedGemma local (js/chat_ia.js), no la simulación. */
@@ -191,15 +182,13 @@ function textoMotivo(){
   const m=$('#motivo').value,d=($('#detalle').value||'').trim();
   return [m,d].filter(Boolean).join('. ');
 }
-/* Discriminadores de la guía que el profesional respondió (Sí/No en "Pasaría a…"): van a la decisión guardada,
-   así quedan en el historial del servidor y no solo en el registro de la pantalla. */
-function textoDiscriminadores(){
-  const si=[],no=[];
-  Object.entries(st.disc).forEach(([k,v])=>{const t=k.split('|')[1];if(v==='si')si.push(t);else if(v==='no')no.push(t)});
-  return [si.length?'Discriminadores confirmados: '+si.join(', ')+'.':'',no.length?'Descartados: '+no.join(', ')+'.':''].filter(Boolean).join(' ');
+/* Reglas del hospital que intervinieron (código y versión): quedan en la decisión guardada. */
+function textoReglasHospital(){
+  const H=window.MotorReglas?MotorReglas.evaluar(REGLAS_HRRG.lista,st.rev):[];
+  return H.length?'Reglas HRRG aplicadas: '+H.map(x=>x.codigo+' v'+x.version+' ('+x.color+', '+x.origen+')').join(', ')+'.':'';
 }
 function decisionActual(lv){
-  const d=decisionBase(lv),disc=st.manual?'':textoDiscriminadores();
+  const d=decisionBase(lv),disc=st.manual?'':textoReglasHospital();
   if(disc)d.motivo=(d.motivo?d.motivo.replace(/\.?$/,'. '):'')+disc;
   d.motivo=d.motivo.slice(0,1000);
   return d;
@@ -243,16 +232,16 @@ function respuestaSimulada(q){
     return falt.length?'Faltan '+falt.length+' datos: '+falt.join(', ')+'.\nSi los cargás en Medición, la sugerencia se recalcula.':'No falta ningún dato obligatorio.';
   if(/sub|empeor|m[aá]s urgente|cambiar|naranja|rojo/.test(t)){
     if(SUG===0)return 'Ya está en '+L+', la prioridad más alta.';
-    const up=LEVELS[SUG-1][0],it=(DISC[diag()][SUG-1]||[]).map(x=>'• '+x[0]).join('\n');
-    return 'Pasaría a '+up+' si se cumple alguno de estos (guía de ejemplo):\n'+it;}
+    const up=LEVELS[SUG-1][0],it=REGLAS_HRRG.lista.filter(r=>MotorReglas.NIVEL[r.color]<SUG).map(r=>'• '+r.nombre+' ('+r.color+')').join('\n');
+    return it?'Pasaría a '+up+' o más si se cumple alguna de estas reglas del hospital:\n'+it:'No hay reglas del hospital activas que suban el color.';}
   if(/fuente|gu[ií]a|de d[oó]nde|p[aá]gina|manchester/.test(t))
-    return 'Sale de la guía '+GUIA_VER+', diagrama «'+diagName()+'», nivel '+L+'.\nNo es la guía del hospital: es de ejemplo para el prototipo.';
+    return 'Sale de las reglas del hospital (pantalla de reglas) y de MedGemma.\nTodavía no hay una guía oficial del HRRG cargada.';
   if(/tiempo|esper|cu[aá]nto|minutos/.test(t))
     return 'Para '+L+' el tiempo de ejemplo es: '+DESC[SUG]+'.\nLos tiempos reales salen de la guía del hospital.';
   if(/por ?qu[eé]|motivo|raz[oó]n|color|prioridad/.test(t)){
-    const r=[...c.R.map(x=>'• Regla: '+x.t),...c.C.map(x=>'• Confirmado: '+x.t),...c.M.why.map(x=>'• Del relato: '+x)];
-    return 'Sugiero '+L+' por:\n'+r.join('\n')+(c.rl<c.M.lv?'\nUna regla de seguridad no deja bajar el color.':'');}
-  return 'Puedo explicarte por qué se sugirió '+L+', qué datos faltan, qué lo haría subir o de qué guía sale. Probá con alguna de esas preguntas.';
+    const r=[...c.H.map(x=>'• Regla del hospital '+x.codigo+': '+x.texto),...c.M.why.map(x=>(c.M.fuente==='ia'?'• MedGemma: ':'• ')+x)];
+    return 'Sugiero '+L+' por:\n'+r.join('\n')+(c.hl<c.M.lv?'\nUna regla del hospital no deja bajar el color.':'');}
+  return 'Puedo explicarte por qué se sugirió '+L+', qué datos faltan, qué lo haría subir o de dónde sale. Probá con alguna de esas preguntas.';
 }
 async function preguntarIA(q){
   if(!CHAT_API){await new Promise(r=>setTimeout(r,600));return respuestaSimulada(q)+AVISO}

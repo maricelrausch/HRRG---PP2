@@ -44,12 +44,14 @@
     catch (e) { return []; }
   }
 
-  function subir() {                            // recuadro "Pasaría a X si se cumple alguno"
-    const box = document.getElementById('subir');
-    if (!box || box.hidden) return '';
-    const titulo = box.querySelector('h4');
-    const items = [...box.querySelectorAll('li')].map(li => texto(li.querySelector('.q') || li)).filter(Boolean);
-    return (titulo ? texto(titulo).replace(/·.*$/, '').trim() + ': ' : '') + [...new Set(items)].join('; ');
+  /* [Dario 30/10] «Qué lo haría subir»: antes se leía del recuadro de discriminadores de ejemplo (se sacó).
+     Ahora se le pasan a MedGemma las reglas activas del hospital que pondrían un color más urgente. */
+  function subir() {
+    try {
+      if (typeof REGLAS_HRRG === 'undefined' || !window.MotorReglas || typeof SUG !== 'number') return '';
+      const rs = REGLAS_HRRG.lista.filter(r => MotorReglas.NIVEL[r.color] < SUG);
+      return rs.length ? 'Reglas del hospital que subirían el color: ' + rs.map(r => r.nombre + ' (' + r.color + ')').join('; ') : '';
+    } catch (e) { return ''; }
   }
 
   function origen() {

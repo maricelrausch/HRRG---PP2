@@ -9,7 +9,20 @@
    Se carga DESPUÉS de formulario.js y sugerencia.js. */
 /* En espera y re-triage */
 const TARGET=[0,10,60,120,240];
+/* [Dario 29/10 · Etapa C] Tiempo objetivo por color: los valores de arriba son solo los de referencia (Manchester).
+   Con servidor se leen de /api/reglas/tiempos (los administra la Jefatura en reglas.html). Si falla, quedan estos. */
+function aplicarTiempos(t){
+  const N=['Inmediato','Muy urgente','Urgente','Normal'];
+  ['ROJO','NARANJA','AMARILLO','VERDE'].forEach((c,i)=>{if(Number.isFinite(t[c])){TARGET[i]=t[c];DESC[i]=N[i]+' · '+(t[c]===0?'atención inmediata':fmtMin(t[c]))}});
+}
+async function cargarTiempos(){
+  if(!TriageAPI.MODO_REAL)return;
+  const r=await TriageAPI.pedir('/api/reglas/tiempos',{method:'GET',cache:'no-store'});
+  if(r.ok&&r.datos&&r.datos.tiempos)aplicarTiempos(r.datos.tiempos);
+}
 const fmtMin=m=>m<60?m+' min':Math.floor(m/60)+' h'+(m%60?' '+m%60+' min':'');
+const horaHM=t=>{try{return new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}catch(e){return ''}};
+cargarTiempos();
 const mk=o=>Object.assign(init(),o);
 const WAIT=[
   {ep:'EP-004818',lv:1,mot:'Dolor torácico',min:6,relato:'Me duele el pecho desde hace media hora, como una presión, y estoy sudando.',rev:mk({motivo_categoria:'Dolor torácico',motivo_consulta:'Dolor de pecho opresivo con sudoración',tiempo_evolucion_valor:'30',tiempo_evolucion_unidad:'minutos',dolor_localizacion:'Tórax',sintomas_asociados:'Sudoración',ant_diabetes:false,antecedentes_otros:'Hipertensión',ta_sistolica:'150',ta_diastolica:'95',frecuencia_cardiaca:'110',frecuencia_respiratoria:'22',saturacion_o2:'94',temperatura:'36,8',estado_conciencia:'Alerta',dolor_intensidad:'8'})},
@@ -36,7 +49,22 @@ async function cargarHistorialAuditor(w){
 }
 /* Historial de casos (auditoría): todos los episodios, también los finalizados, de a 50.
    Se puede filtrar por estado y abrir el historial de cada uno. Solo lectura. */
-const CASOS={lista:[],total:0,abierto:false,cargando:false,filtro:'',desde:'',hasta:''};
+const CASOS={lista:[],total:0,abierto:false,cargando:false,filtro:'',desde:'',hasta:'',pac:null};
+/* Con el historial abierto, el buscador de arriba busca en el historial (no en la lista de espera).
+   DNI completo → se busca el paciente en el servidor y se traen TODAS sus atenciones (CASOS.pac).
+   Código de episodio o DNI incompleto → se filtra entre los episodios ya cargados. */
+function textoBusqueda(){const q=($('#epSearch').value||'').trim().toUpperCase();return {q,qDni:/^[\d.\s]+$/.test(q)?q.replace(/[.\s]/g,''):''}}
+async function buscarEnCasos(){
+  const {qDni}=textoBusqueda(),completo=/^\d{7,8}$/.test(qDni);
+  if(!completo){if(CASOS.pac){CASOS.pac=null;cargarCasos(false)}else renderCasos();return}
+  if(CASOS.pac&&CASOS.pac.dni===qDni)return renderCasos();
+  CASOS.pac={dni:qDni,estado:'buscando'};renderCasos();
+  const r=await TriageAPI.buscarPaciente(qDni);
+  if(r.estado===401){location.href='index.html';return}
+  if(!CASOS.pac||CASOS.pac.dni!==qDni)return;   /* se siguió escribiendo */
+  if(r.ok&&r.datos.paciente){CASOS.pac={dni:qDni,estado:'ok',codigo:r.datos.paciente.codigo_paciente};cargarCasos(false)}
+  else{CASOS.pac={dni:qDni,estado:r.estado===404?'no':'error'};CASOS.lista=[];CASOS.total=0;renderCasos()}
+}
 /* Fechas del filtro (AAAA-MM-DD, hora local) → rango ISO para el servidor: desde 00:00 hasta el día siguiente 00:00. */
 const fechaLocal=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function rangoCasos(){
@@ -47,31 +75,45 @@ const fmtFecha=f=>f?f.split('-').reverse().join('/'):'';
 async function cargarCasos(mas){
   if(CASOS.cargando)return;CASOS.cargando=true;renderCasos();
   if(CASOS.desde&&CASOS.hasta&&CASOS.desde>CASOS.hasta){CASOS.cargando=false;CASOS.error='La fecha "desde" tiene que ser anterior o igual a "hasta".';CASOS.lista=[];CASOS.total=0;renderCasos();return}
-  const r=await TriageAPI.listarCasos(50,mas?CASOS.lista.length:0,rangoCasos());
+  const r=await TriageAPI.listarCasos(50,mas?CASOS.lista.length:0,rangoCasos(),CASOS.pac&&CASOS.pac.codigo);
   CASOS.cargando=false;
   if(r.estado===401){location.href='index.html';return}
   if(!r.ok){CASOS.error='No se pudo consultar el historial de casos: '+((r.datos&&r.datos.mensaje)||'error');renderCasos();return}
   CASOS.error=null;CASOS.total=r.datos.total||0;
   CASOS.lista=(mas?CASOS.lista:[]).concat(r.datos.episodios||[]);renderCasos();
 }
+/* Texto de alcance de la exportación según haya o no un DNI cargado. */
+function alcanceExport(dni){
+  return (dni?'Se exportan <b>todas las atenciones de ese DNI</b> (no se aplican el estado ni las fechas).':'Se exportan los episodios del estado y las fechas elegidos.')+
+    ' El DNI sale <b>enmascarado</b> (solo los últimos 3 números) y el archivo queda <b>protegido con tu misma contraseña</b>: Excel o el lector de PDF te la van a pedir al abrirlo. Queda registrado quién exportó.';
+}
 function renderCasos(){
   const box=$('#casosBox');if(!box)return;
-  box.hidden=!CASOS.abierto;$('#verCasos').textContent=CASOS.abierto?'Ocultar historial de casos':'Historial de casos';
-  if(!CASOS.abierto)return;
+  /* Lo que se está escribiendo en el recuadro de exportar no se pierde si la lista se vuelve a dibujar. */
+  const prev={};['expDni','expPass'].forEach(id=>{const el=document.getElementById(id);if(el)prev[id]=el.value});
+  box.hidden=!CASOS.abierto;$('#verCasos').textContent=CASOS.abierto?'Volver a pacientes en espera':'Historial de casos';
+  /* El título de arriba y la lista de espera cambian según lo que se está mirando. */
+  $('#wList').hidden=CASOS.abierto;$('#wTitulo').textContent=CASOS.abierto?'Historial de casos':'Pacientes en espera';
+  if(!CASOS.abierto){$('#wCount').textContent=WAIT.length+' pacientes';return}
   const est={'':'Todos los estados',en_espera:'En espera',finalizado:'Finalizados',en_ingreso:'En ingreso'};
-  const vis=CASOS.lista.filter(c=>!CASOS.filtro||c.estado===CASOS.filtro);
+  const {q,qDni}=textoBusqueda(),porPac=CASOS.pac&&CASOS.pac.estado==='ok';
+  const vis=CASOS.lista.filter(c=>(!CASOS.filtro||c.estado===CASOS.filtro)&&
+    (porPac||!q||(qDni?(c.dni||'').startsWith(qDni):(c.codigo_episodio||'').includes(q))));
+  $('#wCount').textContent=(CASOS.filtro?est[CASOS.filtro]+': ':'')+vis.length+(vis.length===1?' episodio':' episodios')+
+    (porPac?' del DNI '+fmtDni(CASOS.pac.dni):q?' que coinciden con "'+q+'"':'')+(CASOS.lista.length<CASOS.total?' (entre los cargados)':'');
   const chip=c=>{const L=LEVELS.find(x=>x[0]===c.color_final);return L?'<span class="chipc" style="background:var('+L[1]+');color:'+L[2]+'">'+L[0]+'</span>':'<span class="hint">sin color</span>'};
   const rangoTxt=CASOS.desde||CASOS.hasta?' · '+(CASOS.desde&&CASOS.hasta&&CASOS.desde===CASOS.hasta?'del '+fmtFecha(CASOS.desde):(CASOS.desde?'desde '+fmtFecha(CASOS.desde):'')+(CASOS.hasta?' hasta '+fmtFecha(CASOS.hasta):'')):'';
-  box.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><b>Historial de casos</b> <span class="hint">'+CASOS.lista.length+' de '+CASOS.total+' episodios'+rangoTxt+' · solo lectura</span>'+
+  box.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><b>'+(porPac?'Atenciones del DNI '+esc(fmtDni(CASOS.pac.dni)):'Todos los episodios')+'</b> <span class="hint">'+CASOS.lista.length+' de '+CASOS.total+' episodios cargados'+rangoTxt+' · solo lectura</span>'+
     '<span class="row"><select id="casosFiltro">'+Object.entries(est).map(([k,v])=>'<option value="'+k+'"'+(k===CASOS.filtro?' selected':'')+'>'+v+'</option>').join('')+'</select>'+
     '<button type="button" class="btn sm" id="casosExcel"'+(CASOS.exportando||CASOS.exp?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Exportar')+'</button></span></div>'+
     (CASOS.exp?'<div class="expform"><b>Exportar</b>'+
       '<label><input type="radio" name="expFmt" value="excel"'+(CASOS.exp.formato!=='pdf'?' checked':'')+'> Excel</label>'+
       '<label><input type="radio" name="expFmt" value="pdf"'+(CASOS.exp.formato==='pdf'?' checked':'')+'> PDF</label>'+
+      '<label>Solo este DNI <input id="expDni" inputmode="numeric" autocomplete="off" placeholder="opcional" title="Vacío = exporta todos" value="'+esc(CASOS.exp.dni||'')+'"></label>'+
       '<label>Tu contraseña <input type="password" id="expPass" autocomplete="current-password"></label>'+
-      '<button type="button" class="btn sm primary" id="expOk"'+(CASOS.exportando?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Confirmar')+'</button>'+
-      '<button type="button" class="btn sm" id="expNo">Cancelar</button>'+
-      '<div class="hint" style="flex-basis:100%">Por seguridad se vuelve a pedir tu contraseña. Se exportan los episodios del estado y las fechas elegidos, sin DNI, y queda registrado quién exportó.</div>'+
+      '<span class="row" style="gap:6px"><button type="button" class="btn sm primary" id="expOk"'+(CASOS.exportando?' disabled':'')+'>'+(CASOS.exportando?'Exportando…':'Confirmar')+'</button>'+
+      '<button type="button" class="btn sm" id="expNo">Cancelar</button></span>'+
+      '<div class="hint" id="expAlcance" style="flex-basis:100%">'+alcanceExport(CASOS.exp.dni)+' Excel: hoja Resumen (un episodio por fila) y hoja Eventos (todo el historial).</div>'+
       (CASOS.exp.error?'<div class="werr" style="flex-basis:100%">'+esc(CASOS.exp.error)+'</div>':'')+'</div>':'')+
     (CASOS.listo?'<div class="ok">'+esc(CASOS.listo)+'</div>':'')+
     '<div class="row casos-fechas"><label class="hint">Desde <input type="date" id="casosDesde" value="'+CASOS.desde+'"></label>'+
@@ -82,16 +124,22 @@ function renderCasos(){
     '<ul>'+vis.map(c=>'<li>'+esc(horaCorta(c.creado_en))+' · <b>'+esc(c.codigo_episodio)+'</b>'+(c.dni?' · DNI '+esc(fmtDni(c.dni)):'')+' · '+esc(c.motivo_categoria||'—')+' · '+
       esc(NOMBRE_ESTADO[c.estado]||c.estado||'sin estado')+' · '+chip(c)+' · '+esc(c.profesional_usuario||'')+
       ' <button type="button" class="linkbtn" data-prev="'+esc(c.codigo_episodio)+'">ver historial</button><div class="prevdet" hidden></div></li>').join('')+'</ul>'+
-    (!vis.length&&!CASOS.cargando?'<div class="hint">No hay episodios con ese filtro entre los cargados.</div>':'')+
+    (CASOS.pac&&CASOS.pac.estado==='buscando'?'<div class="hint">Buscando el DNI en el servidor…</div>'
+      :CASOS.pac&&CASOS.pac.estado==='no'?'<div class="hint">No hay ningún paciente identificado con el DNI '+esc(fmtDni(CASOS.pac.dni))+'.</div>'
+      :CASOS.pac&&CASOS.pac.estado==='error'?'<div class="werr">No se pudo consultar el DNI en el servidor. Probá de nuevo.</div>'
+      :!vis.length&&!CASOS.cargando?'<div class="hint">'+(qDni&&!porPac?'Escribí el DNI completo (7 u 8 dígitos) para buscar todas sus atenciones. ':'')+'No hay episodios con ese filtro'+(CASOS.lista.length<CASOS.total?' entre los cargados':'')+'.</div>':'')+
     (CASOS.cargando?'<div class="hint">Cargando…</div>':CASOS.lista.length<CASOS.total?'<button type="button" class="btn sm" id="casosMas">Ver más</button>':'');
+  Object.entries(prev).forEach(([id,v])=>{const el=document.getElementById(id);if(el&&(id!=='expDni'||!el.value))el.value=v});
 }
-$('#verCasos').addEventListener('click',()=>{CASOS.abierto=!CASOS.abierto;if(CASOS.abierto)cargarCasos(false);else renderCasos()});
-$('#casosBox').addEventListener('keydown',e=>{if(e.target.id==='expPass'&&e.key==='Enter'){e.preventDefault();exportarCasos()}});
+$('#verCasos').addEventListener('click',()=>{CASOS.abierto=!CASOS.abierto;CASOS.pac=null;
+  if(CASOS.abierto){const {qDni}=textoBusqueda();if(/^\d{7,8}$/.test(qDni))buscarEnCasos();else cargarCasos(false)}else{renderCasos();renderWait()}});
+$('#casosBox').addEventListener('keydown',e=>{if(/^exp(Pass|Dni)$/.test(e.target.id)&&e.key==='Enter'){e.preventDefault();exportarCasos()}});
+$('#casosBox').addEventListener('input',e=>{if(e.target.id==='expDni'&&CASOS.exp){CASOS.exp.dni=e.target.value.trim();const h=$('#expAlcance');if(h)h.innerHTML=alcanceExport(CASOS.exp.dni)+' Excel: hoja Resumen (un episodio por fila) y hoja Eventos (todo el historial).'}});
 $('#casosBox').addEventListener('change',e=>{if(e.target.name==='expFmt'&&CASOS.exp){CASOS.exp.formato=e.target.value;return}
   if(e.target.id==='casosFiltro'){CASOS.filtro=e.target.value;renderCasos()}
   if(e.target.id==='casosDesde'||e.target.id==='casosHasta'){CASOS[e.target.id==='casosDesde'?'desde':'hasta']=e.target.value;cargarCasos(false)}});
 $('#casosBox').addEventListener('click',e=>{if(e.target.id==='casosMas')cargarCasos(true);
-  if(e.target.id==='casosExcel'){CASOS.exp={formato:'excel',error:null};CASOS.listo=null;renderCasos();const i=$('#expPass');if(i)i.focus()}
+  if(e.target.id==='casosExcel'){CASOS.exp={formato:'excel',error:null,dni:CASOS.pac&&CASOS.pac.estado==='ok'?CASOS.pac.dni:''};CASOS.listo=null;renderCasos();const i=$('#expPass');if(i)i.focus()}
   if(e.target.id==='expNo'){CASOS.exp=null;renderCasos()}
   if(e.target.id==='expOk')exportarCasos();
   const rg=e.target.closest('[data-rango]');if(rg){const hoy=new Date(),h=fechaLocal(hoy);
@@ -99,20 +147,24 @@ $('#casosBox').addEventListener('click',e=>{if(e.target.id==='casosMas')cargarCa
     else if(rg.dataset.rango==='7'){CASOS.desde=fechaLocal(new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-6));CASOS.hasta=h}
     else{CASOS.desde='';CASOS.hasta=''}
     cargarCasos(false)}});
-/* Exporta TODOS los episodios del filtro elegido (no solo los cargados en pantalla), en Excel o PDF, sin DNI.
+/* Exporta TODOS los episodios del filtro elegido (no solo los cargados en pantalla), en Excel (.xlsx) o PDF.
+   El DNI lo agrega el backend (decisión del grupo pendiente: hoy va incluido).
    Pide de nuevo la contraseña; el archivo se descarga en la carpeta de Descargas del navegador. */
 async function exportarCasos(){
   if(!CASOS.exp||CASOS.exportando)return;
-  const pass=($('#expPass')||{}).value||'';
-  if(!pass){CASOS.exp.error='Escribí tu contraseña para exportar.';renderCasos();$('#expPass').focus();return}
-  CASOS.exportando=true;CASOS.exp.error=null;renderCasos();
-  const r=await TriageAPI.exportarCasos(CASOS.filtro,rangoCasos(),CASOS.exp.formato,pass);
+  const val=id=>($('#'+id)||{}).value||'';
+  const pass=val('expPass'),dni=val('expDni').replace(/[.\s]/g,'');
+  const falla=(m,id)=>{CASOS.exp.error=m;renderCasos();const i=$('#'+id);if(i)i.focus()};
+  if(dni&&!/^\d{7,8}$/.test(dni))return falla('El DNI tiene que tener 7 u 8 números (o dejalo vacío para exportar todos).','expDni');
+  if(!pass)return falla('Escribí tu contraseña para exportar.','expPass');
+  CASOS.exp.dni=dni;CASOS.exportando=true;CASOS.exp.error=null;renderCasos();
+  const r=await TriageAPI.exportarCasos(CASOS.filtro,rangoCasos(),CASOS.exp.formato,pass,{dni:dni||null});
   CASOS.exportando=false;
   if(r.codigo==='SESION_REQUERIDA'){location.href='index.html';return}
   if(!r.ok){CASOS.exp.error=r.mensaje;renderCasos();const i=$('#expPass');if(i)i.focus();return}
   const url=URL.createObjectURL(r.blob),a=document.createElement('a');a.href=url;a.download=r.nombre;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
-  CASOS.exp=null;CASOS.listo='Listo: se descargó "'+r.nombre+'" en tu carpeta Descargas.';renderCasos();
+  CASOS.exp=null;CASOS.listo='Listo: se descargó "'+r.nombre+'" en tu carpeta Descargas. Para abrirlo, Excel o el lector de PDF te van a pedir tu contraseña.';renderCasos();
 }
 async function cargarAtencionesPaciente(pac){
   if(PAC_ATENC[pac]!==undefined)return;PAC_ATENC[pac]=null;
@@ -150,10 +202,12 @@ if(TriageAPI.MODO_REAL)WAIT.length=0;
 function commit(lv){
   if(lv==null)return;
   let w=WAIT.find(x=>x.ep===st.ep);
-  if(w){w.dni=st.dni;w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
-  else WAIT.push({ep:st.ep,dni:st.dni,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
+  if(w){w.dni=st.dni;w.cond=st.condicion;w.lv=lv;w.min=0;w.reeval=!!st.prev;w.rev=JSON.parse(JSON.stringify(st.rev));w.esc=false;w.srv=st.srv}
+  else WAIT.push({ep:st.ep,dni:st.dni,cond:st.condicion,lv,mot:st.rev.motivo_categoria||'Sin categoría',min:0,relato:$('#caso').value,rev:JSON.parse(JSON.stringify(st.rev)),srv:st.srv});
   w=WAIT.find(x=>x.ep===st.ep);w.base=Date.now();w.extra=0;
   ponerEnEspera(w);guardarDecision(w,decisionActual(lv));
+  st.registrado=lv;   /* [Dario 30/10] último color registrado: para bajarlo hace falta Modificar con motivo */
+  st.cerrado=true;document.querySelectorAll('#s-resumen [data-go="revision"]').forEach(b=>b.hidden=true); /* [Dario 29/10] decisión registrada: el caso ya no se edita desde Ingreso/Medición */
 }
 
 /* ===== Espera persistente (con servidor) =====
@@ -194,8 +248,11 @@ async function cargarEspera(){
          srv:Object.assign(nuevoSrv(),{ep:s.codigo_episodio,pac:s.codigo_paciente}),remoto:true};
       WAIT.push(w);}
     w.desde=s.en_espera_desde;w.version=s.version;w.quien=s.profesional_estado;
+    /* [D5] Hora de ingreso y hora del triage (mail de Navoni, punto 4). */
+    w.ingreso=s.creado_en||null;w.triage=(s.decision_actual&&s.decision_actual.ocurrido_en)||null;
     /* Desde 23/10 el servidor devuelve el motivo del último ingreso y, a enfermería y médicos, el DNI. */
     if(s.motivo_categoria&&(w.remoto||!w.mot||w.mot==='—'))w.mot=s.motivo_categoria;
+    if('condicion_especial' in s)w.cond=s.condicion_especial||null;   /* [D4] aparte del color */
     if(s.dni&&!w.dni){w.dni=s.dni;DNI_PAC[s.dni]=s.codigo_paciente}
     /* El color guardado en el servidor manda (lo ven todas las compus). */
     if(s.color_final){const i=LEVELS.findIndex(L=>L[0]===s.color_final);if(i>-1)w.lv=i;
@@ -247,18 +304,18 @@ function renderWait(){
      Por DNI se encuentran: los episodios cargados con ese DNI en esta pestaña y, si el paciente ya se
      identificó en esta sesión, todos sus episodios en espera (por su código de paciente). */
   const qDni=/^[\d.\s]+$/.test(q)?q.replace(/[.\s]/g,''):'';
-  if(qDni)buscarDniServidor(qDni);
+  if(qDni&&!CASOS.abierto)buscarDniServidor(qDni);
   const pacDeDni=qDni&&DNI_PAC[qDni];
   /* Los episodios de ese paciente que vinieron de otra compu muestran el DNI buscado. */
   if(pacDeDni)WAIT.forEach(w=>{if(w.srv&&w.srv.pac===pacDeDni&&!w.dni)w.dni=qDni});
   const coincide=w=>!q||(qDni?((w.dni||'').startsWith(qDni)||(!!pacDeDni&&w.srv&&w.srv.pac===pacDeDni)):w.ep.includes(q));
   const rows=WAIT.filter(coincide).sort((a,b)=>(a.lv??9)-(b.lv??9)||minutos(b)-minutos(a));
-  $('#wCount').textContent=WAIT.length+' pacientes';
+  if(!CASOS.abierto)$('#wCount').textContent=WAIT.length+' pacientes';
   const ro=st.user&&st.user.rol==='auditor';
   $('#verCasos').hidden=!(ro&&TriageAPI.MODO_REAL);
   $('#wList').innerHTML=(rows.map(w=>{const L=w.lv==null?['SIN COLOR','--line','var(--ink)']:LEVELS[w.lv],m=minutos(w),over=w.lv>0&&m>TARGET[w.lv];
     const fin='<button type="button" class="btn sm" data-fin="'+esc(w.ep)+'">'+(finPending===w.ep?'Confirmar finalizar':'Finalizar (atendido)')+'</button>';
-    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+'</span>'+clock(w)+'<span class="wf">'+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual'+(w.escMot?': '+esc(w.escMot):' · deterioro en espera')+'</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>'+(TriageAPI.MODO_REAL&&w.srv&&w.srv.ep?'<button type="button" class="btn sm" data-hist="'+esc(w.ep)+'">'+(HIST_ABIERTO.has(w.ep)?'Ocultar historial':'Ver historial')+'</button>':''):(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button>'+(escPending===w.ep?'':'<button type="button" class="btn sm esc" data-esc="'+esc(w.ep)+'">Escalar a ROJO</button>'):'<span class="hint">Atención inmediata</span>')+fin)+'</span>'+(!ro&&escPending===w.ep?htmlEscForm(w):'')+(ro&&HIST_ABIERTO.has(w.ep)?'<div class="histpanel note hist">'+(HIST_HTML[w.ep]||'Cargando el historial…')+'</div>':'')+'</div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
+    return '<div class="wrow"><span class="wc" style="background:var('+L[1]+');color:'+(w.lv==null?'var(--ink)':L[2])+'">'+L[0]+'</span><span class="wep">'+esc(w.ep)+(w.dni?'<br><span class="hint">DNI '+esc(fmtDni(w.dni))+'</span>':'')+'</span><span class="wm">'+esc(w.mot)+'</span><span class="wt">'+(m?'en espera '+fmtMin(m):'recién clasificado')+(w.ingreso||w.triage?'<br><span class="hint">'+[w.ingreso?'Ingreso '+esc(horaHM(w.ingreso)):'',w.triage?'Triage '+esc(horaHM(w.triage)):''].filter(Boolean).join(' · ')+'</span>':'')+'</span>'+clock(w)+'<span class="wf">'+(w.cond?'<span class="st cond" title="Condición especial (no es prioridad clínica)">'+esc(w.cond)+'</span>':'')+(w.aviso?'<span class="st bad">'+esc(w.aviso)+'</span>':'')+(over?'<span class="st bad">Superó '+TARGET[w.lv]+' min</span>':'')+(w.reeval?'<span class="st fix">Reevaluado</span>':'')+(w.esc?'<span class="st bad">Escalado manual'+(w.escMot?': '+esc(w.escMot):' · deterioro en espera')+'</span>':'')+'</span><span class="wa">'+(ro?'<span class="hint">Solo lectura (auditoría)</span>'+(TriageAPI.MODO_REAL&&w.srv&&w.srv.ep?'<button type="button" class="btn sm" data-hist="'+esc(w.ep)+'">'+(HIST_ABIERTO.has(w.ep)?'Ocultar historial':'Ver historial')+'</button>':''):(w.lv!==0?'<button type="button" class="btn sm" data-re="'+esc(w.ep)+'">Reevaluar</button>'+(escPending===w.ep?'':'<button type="button" class="btn sm esc" data-esc="'+esc(w.ep)+'">Escalar a ROJO</button>'):'<span class="hint">Atención inmediata</span>')+fin)+'</span>'+(!ro&&escPending===w.ep?htmlEscForm(w):'')+(ro&&HIST_ABIERTO.has(w.ep)?'<div class="histpanel note hist">'+(HIST_HTML[w.ep]||'Cargando el historial…')+'</div>':'')+'</div>'}).join('')||'<div class="hint">'+(!qDni?'No hay episodios con ese código.'
     :!TriageAPI.MODO_REAL?'No hay pacientes en espera con ese DNI.'
     :!/^\d{7,8}$/.test(qDni)?'Escribí el DNI completo (7 u 8 dígitos) para buscarlo en el servidor.'
     :DNI_BUSQ[qDni]==='buscando'?'Buscando el DNI en el servidor…'
@@ -266,20 +323,45 @@ function renderWait(){
     :DNI_BUSQ[qDni]==='error'?'No se pudo consultar el DNI en el servidor. Probá de nuevo.'
     :'El paciente está identificado, pero no tiene episodios en espera.')+'</div>')
     /* Auditor que busca un DNI completo: todas las atenciones del paciente, incluidas las finalizadas. */
-    +(ro&&pacDeDni?(cargarAtencionesPaciente(pacDeDni),'<div class="histpanel note hist">'+htmlListaAtenciones(PAC_ATENC[pacDeDni],'Todas las atenciones del DNI '+fmtDni(qDni)+' (incluye finalizadas)')+'</div>'):'');
+    +(ro&&pacDeDni?(cargarAtencionesPaciente(pacDeDni),'<div class="histpanel note hist">'+htmlListaAtenciones(PAC_ATENC[pacDeDni],'Todas las atenciones del DNI '+fmtDni(qDni)+' (incluye finalizadas)')+
+      (TriageAPI.MODO_REAL&&PAC_ATENC[pacDeDni]&&PAC_ATENC[pacDeDni].length?'<button type="button" class="btn sm" data-expdni="'+esc(qDni)+'">Exportar este paciente</button>':'')+'</div>'):'');
 }
 /* Al escribir de nuevo se puede volver a consultar un DNI que antes no estaba o dio error. */
-$('#epSearch').addEventListener('input',()=>{for(const k in DNI_BUSQ)if(DNI_BUSQ[k]!=='buscando')delete DNI_BUSQ[k];renderWait()});
+/* [Propuesta Barby 26/10] Texto predictivo del buscador: a partir de 2 caracteres sugiere hasta 8
+   códigos de episodio o DNI que ya están en pantalla (lista de espera, historial cargado y DNI ya buscados).
+   No consulta nada nuevo al servidor: solo usa lo que el perfil ya puede ver. */
+function actualizarSugerencias(){
+  const dl=$('#epSug');if(!dl)return;
+  const norm=v=>String(v||'').toUpperCase().replace(/[.\s]/g,''),qn=norm($('#epSearch').value);
+  if(qn.length<2){dl.innerHTML='';return}
+  const ops=new Map();
+  const add=(ep,dni)=>{if(ep)ops.set(ep,'Episodio');if(dni)ops.set(norm(dni),'DNI '+fmtDni(dni))};
+  WAIT.forEach(w=>add(w.ep,w.dni));
+  CASOS.lista.forEach(c=>add(c.codigo_episodio,c.dni));
+  Object.keys(DNI_PAC).forEach(d=>add(null,d));
+  dl.innerHTML=[...ops].filter(([v])=>v.includes(qn)&&v!==qn).slice(0,8)
+    .map(([v,l])=>'<option value="'+esc(v)+'" label="'+esc(l)+'"></option>').join('');
+}
+$('#epSearch').addEventListener('input',()=>{actualizarSugerencias();if(CASOS.abierto)return buscarEnCasos();for(const k in DNI_BUSQ)if(DNI_BUSQ[k]!=='buscando')delete DNI_BUSQ[k];renderWait()});
 $('#fastT').addEventListener('change',e=>st.fast=e.target.checked);
 setInterval(()=>{if(!st.fast)return;WAIT.forEach(w=>{w.min++;if(w.base)w.extra=(w.extra||0)+1});if(st.screen==='espera'&&!escPending)renderWait()},1000);
+/* [Dario 27/10] Reloj en tiempo real: sin esto los minutos y el aviso de vencido quedaban congelados
+   hasta tocar algo. Cada 30 s recarga del servidor y redibuja; no interrumpe un escalado o finalizar en curso. */
+setInterval(()=>{if(st.fast||st.screen!=='espera'||escPending||finPending||CASOS.abierto)return;
+  /* [Barby 28/10] En segundo plano: esta recarga automática no cuenta como actividad (cierre por inactividad). */
+  if(TriageAPI.MODO_REAL)TriageAPI.enSegundoPlano(()=>cargarEspera()).then(renderWait);else renderWait()},30000);
 $('#wList').addEventListener('click',e=>{
+  /* Auditor: "Exportar este paciente" abre el recuadro de exportar con ese DNI ya cargado. */
+  const xd=e.target.closest('[data-expdni]');
+  if(xd){CASOS.abierto=true;CASOS.listo=null;CASOS.exp={formato:'excel',error:null,dni:xd.dataset.expdni};CASOS.pac=null;
+    buscarEnCasos();setTimeout(()=>{const b=$('#casosBox');if(b)b.scrollIntoView({behavior:'smooth',block:'start'});const i=$('#expPass');if(i)i.focus()},300);return}
   const hi=e.target.closest('[data-hist]');
   if(hi){const ep=hi.dataset.hist,w=WAIT.find(x=>x.ep===ep);
     if(HIST_ABIERTO.has(ep))HIST_ABIERTO.delete(ep);else{HIST_ABIERTO.add(ep);if(w)cargarHistorialAuditor(w)}
     renderWait();return}
   const re=e.target.closest('[data-re]'),es=e.target.closest('[data-esc]'),fi=e.target.closest('[data-fin]');
   if(fi){const ep=fi.dataset.fin;if(finPending===ep){finPending=null;const w=WAIT.find(x=>x.ep===ep);if(w)finalizar(w)}else{finPending=ep;renderWait()}return}
-  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));st.disc={};$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
+  if(re){const w=WAIT.find(x=>x.ep===re.dataset.re);st.cerrado=false;st.registrado=null;st.ep=w.ep;st.dni=w.dni||null;$('#dni').value=st.dni?fmtDni(st.dni):'';st.condicion=w.cond||null;$('#condEsp').value=st.condicion||'';st.srv=w.srv?Object.assign({},w.srv,{nuevaToma:true}):nuevoSrv();st.prev=w.lv==null?null:{lv:w.lv,min:minutos(w)};st.rev=JSON.parse(JSON.stringify(w.rev));$('#caso').value=w.relato||'';st.insuf=false;st.manual=false;escPending=null;resetDecision();
     if(w.remoto&&TriageAPI.MODO_REAL){recuperarUltimaMedicion(w).then(()=>go('revision'));return}
     go('revision');return}
   if(es){escPending=es.dataset.esc;escForm={mot:'',det:''};renderWait();const sel=$('[data-escmot]');if(sel)sel.focus();return}

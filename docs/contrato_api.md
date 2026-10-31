@@ -839,3 +839,82 @@ Lo usa la pantalla "Historial de casos" del auditor (todos los episodios, de a 5
 
 `GET /api/demo/episodios` y la exportación aceptan `desde` (inclusive) y `hasta` (exclusivo), en ISO 8601 **con zona horaria** (por ejemplo `2026-10-23T00:00:00-03:00`). Se comparan en UTC con la fecha de creación del episodio. Fechas sin zona o `desde >= hasta` → `422`.
 El frontend manda el día elegido desde las 00:00 hasta las 00:00 del día siguiente, en la hora de la compu.
+
+### Exportación en Excel real (.xlsx) — propuesta Barby 26/10
+
+`formato: "excel"` devuelve ahora un `.xlsx` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) con tres hojas: **Resumen** (una fila por episodio, fechas y números como valores de Excel, filtro y color pintado), **Eventos** (una fila por evento con tipo, fecha de registro, profesional, fecha de la toma, registro corregido y detalle legible) e **Info** (usuario, fecha, filtros, avisos). Horas en UTC-03:00. Requiere `openpyxl` (si falta → `503 EXCEL_NO_DISPONIBLE`). `formato: "csv"` sigue disponible (una fila por evento). La columna DNI aparece solo si la ruta la agrega (decisión del grupo pendiente).
+
+### Exportar un solo DNI · DNI enmascarado · archivo con la contraseña del auditor — propuesta Barby 26/10
+
+El cuerpo de `POST /api/demo/episodios/exportar` suma un campo:
+
+| Campo | Qué hace |
+|---|---|
+| `dni` (opcional) | Exporta **un solo paciente**: se busca su código con el índice cifrado (sin crear pacientes) y se exportan **todas sus atenciones**, sin aplicar `estado` ni fechas. DNI desconocido → `404 PACIENTE_NO_ENCONTRADO`. El DNI no se escribe en el log (se registra el código `PAC-…`). |
+| — | El archivo se protege con la **misma `password` del auditor** (decisión 26/10: el auditor no comparte los archivos exportados). Excel: cifrado nativo de Office (`msoffcrypto-tool`), Excel la pide al abrir. PDF: AES-256 (`pikepdf`), el lector la pide al abrir. No se guarda en ningún lado. |
+
+- En ambos formatos el **DNI sale enmascarado**: solo los últimos 3 números (`••.•••.222`).
+- `formato` acepta `"excel"` o `"pdf"` (el CSV quedó fuera porque no se puede proteger con clave).
+- Si falta una librería → `503 PROTECCION_NO_DISPONIBLE` con el comando para instalarla. Nuevas dependencias en `requirements.txt`: `msoffcrypto-tool`, `pikepdf`.
+
+
+## 15. Propuestas del 28/10 (Barby) · a revisar por Maricel y el grupo
+
+### Cancelar (anular) un caso cargado por error — `POST /api/demo/episodios/<codigo>/anular`
+
+> **Actualización 29/10:** el botón "Cancelar caso" se sacó de la pantalla. La ruta queda en el backend sin uso desde el frontend; el grupo decide si se conserva.
+
+Entrada: `{"motivo": "Datos cargados por error. …", "version_esperada": 1}` (la versión de `GET …/estado`).
+
+- Solo **enfermería y médicos** (el auditor no puede escribir).
+- Solo si el episodio está **en ingreso o sin estado** y **no tiene una decisión registrada**. Si ya pasó a la lista de espera → `409 EPISODIO_NO_ANULABLE`.
+- No borra nada: el estado pasa a **`anulado`** y se agrega el evento **`EPISODIO_ANULADO`** con `motivo`, `estado_anterior` y versión.
+- Un caso anulado no aparece en `/api/demo/espera` ni en la sala, no acepta decisiones ni cambios de estado, y el auditor lo ve en el historial (filtro **Anulados**) y en la exportación.
+- Errores: `400 CAMPOS_INVALIDOS`, `404 EPISODIO_NO_ENCONTRADO`, `409 VERSION_DESACTUALIZADA`, `409 EPISODIO_NO_ANULABLE`, `422 ANULACION_INVALIDA` (sin motivo).
+- **Migración:** `estados_episodio` tiene un `CHECK` con los estados permitidos. Al arrancar, `inicializar_registro` rehace la tabla si no incluye `anulado`, copiando los datos (`_migrar_estado_anulado`). No hace falta borrar la base.
+
+### Cierre de sesión por inactividad
+
+- El servidor guarda `ultima_actividad` en la sesión. Si pasan **15 minutos** sin actividad (`HRRG_SESION_INACTIVIDAD_MIN`), la próxima consulta devuelve `401 SESION_VENCIDA` y se borra la sesión.
+- Las consultas automáticas (lista de espera que se recarga sola, `sala.html?personal=1`) mandan el encabezado **`X-HRRG-Auto: 1`** y **no cuentan** como actividad. Antes, esas recargas renovaban la cookie y la sesión no vencía nunca.
+- `GET /api/sesion` devuelve además `inactividad_min`.
+- En el navegador (`api.js`): cuenta la actividad real (teclado, mouse, toques) de todas las pestañas, avisa 1 minuto antes con "Seguir conectado" y, al vencer, cierra la sesión y vuelve al ingreso con el aviso.
+
+### Reglas del hospital — perfil `jefatura` y rutas `/api/reglas/...`
+
+Perfil nuevo **`jefatura`** (Jefatura de Guardia): solo administra reglas; no accede a la atención (`403` en las rutas clínicas). Se asigna desde la administración o con `flask asignar-rol --rol jefatura`.
+
+Base propia: `~/.hrrg_pp2/reglas_hospital.db` (tablas `reglas`, `reglas_eventos`, `reglas_config`).
+
+| Ruta | Quién | Qué hace |
+|---|---|---|
+| `GET /api/reglas/campos` | enfermería, médico, auditor, jefatura | Catálogo de datos que puede usar una regla y sus operadores |
+| `GET /api/reglas/activas` | enfermería, médico, auditor, jefatura | Reglas activas (las usa el motor) |
+| `GET /api/reglas` | auditor, jefatura | Todas, con su historial |
+| `POST /api/reglas` | jefatura | Crear (queda en **borrador**) |
+| `POST /api/reglas/<id>` | jefatura | Editar: vuelve a **borrador** y sube la versión |
+| `POST /api/reglas/<id>/activar` · `/desactivar` | jefatura | Cambiar el estado |
+| `POST /api/reglas/<id>/eliminar` | jefatura | Solo borradores que nunca se activaron |
+
+Formato de una regla:
+
+```json
+{
+  "nombre": "Hipoxemia moderada",
+  "explicacion": "SpO₂ menor a 94 % en paciente con antecedente respiratorio: riesgo de descompensación",
+  "color": "NARANJA",
+  "combinacion": "todas",
+  "condiciones": [
+    {"campo": "saturacion_o2", "operador": "<", "valor": 94},
+    {"campo": "ant_resp", "operador": "si", "valor": null}
+  ]
+}
+```
+
+- `color`: `ROJO`, `NARANJA`, `AMARILLO` o `VERDE` (piso: la sugerencia no puede ser menor).
+- `combinacion`: `todas` o `alguna`. Entre 1 y 8 condiciones.
+- Operadores: numéricos `<`, `<=`, `>`, `>=`, `=`, `!=`; opciones `es`, `no_es`; sí/no `si`, `no`.
+- Los campos son los de la pantalla de Medición (signos vitales, conciencia, dolor, edad, sexo, categoría del motivo, banderas rojas y antecedentes). **No** hay DNI ni relato.
+- Validación en el servidor con mensajes en castellano (`422 REGLA_INVALIDA`).
+
+**Motor (`frontend/js/motor_reglas.js`):** la sugerencia pide las reglas activas cada vez que se toca *Pedir sugerencia*, así una regla recién activada interviene en el próximo paciente. Las que se cumplen fijan un piso y aparecen en el "Por qué" con la marca **HRRG**. La decisión guardada agrega `Reglas HRRG aplicadas: R-001 v1 (NARANJA).` en el motivo. **Un dato que falta nunca cumple una condición.**

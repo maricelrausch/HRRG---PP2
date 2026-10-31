@@ -49,6 +49,13 @@
             "Fiebre",
             "Cefalea",
             "Síntoma neurológico",
+            "Alteración de conciencia",
+            "Convulsiones",
+            "Hemorragia",
+            "Intoxicación",
+            "Reacción alérgica",
+            "Embarazo / obstétrico",
+            "Salud mental",
             "Otro"
           ],
           "type": "string"

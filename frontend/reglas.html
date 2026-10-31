@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reglas del hospital · Triage asistido</title>
+<!-- frontend/reglas.html · Reglas del hospital para el motor de sugerencia (propuesta Barby 28/10).
+     Perfil "jefatura" (Jefatura de Guardia): crea, edita, activa y desactiva reglas.
+     Perfil "auditor": las ve en solo lectura, con su historial.
+     Las reglas activas intervienen en la sugerencia desde el próximo paciente (js/motor_reglas.js). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<div class="wrap">
+  <section class="app reglas-app">
+    <div class="app-head">
+      <div class="brand"><img class="logo" src="img/logo-hrrg.png" alt="HRRG · Hospital Regional Río Grande"><span class="sep"></span><h2>Reglas del hospital · Motor de sugerencia</h2></div>
+      <div class="chips"><span class="chip" id="userChip" hidden></span></div>
+    </div>
+    <!-- [Dario 30/10] Pantalla nueva: pestañas, resumen, filtros y lista agrupada por color con interruptor. -->
+    <nav class="rg-tabs" id="rgTabs" role="tablist">
+      <button type="button" role="tab" data-tab="reglas" aria-selected="true">Reglas</button>
+      <button type="button" role="tab" data-tab="tiempos" aria-selected="false">Tiempos por color</button>
+      <button type="button" role="tab" data-tab="signos" aria-selected="false">Signos vitales</button>
+      <button type="button" role="tab" data-tab="historial" aria-selected="false">Historial de cambios</button>
+      <button type="button" role="tab" data-tab="ayuda" aria-selected="false">Cómo funcionan</button>
+    </nav>
+    <div class="body">
+      <div class="banner" id="rgErr" hidden role="alert"><b></b></div>
+
+      <section id="tab-reglas">
+        <div class="rg-kpis" id="rgResumen"></div>
+        <div class="rg-barra">
+          <div class="rg-filtros" id="rgFiltros">
+            <button type="button" class="rg-f" data-f="e:todas">Todas</button>
+            <button type="button" class="rg-f" data-f="e:activa">Activas</button>
+            <button type="button" class="rg-f" data-f="e:inactiva">Inactivas</button>
+            <span class="rg-sep"></span>
+            <button type="button" class="rg-f" data-f="o:manchester">Manchester</button>
+            <button type="button" class="rg-f" data-f="o:local">HRRG</button>
+            <button type="button" class="rg-f" data-f="o:provisoria">Provisoria</button>
+            <button type="button" class="rg-f" data-f="o:sinvalidar">Sin validar</button>
+          </div>
+          <input type="search" id="rgBuscar" class="rg-buscar" placeholder="Buscar regla o dato…" aria-label="Buscar regla">
+          <button type="button" class="btn primary" id="rgNueva" hidden>+ Nueva regla</button>
+        </div>
+        <div class="rg-editor" id="rgEditor" hidden></div>
+        <div class="rg-lista" id="rgLista"><div class="hint">Cargando…</div></div>
+      </section>
+
+      <section id="tab-tiempos" hidden>
+        <!-- [Dario 29/10 · Etapa C] Tiempo objetivo máximo de atención por color -->
+        <div class="rg-tiempos" id="rgTiempos"></div>
+      </section>
+
+      <section id="tab-signos" hidden>
+        <!-- [Dario 30/10 · pedido de Navoni] Rangos de los signos vitales (tabla parametros_signos) -->
+        <p class="hint">Lo que ve enfermería en la pantalla de Medición: el rango <b>normal</b> pinta el campo y se le informa a MedGemma; el rango <b>posible</b> solo frena errores de tipeo. La marca roja no está acá: sale de las reglas activas. Los valores iniciales son los que estaban en el programa y no son oficiales.</p>
+        <div class="rg-filtros" id="sgGrupos"></div>
+        <div id="sgTabla"></div>
+      </section>
+
+      <section id="tab-historial" hidden>
+        <p class="hint">Todos los cambios, del más nuevo al más viejo: quién, cuándo, qué regla y qué versión. No se borra nunca.</p>
+        <div id="rgHistorial"></div>
+      </section>
+
+      <section id="tab-ayuda" hidden>
+        <div class="note rg-ayuda">
+          <p><b>Qué hace una regla.</b> Dice: <i>si se cumplen estas condiciones, la sugerencia no puede ser de un color menor que este</i>. Por ejemplo: «Si SpO₂ &lt; 90 % → al menos NARANJA».</p>
+          <p><b>Activa o inactiva.</b> Solo las reglas <b>activas</b> intervienen, desde el próximo paciente. Las nuevas se guardan <b>inactivas</b>: probalas con un caso de ejemplo en el editor y activalas con el interruptor. Editar una regla activa no la apaga.</p>
+          <p><b>Origen.</b> MANCHESTER (Sistema Manchester), HRRG (adaptación local del hospital) o PROVISORIA (en revisión). Completá «Validada por» cuando la Guardia la apruebe; la fecha se registra sola.</p>
+          <p><b>Datos faltantes.</b> Un dato que no se midió nunca cumple una condición. La decisión final es siempre del profesional.</p>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
+<script src="api.js"></script>
+<script src="js/mostrar_clave.js"></script>
+<script src="js/motor_reglas.js"></script>
+<script src="js/reglas.js"></script>
+</body>
+</html>

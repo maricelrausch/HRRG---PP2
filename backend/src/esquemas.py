@@ -21,9 +21,19 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 
 Color = Literal["Rojo", "Naranja", "Amarillo", "Verde", "Azul"]
 Sexo = Literal["Femenino", "Masculino", "No informado"]
+# [Dario 29/10 · D3] Motivos que lista el mail de Francisco Navoni: se suman los que faltaban
+# (alteración de conciencia, convulsiones, hemorragia, intoxicación, reacción alérgica, embarazo y
+# salud mental). MedGemma sigue proponiendo solo las 8 primeras (ia/medgemma.py, sin cambios, para
+# no alterar la extracción ya evaluada); las nuevas las elige el profesional en la pantalla.
 Categoria = Literal["Dolor torácico", "Dolor abdominal", "Disnea", "Trauma", "Fiebre",
-                    "Cefalea", "Síntoma neurológico", "Otro"]
+                    "Cefalea", "Síntoma neurológico", "Alteración de conciencia", "Convulsiones",
+                    "Hemorragia", "Intoxicación", "Reacción alérgica", "Embarazo / obstétrico",
+                    "Salud mental", "Otro"]
 UnidadTiempo = Literal["minutos", "horas", "días"]
+# [Dario 29/10 · D4] Condición especial del episodio (mail de Francisco Navoni, punto 5): se registra
+# APARTE de la prioridad clínica, para no usar un color (antes, el azul) para algo administrativo o legal.
+CondicionEspecial = Literal["Policial", "Judicial", "Custodia policial", "Violencia", "Accidente laboral",
+                            "Salud mental", "Otra"]
 Conciencia = Literal["Alerta", "Responde a la voz", "Responde al dolor", "No responde"]
 
 # ---------- Alias: nombre viejo -> nombre V2 ----------
@@ -82,6 +92,12 @@ class _Base(BaseModel):
 class Identificacion(_Base):
     edad: Optional[int] = _f(desc="Edad", origen="HCE", unidad="años", ge=0, le=120)
     sexo: Optional[Sexo] = _f(desc="Sexo", origen="HCE")
+
+
+class ContextoEpisodio(_Base):
+    """[D4] Datos del episodio que NO son clínicos: no van a la IA ni a las reglas ni cambian el color."""
+    condicion_especial: Optional[CondicionEspecial] = _f(
+        desc="Condición especial del episodio (no es prioridad clínica)", origen="profesional")
 
 
 class ExtraccionIA(_Base):

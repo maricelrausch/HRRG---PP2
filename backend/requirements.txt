@@ -12,8 +12,10 @@ faster-whisper==1.2.1   # dictado por voz local (backend/ia/transcripcion.py)
 av>=11,<19
 cryptography==43.0.0
 reportlab==4.4.10        # PDF (exportación del auditor e impresión)
+openpyxl==3.1.5          # Excel (.xlsx) de la exportación del auditor
+segno==1.6.6             # Código QR de la lista de espera (pantalla qr_sala.html)
+msoffcrypto-tool==5.4.2  # clave para abrir el Excel exportado
+pikepdf==10.5.1          # clave para abrir el PDF exportado (AES-256)
 
 #Instalación:
 # python -m pip install -r requirements.txt
-
-

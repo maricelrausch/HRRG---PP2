@@ -1,0 +1,71 @@
+# IngenIA Salud – Triage con Docker
+#   PCs de la red  ──https──►  caddy  ──►  app (Flask)  ──►  ollama (MedGemma)
+# Uso: iniciar.bat (Windows) o ./iniciar.sh (Linux). Configuración en .env (ver .env.example).
+name: ingenia
+
+services:
+  ollama:
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    container_name: ingenia-ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+    volumes:
+      - ollama:/root/.ollama                 # modelos de IA
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    # Sin puertos publicados: solo la app habla con Ollama.
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    # Local: ingenia-salud-triage | Registro: ghcr.io/<usuario>/ingenia-salud-triage
+    image: ${HRRG_IMAGEN:-ingenia-salud-triage}:${APP_VERSION:-0.1.0}
+    container_name: ingenia-app
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      # Acceso directo solo desde el propio equipo (http://localhost:5000).
+      # Desde la red se entra por Caddy (https).
+      - "127.0.0.1:${HRRG_PUERTO_LOCAL:-5000}:5000"
+    environment:
+      MEDGEMMA_MODELO: ${MEDGEMMA_MODELO:-medgemma:4b}
+      HRRG_API_HOSPITAL_TOKEN: ${HRRG_API_HOSPITAL_TOKEN:-}
+    volumes:
+      - datos:/home/ingenia/.hrrg_pp2           # usuarios, episodios, registros
+      - claves:/home/ingenia/.hrrg_pp2_claves   # claves de cifrado (respaldar junto con datos)
+
+  caddy:
+    image: caddy:${CADDY_VERSION:-2}
+    container_name: ingenia-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${HRRG_PUERTO_HTTPS:-443}:443"
+      - "${HRRG_PUERTO_HTTP:-80}:80"
+    environment:
+      # Nombres o IP por los que se entra, separados por "coma y espacio"
+      HRRG_SITIO: ${HRRG_SITIO:-localhost}
+      # internal = certificado propio de Caddy | /certs/cert.pem /certs/key.pem = certificado del hospital
+      HRRG_TLS: ${HRRG_TLS:-internal}
+      # IP del servidor (la misma que figura en HRRG_SITIO), para entrar por IP
+      HRRG_IP_SERVIDOR: ${HRRG_IP_SERVIDOR:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certificados:/certs:ro
+      - caddy_data:/data                       # certificados generados (incluye la CA interna)
+      - caddy_config:/config
+
+volumes:
+  ollama:
+  datos:
+  claves:
+  caddy_data:
+  caddy_config:

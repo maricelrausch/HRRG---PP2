@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "aviso": "Rangos de cada signo vital, pasados del código (formulario.js, validacion.js y ia/medgemma.py) a la base, con los MISMOS valores que había. Son orientativos para adultos y NO son oficiales del HRRG: la Jefatura los puede corregir en reglas.html (pestaña «Signos vitales») y cargar rangos por grupo etario. Se cargan una sola vez, al primer arranque.",
+  "parametros": [
+    {"campo": "ta_sistolica", "nombre": "TA sistólica", "abreviatura": "TA", "unidad": "mmHg", "minimo_posible": 50, "maximo_posible": 260, "normal_min": 90, "normal_max": 140, "texto_bajo": "Hipotensión", "texto_alto": "Hipertensión", "referencia": "", "obligatorio": true, "orden": 1},
+    {"campo": "ta_diastolica", "nombre": "TA diastólica", "abreviatura": "TA", "unidad": "mmHg", "minimo_posible": 20, "maximo_posible": 160, "normal_min": 60, "normal_max": 90, "texto_bajo": "Diastólica baja", "texto_alto": "Hipertensión", "referencia": "", "obligatorio": true, "orden": 2},
+    {"campo": "frecuencia_cardiaca", "nombre": "Frecuencia cardíaca", "abreviatura": "FC", "unidad": "lpm", "minimo_posible": 20, "maximo_posible": 250, "normal_min": 60, "normal_max": 100, "texto_bajo": "Bradicardia", "texto_alto": "Taquicardia", "referencia": "", "obligatorio": true, "orden": 3},
+    {"campo": "frecuencia_respiratoria", "nombre": "Frecuencia respiratoria", "abreviatura": "FR", "unidad": "rpm", "minimo_posible": 4, "maximo_posible": 60, "normal_min": 12, "normal_max": 20, "texto_bajo": "Bradipnea", "texto_alto": "Taquipnea", "referencia": "", "obligatorio": true, "orden": 4},
+    {"campo": "saturacion_o2", "nombre": "Saturación de oxígeno", "abreviatura": "SpO₂", "unidad": "%", "minimo_posible": 50, "maximo_posible": 100, "normal_min": 95, "normal_max": 100, "texto_bajo": "Saturación baja", "texto_alto": "", "referencia": "", "obligatorio": true, "orden": 5},
+    {"campo": "temperatura", "nombre": "Temperatura", "abreviatura": "T°", "unidad": "°C", "minimo_posible": 30, "maximo_posible": 43, "normal_min": 36, "normal_max": 37.5, "texto_bajo": "Hipotermia", "texto_alto": "Fiebre", "referencia": "", "obligatorio": true, "orden": 6},
+    {"campo": "glucemia", "nombre": "Glucemia capilar", "abreviatura": "opcional", "unidad": "mg/dL", "minimo_posible": 20, "maximo_posible": 800, "normal_min": 70, "normal_max": 140, "texto_bajo": "Hipoglucemia", "texto_alto": "Hiperglucemia", "referencia": "", "obligatorio": false, "orden": 7},
+    {"campo": "glasgow", "nombre": "Escala de Glasgow", "abreviatura": "3–15", "unidad": "pts", "minimo_posible": 3, "maximo_posible": 15, "normal_min": 15, "normal_max": 15, "texto_bajo": "Alteración de conciencia", "texto_alto": "", "referencia": "15 = normal", "obligatorio": false, "orden": 8},
+    {"campo": "dolor_intensidad", "nombre": "Intensidad del dolor", "abreviatura": "0–10", "unidad": "/10", "minimo_posible": 0, "maximo_posible": 10, "normal_min": 0, "normal_max": 4, "texto_bajo": "", "texto_alto": "Dolor moderado", "referencia": "0 sin dolor · 10 el peor", "obligatorio": true, "orden": 9}
+  ]
+}

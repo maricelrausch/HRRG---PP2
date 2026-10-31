@@ -12,7 +12,7 @@ Tabla de control generada desde `src/esquemas.py`. El documento del equipo es `d
 |---|---|---|---|---|---|---|---|
 | `edad` | Edad | entero | años | 0–120 | HCE | ingreso |  |
 | `sexo` | Sexo | opción: Femenino / Masculino / No informado |  |  | HCE | ingreso |  |
-| `motivo_categoria` | Categoría del motivo | opción: Dolor torácico / Dolor abdominal / Disnea / Trauma / Fiebre / Cefalea / Síntoma neurológico / Otro |  |  | IA | ingreso |  |
+| `motivo_categoria` | Categoría del motivo | opción: Dolor torácico / Dolor abdominal / Disnea / Trauma / Fiebre / Cefalea / Síntoma neurológico / Alteración de conciencia / Convulsiones / Hemorragia / Intoxicación / Reacción alérgica / Embarazo / obstétrico / Salud mental / Otro |  |  | IA | ingreso |  |
 | `tiempo_evolucion_valor` | Desde hace (valor) | decimal |  | 0–10000 | IA | ingreso |  |
 | `tiempo_evolucion_unidad` | Desde hace (unidad) | opción: minutos / horas / días |  |  | IA | ingreso |  |
 | `motivo_consulta` | Motivo (resumen del relato) | texto |  |  | IA | ingreso |  |
@@ -52,7 +52,7 @@ Tabla de control generada desde `src/esquemas.py`. El documento del equipo es `d
 1. Tipo y rango de cada campo numérico según la tabla.
 2. Opciones cerradas: solo los valores listados.
 3. TA diastólica menor que sistólica.
-4. Sin datos personales en textos libres (DNI, teléfono, nombre, domicilio) — Ley 25.326.
+4. Sin datos personales en textos libres (DNI/documento, teléfono, email, nombre, domicilio) — Ley 25.326.
 5. Campos desconocidos se rechazan.
 6. Faltantes por etapa (`ingreso`, `medicion`) se listan, no bloquean.
 7. `codigo_paciente` y `codigo_episodio` con formato `XXX-XXXX` (ej.: PAC-DEMO-001, EPI-DEMO-001).

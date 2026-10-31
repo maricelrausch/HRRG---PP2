@@ -48,14 +48,21 @@
       <div class="body" id="s-ingreso">
         <div class="banner" id="errBanner" hidden><b id="errTitle"></b><span id="errMsg"></span><span class="code" id="errCode"></span></div>
         <div class="banner" id="piiBanner" hidden><b>El relato parece tener un dato personal (DNI o teléfono).</b><span>La IA no puede recibir datos identificatorios. Quitalo antes de seguir.</span><div class="row" style="margin-top:6px"><button type="button" class="btn" id="piiFix">Quitar dato y continuar</button></div></div>
-        <div class="ident-pac">
-          <label class="label" for="dni">DNI</label>
-          <input id="dni" inputmode="numeric" autocomplete="off" placeholder="Ej. 30.123.456" maxlength="11">
+        <div class="ident-pac ident-fila">
+          <div class="ident-col">
+            <label class="label" for="dni">DNI</label>
+            <input id="dni" inputmode="numeric" autocomplete="off" placeholder="Ej. 30.123.456" maxlength="11">
+          </div>
+          <!-- [Dario 29/10 · D4] Condición especial del episodio (mail de Navoni, punto 5): aparte del color clínico. Va al lado del DNI. -->
+          <div class="ident-col">
+            <label class="label" for="condEsp" title="Policial, judicial, custodia…">Condición especial <span class="opt">No cambia el color ni se envía a la IA.</span></label>
+            <select id="condEsp"><option value="">Ninguna</option></select>
+          </div>
         </div>
         <!-- Textos del ingreso simplificados (pedido 22/10): el aviso de caso ficticio va al lado del título. -->
         <label class="label" for="caso">Descripción del evento. <span class="n">1</span> <span class="opt">Caso ficticio: sin nombre, DNI, domicilio ni teléfono en el relato.</span></label>
         <div class="field-wrap">
-          <textarea id="caso">Me duele mucho la panza, acá arriba, desde hace unas 6 horas. Tengo ganas de vomitar y me siento afiebrada. Soy diabética, tomo pastillas.</textarea>
+          <textarea id="caso" placeholder="Ej.: me duele mucho la panza desde hace 6 horas, tengo ganas de vomitar…"></textarea>
           <button type="button" class="mic" id="mic" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             <span id="micTxt">Dictar</span><span class="n">M</span>
@@ -76,7 +83,8 @@
             <div class="strip">
               <span class="ep"><span class="eyebrow">Episodio</span><b id="epCode">EP-004812</b><span class="dnitag" id="dniTag"></span></span><span class="rebadge" id="reBadge" hidden></span>
               <div class="strip-f" id="g-ident"></div>
-              <button type="button" class="relline" id="relline" aria-expanded="false"><b>Relato:</b> <span id="origTxt"></span></button>
+              <!-- [Dario 29/10] Relato oculto en Medición (pedido del grupo); se deja el elemento porque formulario.js lo usa -->
+              <button type="button" class="relline" id="relline" aria-expanded="false" style="display:none"><b>Relato:</b> <span id="origTxt"></span></button>
             </div>
             <div class="cx"><div class="cx-h">Signos vitales <span class="n">1</span><span class="sub">Enter pasa al siguiente · referencias orientativas para adultos</span></div><div class="gvt" id="g-vitales"></div></div>
             <div class="cx"><div class="cx-h">Conciencia, dolor y aspecto</div><div class="gvt" id="g-dolor"></div></div>
@@ -130,9 +138,7 @@
               <ul class="why" id="tcWhy"></ul></div>
             <div id="missBox"><h4>Falta</h4><ul id="triageMiss"></ul></div>
           </div>
-          <!-- Fuente (guía de EJEMPLO, no oficial): oculta por acuerdo del 21/10. Volver a mostrarla cuando esté la guía del HRRG (A09). -->
-          <details class="fuente" id="fuente" hidden><summary><span class="src f">FUENTE</span><span id="fuenteTxt"></span><span class="prov">ver fragmento</span></summary><div class="frag" id="fuenteFrag"></div></details>
-          <div class="subir" id="subir"></div>
+          <!-- [Dario 30/10] Se sacaron «Fuente» (guía de ejemplo) y «Pasaría a…» (discriminadores de ejemplo). -->
           <div class="decision">
             <div class="dbtns"><span class="n" style="position:absolute;margin:-10px 0 0 -10px">3</span>
               <button type="button" class="btn dark" data-d="aceptar" aria-pressed="false">Aceptar</button>
@@ -145,9 +151,9 @@
             </div>
             <div class="form" id="motivoForm" hidden>
               <label for="motivo" class="hint">Motivo (obligatorio)</label>
-              <select id="motivo"><option value="">Seleccionar…</option><option>Signo clínico observado no capturado en los datos</option><option>Dato ingresado incorrecto</option><option>Criterio clínico del profesional</option><option>Caso policial o judicial (categoría AZUL)</option><option>Otro</option></select>
+              <select id="motivo" autocomplete="off"><option value="">Seleccionar…</option><option>Signo clínico observado no capturado en los datos</option><option>Dato ingresado incorrecto</option><option>Criterio clínico del profesional</option><option>Otro</option></select>
               <label for="detalle" class="hint">Detalle (opcional)</label>
-              <textarea id="detalle" placeholder="Ej.: palidez marcada no capturada en los datos iniciales"></textarea>
+              <textarea id="detalle" autocomplete="off" placeholder="Ej.: palidez marcada no capturada en los datos iniciales"></textarea>
               <label class="hint" id="lowerBox" hidden><input type="checkbox" id="lowerOk"> <span id="lowerTxt">Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.</span></label>
               <div class="row"><button type="button" class="btn primary" id="registrar" disabled>Registrar decisión</button></div>
             </div>
@@ -188,9 +194,11 @@
       <!-- 4 · EN ESPERA -->
       <div class="body" id="s-espera" hidden>
         <div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div><b style="font-family:var(--f-display);font-size:18px">Pacientes en espera</b> <span class="hint" id="wCount"></span>
-            <button type="button" class="btn sm" id="verCasos" hidden>Historial de casos</button></div>
-          <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio o DNI</span><input id="epSearch" placeholder="EPI-… o 30.123.456" autocomplete="off"></label>
+          <div><b style="font-family:var(--f-display);font-size:18px" id="wTitulo">Pacientes en espera</b> <span class="hint" id="wCount"></span>
+            <button type="button" class="btn sm" id="verCasos" hidden>Historial de casos</button>
+            <!-- [Barby 30/10] QR para abrir la lista de espera desde un celular -->
+            <a class="btn sm" href="qr_sala.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none">QR de la sala</a></div>
+          <label class="srch" for="epSearch"><span class="hint">Buscar por código de episodio o DNI</span><input id="epSearch" placeholder="EPI-… o 30.123.456" autocomplete="off" list="epSug"><datalist id="epSug"></datalist></label>
         </div>
         <div class="werr" id="wErr" hidden></div>
         <div class="casos note hist" id="casosBox" hidden></div>
@@ -204,8 +212,10 @@
 </div>
 
 <script src="api.js"></script>
+<script src="js/mostrar_clave.js"></script>
 <script src="validacion.js"></script>
 <script src="formulario.js"></script>
+<script src="js/motor_reglas.js"></script>
 <script src="sugerencia.js"></script>
 <script src="espera.js"></script>
 <script src="js/dictado.js"></script>
