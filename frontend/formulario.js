@@ -661,9 +661,9 @@ function refreshSummary(){
   $('#triageMiss').innerHTML=m.map(k=>'<li>'+ml(k)+'</li>').join('');$('#missBox').hidden=!m.length;
 }
 function renderReg(){
-  const d=st.decision,l=st.level!=null?LEVELS[st.level][0]:null;
+  const R=st.decReg,d=R?R.d:null,l=R&&R.lv!=null?LEVELS[R.lv][0]:null;   /* [Dario 30/10] lo registrado */
   const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' ('+(c.M.fuente==='ia'?'MedGemma: '+LEVELS[c.M.lv][0]:'sin IA')+(c.H.length?' · reglas HRRG: '+c.H.map(x=>x.codigo+' v'+x.version).join(', '):'')+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
-  const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+LEVELS[SUG][0]:d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
+  const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+(l||LEVELS[SUG][0]):d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
   $('#reg').textContent='Episodio:  '+st.ep+'\nPaciente:  '+(st.dni?'DNI '+fmtDni(st.dni):'sin identificar')+'\n'+(st.prev?'Anterior:  '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+') · se conserva en el historial\n':'')+'Fecha:     '+new Date().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+'\nExtracción: '+(st.extraccion?(st.extraccion.modo==='ia'?'IA · '+(st.extraccion.modelo||'modelo local'):'simulada · caso '+(st.extraccion.caso_simulado_id||'—')):'SIMULADO (sin servidor)')+'\nDatos:     '+(()=>{const q=conteo();return q.ia+' extraídos · '+q.fix+' corregidos · '+q.add+' completados · '+q.med+' medidos · '+q.falta+' faltantes'})()+'\nSugerencia: '+sug+'\nDecisión:  '+dec+'\nFuente:    reglas del hospital'+(medgemma().fuente==='ia'?' y MedGemma':'')+' · '+LEVELS[SUG][0]+'\nUsuario:   '+(st.user?st.user.u+' ('+st.user.nom+')':'[USUARIO]')+' · Box 1';
 }
 

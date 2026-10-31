@@ -112,6 +112,9 @@ td input.bad{border:2px solid var(--err)}
 .dbtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .dbtns .btn{min-height:50px}
 .dbtns .btn[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:1px}
+/* [Dario 30/10] Decisión registrada: el botón elegido queda marcado (verde suave con ✓) */
+.dbtns .btn.hecho{background:#E7F4EC;color:#1D6B3A;border-color:#1D6B3A;outline:none}
+:root[data-theme="dark"] .dbtns .btn.hecho{background:#16372A;color:#8FD9AE;border-color:#8FD9AE}
 .levels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .lvl{min-height:48px;border-radius:8px;border:1px solid transparent;font-weight:700;font-size:13px;cursor:pointer}
 .lvl[aria-pressed="true"]{outline:3px solid var(--ink);outline-offset:2px}
