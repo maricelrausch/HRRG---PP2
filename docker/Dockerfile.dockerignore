@@ -8,3 +8,7 @@
 backend/tests
 backend/.pytest_cache
 frontend/tests
+
+# Documentación interna y herramientas de evaluación
+backend/docs
+backend/evaluacion
