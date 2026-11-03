@@ -12,3 +12,8 @@ frontend/tests
 # Documentación interna y herramientas de evaluación
 backend/docs
 backend/evaluacion
+
+# Archivos temporales y registros locales
+**/.pytest_cache
+**/*.log
+**/*.log.*
