@@ -643,10 +643,7 @@ function renderInsuf(){
 function renderSimbar(){
   /* Se recuerda el último modo que informó el servidor, aunque se empiece un caso nuevo. */
   const ia=st.modoServidor==='ia';
-  $('#simbar').innerHTML=ia
-    ?'<b>Datos ficticios · Extracción con IA local.</b> Los datos del relato los extrajo MedGemma en esta computadora y requieren revisión. La sugerencia de color, el dictado, los tiempos y los registros siguen siendo de demostración (no son guías del hospital).'
-    :'<b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.';
-  $('#simChip').lastChild.textContent=ia?'IA LOCAL · RESTO SIMULADO':'MODO SIMULADO';
+$('#simChip').lastChild.textContent=ia?'IA LOCAL':'MODO SIMULADO';
   /* Chip de estado de la IA: antes de la primera extracción decía siempre "IA: simulada". */
   if(st.ollama&&!st.extraccion)$('#ollama').innerHTML='<span class="dot"></span>IA: '+(ia?'MedGemma local':'simulada');
 }
