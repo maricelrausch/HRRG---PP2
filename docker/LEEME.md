@@ -133,6 +133,17 @@ HRRG_IP_SERVIDOR=192.168.1.50
 
 **Firewall del servidor:** abrir los puertos **443** y **80** (TCP) para la red interna.
 
+### APIs para otros sistemas (opcional)
+
+Las dos se configuran en `.env` y vienen **apagadas** (valor vacío):
+
+| Variable | Para qué |
+|---|---|
+| `HRRG_API_HOSPITAL_TOKEN` | API para el sistema del hospital |
+| `HRRG_API_AUDITORIA_TOKEN` | API de auditoría (`/api/auditoria/...`). Vacía responde 503 |
+
+Para habilitar una: completar la variable con un texto al azar de 16 caracteres o más (los dos tokens tienen que ser **distintos**) y reiniciar con `docker compose up -d`. Detalle de los endpoints: `docs/endpoints_externos.md`.
+
 ---
 
 ## 4. Cuando cambia el código
