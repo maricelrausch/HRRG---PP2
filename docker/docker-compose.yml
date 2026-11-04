@@ -37,6 +37,7 @@ services:
     environment:
       MEDGEMMA_MODELO: ${MEDGEMMA_MODELO:-medgemma:4b}
       HRRG_API_HOSPITAL_TOKEN: ${HRRG_API_HOSPITAL_TOKEN:-}
+      HRRG_API_AUDITORIA_TOKEN: ${HRRG_API_AUDITORIA_TOKEN:-}
     volumes:
       - datos:/home/ingenia/.hrrg_pp2           # usuarios, episodios, registros
       - claves:/home/ingenia/.hrrg_pp2_claves   # claves de cifrado (respaldar junto con datos)
