@@ -135,7 +135,7 @@ function showErr(code){
     '502':['La respuesta de la IA no es válida.','No se muestran datos de esta respuesta. Probá de nuevo.','502 · salida_invalida']}[code];
   $('#errTitle').textContent=E[0];$('#errMsg').textContent=E[1];$('#errCode').textContent=E[2];$('#errBanner').hidden=false;
   st.ollama=code!=='503';
-  $('#ollama').innerHTML=st.ollama?'<span class="dot"></span>Ollama: conectado':'<span class="dot off"></span>Ollama: no disponible';
+  renderBotonIA();
 }
 const PII=/\b(?:dni|documento|tel(?:é|e)fono|tel\.|cel(?:ular)?)\b[^\d\n]{0,6}[\d.\s-]{6,}|\b\d{1,2}\.\d{3}\.\d{3}\b|\b\d{7,10}\b|\b\d{2,4}[\s-]\d{6,8}\b/gi;
 $('#piiFix').addEventListener('click',()=>{$('#caso').value=$('#caso').value.replace(PII,'[dato quitado]');$('#piiBanner').hidden=true;$('#extraer').click()});
@@ -224,11 +224,17 @@ $('#extraer').addEventListener('click', async () => {
     $('#proc').hidden = true;
   }
 
+function renderBotonIA(){
+  const boton = $('#ollama');
+  boton.textContent = st.ollama ? 'Usar IA: sí' : 'Usar IA: no';
+  boton.setAttribute('aria-pressed', String(st.ollama));
+  boton.title = st.ollama
+    ? 'Continuar sin extracción automática'
+    : 'Habilitar la extracción según el modo del servidor';
+}
 });
 function updOllama(){
-  $('#ollama').textContent = st.ollama
-    ? (st.extraccion ? 'Extracción: '+st.extraccion.modo : (TriageAPI.MODO_REAL ? 'Extracción: backend (sin consultar)' : 'Demo sin servidor'))
-    : 'Continuar sin extracción';
+  renderBotonIA();
   if(!st.ollama){$('#errTitle').textContent='La IA no está disponible.';$('#errMsg').textContent='Seguí con el triage habitual: no se pierde nada de lo cargado.';$('#errCode').textContent='503 · ollama_no_disponible';$('#errBanner').hidden=false;$('#extraer').textContent='Continuar sin IA'}
   else{$('#errBanner').hidden=true;$('#extraer').textContent='Extraer datos'}
   const c=$('#confirmar');c.textContent=st.ollama?'Pedir sugerencia':'IA no disponible';$('#sinIA').classList.toggle('primary',!st.ollama);
@@ -647,8 +653,7 @@ function renderSimbar(){
     ?'<b>Datos ficticios · Extracción con IA local.</b> Los datos del relato los extrajo MedGemma en esta computadora y requieren revisión. La sugerencia de color, el dictado, los tiempos y los registros siguen siendo de demostración (no son guías del hospital).'
     :'<b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.';
   $('#simChip').lastChild.textContent=ia?'IA LOCAL · RESTO SIMULADO':'MODO SIMULADO';
-  /* Chip de estado de la IA: antes de la primera extracción decía siempre "IA: simulada". */
-  if(st.ollama&&!st.extraccion)$('#ollama').innerHTML='<span class="dot"></span>IA: '+(ia?'MedGemma local':'simulada');
+  renderBotonIA();
 }
 function refreshSummary(){
   $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>'+c+'</em>':'')+'</div>').join('');
