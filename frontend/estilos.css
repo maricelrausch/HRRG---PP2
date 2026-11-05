@@ -558,3 +558,23 @@ html.cargando,html.cargando *{cursor:progress}
 }
 .rg-tabla .chipc{display:inline-block;padding:3px 8px;border-radius:5px;font-weight:700;font-size:12px;white-space:nowrap}
 .rg-tabla .src{font-size:11px;padding:3px 8px}
+
+form.login .recuperar-clave {
+  margin: 4px 0 12px;
+}
+
+form.login .recuperar-clave > summary {
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+}
+
+form.login .recuperar-clave > summary::-webkit-details-marker {
+  display: none;
+}
+
+form.login .recuperar-clave > p {
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 8px 0;
+}

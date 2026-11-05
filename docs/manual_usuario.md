@@ -438,4 +438,4 @@ Son los rangos que ve Enfermería en el paso 2 (Medición), **según el grupo et
 
 ---
 
-*Cómo instalar y levantar el sistema: ver `README.md`. Conexión con otros sistemas (para informática): `docs/api_hospital.md` y `docs/endpoints_externos.md`. Detalle técnico de cada pantalla: `docs/frontend_cambios.md` y `docs/contrato_api.md`.*
+*Cómo instalar y levantar el sistema: ver `README.md`. Conexión con otros sistemas (para informática): `docs/api_hospital.md` y `docs/endpoints_externos.md`. Contrato técnico de la API: `docs/contrato_api.md`.*

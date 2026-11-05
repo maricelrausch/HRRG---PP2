@@ -649,11 +649,13 @@ function renderInsuf(){
 function renderSimbar(){
   /* Se recuerda el último modo que informó el servidor, aunque se empiece un caso nuevo. */
   const ia=st.modoServidor==='ia';
-  $('#simbar').innerHTML=ia
-    ?'<b>Datos ficticios · Extracción con IA local.</b> Los datos del relato los extrajo MedGemma en esta computadora y requieren revisión. La sugerencia de color, el dictado, los tiempos y los registros siguen siendo de demostración (no son guías del hospital).'
-    :'<b>Datos ficticios · Simulación.</b> La extracción, la sugerencia de color, el dictado, los tiempos y los registros son de demostración. No provienen de MedGemma ni de guías del hospital.';
-  $('#simChip').lastChild.textContent=ia?'IA LOCAL · RESTO SIMULADO':'MODO SIMULADO';
+
+  function renderSimbar(){
+  /* Conserva el último modo informado por el servidor. */
+  const ia = st.modoServidor === 'ia';
+  $('#simChip').lastChild.textContent = ia ? 'IA LOCAL' : 'MODO SIMULADO';
   renderBotonIA();
+}
 }
 function refreshSummary(){
   $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>'+c+'</em>':'')+'</div>').join('');
