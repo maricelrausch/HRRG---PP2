@@ -69,20 +69,21 @@
     const base = signos.filter((p) => p.grupo_etario === 'Adulto');
     const filas = base.map((b) => {
       const p = signos.find((x) => x.campo === b.campo && x.grupo_etario === sgGrupo) || null, v = p || b;
-      const hereda = !p, dis = soloLectura || hereda ? ' disabled' : '', k = esc(b.campo);
+      const hereda = !p, dis = soloLectura ? ' disabled' : '', k = esc(b.campo);   /* [Dario 02/11] se edita directo, aunque herede de Adulto */
       const inp = (n, w) => '<input data-sg="' + n + '" value="' + esc(n.startsWith('texto') ? v[n] : nro(v[n])) + '"' + dis + ' style="width:' + (w || 60) + 'px"' + (n.startsWith('texto') ? '' : ' inputmode="decimal"') + '>';
       let acc = '';
-      if (!soloLectura) acc = hereda ? '<button type="button" class="btn ghost" data-sgacc="crear">Usar valores propios</button>'
+      if (!soloLectura) acc = hereda ? '<button type="button" class="btn" data-sgacc="crear">Guardar</button>'
         : '<button type="button" class="btn" data-sgacc="guardar">Guardar</button>' + (sgGrupo === 'Adulto' ? '' : ' <button type="button" class="linkbtn" data-sgacc="quitar">volver a Adulto</button>');
-      return '<tr data-campo="' + k + '"' + (hereda ? ' class="rg-hereda"' : '') + '><td><b>' + esc(v.nombre) + '</b><div class="hint">' + esc(v.unidad) + (hereda ? ' · valores de Adulto' : ' · v' + v.version) + '</div></td>' +
+      return '<tr data-campo="' + k + '"' + (hereda ? ' class="rg-hereda"' : '') + '><td><b>' + esc(v.nombre) + '</b><div class="hint">' + esc(v.unidad) + (hereda ? ' · usa los de Adulto' : ' · v' + v.version) + '</div></td>' +
         '<td>' + inp('normal_min') + ' – ' + inp('normal_max') + '</td><td>' + inp('minimo_posible') + ' – ' + inp('maximo_posible') + '</td>' +
         '<td>' + inp('texto_bajo', 130) + '</td><td>' + inp('texto_alto', 130) + '</td>' +
         '<td><input type="checkbox" data-sg="obligatorio"' + (v.obligatorio ? ' checked' : '') + dis + '></td><td>' + acc +
         (sgMsg[b.campo] ? '<div class="' + (sgMsg[b.campo].ok ? 'hint' : 'werr') + '">' + esc(sgMsg[b.campo].t) + '</div>' : '') + '</td></tr>';
     }).join('');
-    $('sgTabla').innerHTML = base.length
+    const ayudaGrupo = sgGrupo === 'Adulto' ? '' : '<p class="hint">Estás editando <b>' + esc(sgGrupo) + '</b>. Los signos con borde punteado todavía usan los valores de Adulto: cambiá los números y tocá «Guardar» para que queden propios de ' + esc(sgGrupo) + '.</p>';
+    $('sgTabla').innerHTML = ayudaGrupo + (base.length
       ? '<table class="rg-tabla rg-sgtabla"><thead><tr><th>Signo</th><th>Normal</th><th>Posible</th><th>Texto si está bajo</th><th>Texto si está alto</th><th>Oblig.</th><th></th></tr></thead><tbody>' + filas + '</tbody></table>'
-      : '<div class="rg-vacio">No hay rangos cargados.</div>';
+      : '<div class="rg-vacio">No hay rangos cargados.</div>');
   }
   function datosFila(tr, origen) {
     const d = Object.assign({}, origen);

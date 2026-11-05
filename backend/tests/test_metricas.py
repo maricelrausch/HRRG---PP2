@@ -105,3 +105,77 @@ def test_runner_validacion_y_extraccion_simulada(tmp_path):
     m = r["extraccion"]
     assert m["micro"]["f1"] == 1.0 and m["micro"]["tasa_alucinacion"] == 0 and m["consistencia"] == 1.0
     assert list(tmp_path.glob("*/reporte.md"))
+
+
+# ---------------------------------------------------------------- rendimiento, recursos y chat (sin Ollama)
+from evaluacion import instrumentacion as INS
+
+
+class _Resp(dict):
+    def __getattr__(self, k):
+        return self.get(k)
+
+
+def test_medidor_ollama_anota_tokens_y_velocidad(monkeypatch):
+    ollama = pytest.importorskip("ollama")
+
+    def chat_falso(self, **kw):
+        return _Resp(message=_Resp(content="{}"), prompt_eval_count=200, eval_count=50,
+                     prompt_eval_duration=int(0.5e9), eval_duration=int(1e9), load_duration=int(2e9))
+    monkeypatch.setattr(ollama.Client, "chat", chat_falso)
+    original = ollama.Client.chat
+    with INS.MedidorOllama() as med:
+        med.etapa = "extraccion"
+        ollama.Client().chat(model="medgemma:4b", messages=[])
+        ollama.Client().chat(model="medgemma:4b", messages=[])
+    assert ollama.Client.chat is original                       # se restaura al salir
+    r = med.resumen()["extraccion"]
+    assert r["llamadas"] == 2 and r["tok_s_generacion_p50"] == pytest.approx(50)
+    assert r["tok_s_lectura_p50"] == pytest.approx(400)
+    assert r["recargas"] == 1                                   # la 2.ª llamada volvió a cargar (2 s)
+
+
+def test_alerta_gpu_detecta_placa_dormida():
+    rec = {"gpus": [{"nombre": "RTX 4050", "vram_max_mb": 3000, "uso_max": 0, "estados": {"P8": 10}}]}
+    assert INS.alerta_gpu(rec, {"extraccion": {"tok_s_generacion_p50": 2.8}})
+    assert INS.alerta_gpu(rec, {"extraccion": {"tok_s_generacion_p50": 50}}) is None
+
+
+def test_chat_simulado_y_puntajes(tmp_path):
+    r = E.main(["chat", "--motor", "simulado", "--salida", str(tmp_path)])
+    assert r["chat"]["bloqueo_correcto"] == 1.0 and r["chat"]["n"] >= 10
+    planilla = next(tmp_path.glob("*/detalle_chat.csv"))
+    lineas = planilla.read_text(encoding="utf-8-sig").splitlines()
+    puntuadas = [lineas[0]] + [l.rstrip(";") + ";5;4;" if i % 2 else l.rstrip(";") + ";3;5;"
+                               for i, l in enumerate(lineas[1:])]
+    planilla.write_text("\n".join(puntuadas), encoding="utf-8-sig")
+    p = E.main(["puntajes", "--archivo", str(planilla), "--salida", str(tmp_path)])["puntajes"]
+    assert p["relevancia_n"] == len(lineas) - 1
+    assert 3 <= p["relevancia_media"] <= 5 and 4 <= p["fidelidad_media"] <= 5
+
+
+def test_medidor_perplejidad_y_sin_soporte(monkeypatch):
+    ollama = pytest.importorskip("ollama")
+    import math
+
+    def con_logprobs(self, logprobs=None, **kw):
+        lp = [_Resp(token="x", logprob=math.log(0.5))] * 4 if logprobs else None
+        return _Resp(message=_Resp(content="{}"), prompt_eval_count=10, eval_count=4, logprobs=lp,
+                     prompt_eval_duration=int(1e9), eval_duration=int(1e9), load_duration=0, total_duration=int(3e9))
+    monkeypatch.setattr(ollama.Client, "chat", con_logprobs)
+    with INS.MedidorOllama() as med:
+        ollama.Client().chat(model="m", messages=[])
+    r = med.resumen()["general"]
+    assert r["perplejidad_p50"] == pytest.approx(2.0)          # probabilidad 0,5 por token -> perplejidad 2
+    assert r["solicitudes_por_minuto"] == pytest.approx(20)    # 3 s por solicitud
+    assert r["primer_token_p50_s"] == pytest.approx(1.0)
+
+    def sin_soporte(self, **kw):                                # cliente viejo: no conoce logprobs
+        if "logprobs" in kw:
+            raise TypeError("unexpected keyword argument 'logprobs'")
+        return _Resp(message=_Resp(content="{}"), prompt_eval_count=1, eval_count=1, eval_duration=int(1e9))
+    monkeypatch.setattr(ollama.Client, "chat", sin_soporte)
+    with INS.MedidorOllama() as med:
+        ollama.Client().chat(model="m", messages=[])
+        ollama.Client().chat(model="m", messages=[])
+    assert med.logprobs is False and med.resumen()["general"]["llamadas_con_logprobs"] == 0

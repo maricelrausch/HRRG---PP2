@@ -1,6 +1,6 @@
 {
-  "version": "1.2",
-  "fecha": "2026-10-13",
+  "version": "1.3",
+  "fecha": "2026-11-03",
   "aviso": "Casos FICTICIOS, sin datos de pacientes reales. 'nivel_maqueta' es el color que muestra la demo; NO tiene validez clínica. Los resultados esperados son técnicos (validación, faltantes, PAM).",
   "casos": [
     {
@@ -867,6 +867,845 @@
       "esperado_validacion": {
         "valido": true
       }
+    },
+    {
+      "id": "CF-13",
+      "tipo": "cefalea",
+      "texto": "Mujer de 34 años con dolor de cabeza intenso desde hace 4 horas, dolor 7/10. Temperatura 36,9 °C, FC 84, saturación 98 %.",
+      "esperado_extraccion": {
+        "edad": 34,
+        "motivo_categoria": "Cefalea",
+        "motivo_consulta": "Dolor de cabeza",
+        "tiempo_evolucion_valor": 4,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Cabeza",
+        "dolor_intensidad": 7,
+        "temperatura": 36.9,
+        "frecuencia_cardiaca": 84,
+        "saturacion_o2": 98
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-14",
+      "tipo": "disnea",
+      "texto": "Varón de 70 años con falta de aire desde hace 2 días, empeora al caminar. FR 28, saturación 88 %, FC 110.",
+      "esperado_extraccion": {
+        "edad": 70,
+        "motivo_categoria": "Disnea",
+        "motivo_consulta": "Falta de aire",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "días",
+        "frecuencia_respiratoria": 28,
+        "saturacion_o2": 88,
+        "frecuencia_cardiaca": 110
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-15",
+      "tipo": "trauma",
+      "texto": "Mujer de 81 años que se cayó en la cocina hace 3 horas, dolor en la cadera derecha 8/10, no puede apoyar.",
+      "esperado_extraccion": {
+        "edad": 81,
+        "motivo_categoria": "Trauma",
+        "motivo_consulta": "Caída con dolor de cadera",
+        "tiempo_evolucion_valor": 3,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Cadera derecha",
+        "dolor_intensidad": 8
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-16",
+      "tipo": "pediatria",
+      "texto": "Niño de 4 años con fiebre de 39,5 °C desde hace 2 días y tos. FC 130, FR 32, saturación 96 %.",
+      "esperado_extraccion": {
+        "edad": 4,
+        "motivo_categoria": "Fiebre",
+        "motivo_consulta": "Fiebre y tos",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "días",
+        "temperatura": 39.5,
+        "frecuencia_cardiaca": 130,
+        "frecuencia_respiratoria": 32,
+        "saturacion_o2": 96
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-17",
+      "tipo": "alergia",
+      "texto": "Mujer de 25 años con ronchas en todo el cuerpo y picazón desde hace 40 minutos, después de comer maní. Saturación 97 %.",
+      "esperado_extraccion": {
+        "edad": 25,
+        "motivo_categoria": "Reacción alérgica",
+        "motivo_consulta": "Ronchas y picazón",
+        "tiempo_evolucion_valor": 40,
+        "tiempo_evolucion_unidad": "minutos",
+        "saturacion_o2": 97
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-18",
+      "tipo": "convulsion",
+      "texto": "Varón de 19 años traído por amigos tras una convulsión hace media hora, ahora está somnoliento. Sin golpe en la cabeza.",
+      "esperado_extraccion": {
+        "edad": 19,
+        "motivo_categoria": "Convulsiones",
+        "motivo_consulta": "Convulsión",
+        "tiempo_evolucion_valor": 30,
+        "tiempo_evolucion_unidad": "minutos"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-19",
+      "tipo": "hemorragia",
+      "texto": "Mujer de 45 años con sangrado nasal abundante desde hace 1 hora que no para. FC 96.",
+      "esperado_extraccion": {
+        "edad": 45,
+        "motivo_categoria": "Hemorragia",
+        "motivo_consulta": "Sangrado nasal",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "horas",
+        "br_sangrado": true,
+        "frecuencia_cardiaca": 96
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-20",
+      "tipo": "intoxicacion",
+      "texto": "Varón de 23 años que tomó muchas pastillas de clonazepam hace 2 horas, está somnoliento. FC 58, FR 12, saturación 94 %.",
+      "esperado_extraccion": {
+        "edad": 23,
+        "motivo_categoria": "Intoxicación",
+        "motivo_consulta": "Ingesta de muchas pastillas",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "horas",
+        "frecuencia_cardiaca": 58,
+        "frecuencia_respiratoria": 12,
+        "saturacion_o2": 94
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-21",
+      "tipo": "obstetrico",
+      "texto": "Mujer de 29 años embarazada de término, con contracciones desde hace 3 horas y pérdida de líquido.",
+      "esperado_extraccion": {
+        "edad": 29,
+        "motivo_categoria": "Embarazo / obstétrico",
+        "motivo_consulta": "Contracciones",
+        "tiempo_evolucion_valor": 3,
+        "tiempo_evolucion_unidad": "horas"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-22",
+      "tipo": "salud_mental",
+      "texto": "Varón de 40 años que refiere una crisis de angustia desde hace 2 horas, sin ideas de hacerse daño.",
+      "esperado_extraccion": {
+        "edad": 40,
+        "motivo_categoria": "Salud mental",
+        "motivo_consulta": "Crisis de angustia",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "horas"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-23",
+      "tipo": "neurologico",
+      "texto": "Mujer de 67 años con boca torcida y pérdida de fuerza en el brazo izquierdo desde hace 50 minutos.",
+      "esperado_extraccion": {
+        "edad": 67,
+        "motivo_categoria": "Síntoma neurológico",
+        "motivo_consulta": "Boca torcida y pérdida de fuerza",
+        "tiempo_evolucion_valor": 50,
+        "tiempo_evolucion_unidad": "minutos"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-24",
+      "tipo": "conciencia",
+      "texto": "Varón de 85 años, la familia lo nota confundido y desorientado desde esta mañana. Temperatura 38,2 °C.",
+      "esperado_extraccion": {
+        "edad": 85,
+        "motivo_categoria": "Alteración de conciencia",
+        "motivo_consulta": "Confusión y desorientación",
+        "temperatura": 38.2
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-25",
+      "tipo": "sin_numeros",
+      "texto": "Me duele la panza del lado derecho desde ayer a la noche y tengo ganas de vomitar.",
+      "esperado_extraccion": {
+        "motivo_categoria": "Dolor abdominal",
+        "motivo_consulta": "Dolor abdominal",
+        "dolor_localizacion": "Panza, lado derecho"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-26",
+      "tipo": "negaciones",
+      "texto": "Varón de 55 años con dolor en el pecho de 20 minutos, niega falta de aire, niega sangrado. Dolor 7/10, FC 98, saturación 97 %.",
+      "esperado_extraccion": {
+        "edad": 55,
+        "motivo_categoria": "Dolor torácico",
+        "motivo_consulta": "Dolor de pecho",
+        "tiempo_evolucion_valor": 20,
+        "tiempo_evolucion_unidad": "minutos",
+        "dolor_localizacion": "Tórax",
+        "br_sangrado": false,
+        "dolor_intensidad": 7,
+        "frecuencia_cardiaca": 98,
+        "saturacion_o2": 97
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-27",
+      "tipo": "trauma",
+      "texto": "Chico de 15 años que se golpeó la cabeza jugando al rugby hace 1 hora, tiene dolor de cabeza y vomitó una vez.",
+      "esperado_extraccion": {
+        "edad": 15,
+        "motivo_categoria": "Trauma",
+        "motivo_consulta": "Golpe en la cabeza",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Cabeza"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-28",
+      "tipo": "tiempo_vago",
+      "texto": "Adulta con tos y fiebre desde hace unos días, refiere escalofríos.",
+      "esperado_extraccion": {
+        "motivo_categoria": "Fiebre",
+        "motivo_consulta": "Tos y fiebre"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-29",
+      "tipo": "numeros_letras",
+      "texto": "Mujer de cuarenta años con dolor de garganta desde hace tres días y fiebre de 38 grados.",
+      "esperado_extraccion": {
+        "edad": 40,
+        "motivo_categoria": "Fiebre",
+        "motivo_consulta": "Dolor de garganta y fiebre",
+        "tiempo_evolucion_valor": 3,
+        "tiempo_evolucion_unidad": "días",
+        "dolor_localizacion": "Garganta",
+        "temperatura": 38
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-30",
+      "tipo": "negaciones",
+      "texto": "Varón de 30 años con diarrea desde hace 2 días, sin fiebre, sin sangre en las heces.",
+      "esperado_extraccion": {
+        "edad": 30,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Diarrea",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "días",
+        "br_sangrado": false
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-31",
+      "tipo": "otro",
+      "texto": "Mujer de 50 años con dolor de espalda baja desde hace 5 días, dolor 6/10, sin golpe previo.",
+      "esperado_extraccion": {
+        "edad": 50,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Dolor de espalda baja",
+        "tiempo_evolucion_valor": 5,
+        "tiempo_evolucion_unidad": "días",
+        "dolor_localizacion": "Espalda baja",
+        "dolor_intensidad": 6
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-32",
+      "tipo": "pediatria",
+      "texto": "Nena de 6 años con dolor de oído desde hace 1 día y fiebre de 38,3 °C.",
+      "esperado_extraccion": {
+        "edad": 6,
+        "motivo_categoria": "Fiebre",
+        "motivo_consulta": "Dolor de oído y fiebre",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "días",
+        "dolor_localizacion": "Oído",
+        "temperatura": 38.3
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-33",
+      "tipo": "trauma",
+      "texto": "Varón de 38 años con quemadura en la mano derecha con aceite caliente hace 30 minutos, dolor 9/10.",
+      "esperado_extraccion": {
+        "edad": 38,
+        "motivo_categoria": "Trauma",
+        "motivo_consulta": "Quemadura en la mano",
+        "tiempo_evolucion_valor": 30,
+        "tiempo_evolucion_unidad": "minutos",
+        "dolor_localizacion": "Mano derecha",
+        "dolor_intensidad": 9
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-34",
+      "tipo": "trauma",
+      "texto": "Mujer de 27 años con un corte en el dedo con un cuchillo hace 20 minutos, sangra un poco.",
+      "esperado_extraccion": {
+        "edad": 27,
+        "motivo_categoria": "Trauma",
+        "motivo_consulta": "Corte en el dedo",
+        "tiempo_evolucion_valor": 20,
+        "tiempo_evolucion_unidad": "minutos",
+        "dolor_localizacion": "Dedo",
+        "br_sangrado": true
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-35",
+      "tipo": "disnea",
+      "texto": "Varón de 22 años con antecedente de asma, le cuesta respirar desde hace 1 hora. Saturación 91 %, FR 26.",
+      "esperado_extraccion": {
+        "edad": 22,
+        "motivo_categoria": "Disnea",
+        "motivo_consulta": "Dificultad para respirar",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "horas",
+        "saturacion_o2": 91,
+        "frecuencia_respiratoria": 26
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-36",
+      "tipo": "neurologico",
+      "texto": "Mujer de 60 años con mareos y vértigo desde esta mañana, sin pérdida de conocimiento.",
+      "esperado_extraccion": {
+        "edad": 60,
+        "motivo_categoria": "Síntoma neurológico",
+        "motivo_consulta": "Mareos y vértigo"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-37",
+      "tipo": "otro",
+      "texto": "Varón de 33 años con vómitos desde hace 8 horas, no tolera líquidos.",
+      "esperado_extraccion": {
+        "edad": 33,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Vómitos",
+        "tiempo_evolucion_valor": 8,
+        "tiempo_evolucion_unidad": "horas"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-38",
+      "tipo": "pediatria",
+      "texto": "Niño de 9 años al que le picó una abeja en el brazo hace 15 minutos, tiene hinchado el brazo.",
+      "esperado_extraccion": {
+        "edad": 9,
+        "motivo_categoria": "Reacción alérgica",
+        "motivo_consulta": "Picadura de abeja",
+        "tiempo_evolucion_valor": 15,
+        "tiempo_evolucion_unidad": "minutos",
+        "dolor_localizacion": "Brazo"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-39",
+      "tipo": "tiempo_vago",
+      "texto": "Señor mayor con dolor en el pecho desde hace un rato, dice que es fuerte.",
+      "esperado_extraccion": {
+        "motivo_categoria": "Dolor torácico",
+        "motivo_consulta": "Dolor de pecho",
+        "dolor_localizacion": "Tórax"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-40",
+      "tipo": "hora_y_media",
+      "texto": "Mujer de 42 años con dolor de estómago desde hace una hora y media, dolor 5/10.",
+      "esperado_extraccion": {
+        "edad": 42,
+        "motivo_categoria": "Dolor abdominal",
+        "motivo_consulta": "Dolor de estómago",
+        "tiempo_evolucion_valor": 1.5,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Abdomen",
+        "dolor_intensidad": 5
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-41",
+      "tipo": "semanas",
+      "texto": "Varón de 58 años con tos seca desde hace 2 semanas, sin fiebre.",
+      "esperado_extraccion": {
+        "edad": 58,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Tos seca",
+        "tiempo_evolucion_valor": 14,
+        "tiempo_evolucion_unidad": "días"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-42",
+      "tipo": "negaciones",
+      "texto": "Mujer de 70 años con dolor e hinchazón en la rodilla izquierda desde hace 4 días, no recuerda golpes.",
+      "esperado_extraccion": {
+        "edad": 70,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Dolor e hinchazón de rodilla",
+        "tiempo_evolucion_valor": 4,
+        "tiempo_evolucion_unidad": "días",
+        "dolor_localizacion": "Rodilla izquierda"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-43",
+      "tipo": "obstetrico",
+      "texto": "Mujer de 26 años embarazada, con dolor en la parte baja de la panza desde hace 6 horas.",
+      "esperado_extraccion": {
+        "edad": 26,
+        "motivo_categoria": "Embarazo / obstétrico",
+        "motivo_consulta": "Dolor bajo en la panza",
+        "tiempo_evolucion_valor": 6,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Panza, parte baja"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-44",
+      "tipo": "sin_numeros",
+      "texto": "Me duele mucho la cabeza desde ayer y me molesta la luz.",
+      "esperado_extraccion": {
+        "motivo_categoria": "Cefalea",
+        "motivo_consulta": "Dolor de cabeza",
+        "dolor_localizacion": "Cabeza"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-45",
+      "tipo": "trauma",
+      "texto": "Varón de 45 años que tuvo un accidente en moto hace 1 hora, dolor en la pierna derecha 8/10. FC 104.",
+      "esperado_extraccion": {
+        "edad": 45,
+        "motivo_categoria": "Trauma",
+        "motivo_consulta": "Accidente en moto",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Pierna derecha",
+        "dolor_intensidad": 8,
+        "frecuencia_cardiaca": 104
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-46",
+      "tipo": "otro",
+      "texto": "Varón de 64 años, diabético, sudoroso y tembloroso desde hace 20 minutos.",
+      "esperado_extraccion": {
+        "edad": 64,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Sudoración y temblor",
+        "tiempo_evolucion_valor": 20,
+        "tiempo_evolucion_unidad": "minutos"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-47",
+      "tipo": "pediatria",
+      "texto": "Bebé de 8 meses con fiebre de 38,8 °C desde hace 1 día y no quiere comer.",
+      "esperado_extraccion": {
+        "edad": 0,
+        "motivo_categoria": "Fiebre",
+        "motivo_consulta": "Fiebre",
+        "tiempo_evolucion_valor": 1,
+        "tiempo_evolucion_unidad": "días",
+        "temperatura": 38.8
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-48",
+      "tipo": "negaciones",
+      "texto": "Mujer de 36 años con dolor de pecho leve desde hace 3 días, niega fiebre, niega falta de aire, niega golpes.",
+      "esperado_extraccion": {
+        "edad": 36,
+        "motivo_categoria": "Dolor torácico",
+        "motivo_consulta": "Dolor de pecho",
+        "tiempo_evolucion_valor": 3,
+        "tiempo_evolucion_unidad": "días",
+        "dolor_localizacion": "Tórax"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-49",
+      "tipo": "otro",
+      "texto": "Varón de 50 años con un cuerpo extraño en el ojo derecho desde hace 2 horas, mucho ardor.",
+      "esperado_extraccion": {
+        "edad": 50,
+        "motivo_categoria": "Otro",
+        "motivo_consulta": "Cuerpo extraño en el ojo",
+        "tiempo_evolucion_valor": 2,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Ojo derecho"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-50",
+      "tipo": "intoxicacion",
+      "texto": "Familia con dolor de cabeza y mareos; usaron un brasero toda la noche. La madre, de 39 años, está somnolienta.",
+      "esperado_extraccion": {
+        "edad": 39,
+        "motivo_categoria": "Intoxicación",
+        "motivo_consulta": "Posible intoxicación por brasero",
+        "dolor_localizacion": "Cabeza"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-51",
+      "tipo": "salud_mental",
+      "texto": "Varón de 28 años que escucha voces desde hace 3 días y no duerme.",
+      "esperado_extraccion": {
+        "edad": 28,
+        "motivo_categoria": "Salud mental",
+        "motivo_consulta": "Escucha voces",
+        "tiempo_evolucion_valor": 3,
+        "tiempo_evolucion_unidad": "días"
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
+    },
+    {
+      "id": "CF-52",
+      "tipo": "abdominal",
+      "texto": "Mujer de 19 años con dolor abdominal en la parte baja derecha desde hace 12 horas, fiebre de 38,1 °C y vómitos.",
+      "esperado_extraccion": {
+        "edad": 19,
+        "motivo_categoria": "Dolor abdominal",
+        "motivo_consulta": "Dolor abdominal con fiebre",
+        "tiempo_evolucion_valor": 12,
+        "tiempo_evolucion_unidad": "horas",
+        "dolor_localizacion": "Abdomen, parte baja derecha",
+        "temperatura": 38.1
+      },
+      "diagrama_esperado": null,
+      "estado_esperado": null,
+      "color_esperado": null,
+      "pagina_guia": null,
+      "esperado_validacion": {
+        "valido": true
+      },
+      "nota": "Agregado 03/11 para ampliar la evaluación"
     }
   ],
   "casos_api": [
