@@ -12,8 +12,6 @@
 <link rel="stylesheet" href="estilos.css">
 <style>
   .qr-app{max-width:640px;margin:24px auto}
-  .qr-tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .qr-tabs .btn[aria-pressed="true"]{background:var(--tab);color:var(--bg);border-color:var(--tab)}
   .qr-caja{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
   .qr-caja img{width:min(320px,80vw);height:auto;background:#fff;border-radius:12px;padding:8px;border:1px solid var(--line)}
   .qr-url{font-family:var(--f-mono);font-size:15px;word-break:break-all;background:var(--panel-2);border-radius:8px;padding:8px 12px}
@@ -29,10 +27,7 @@
       <div class="chips no-print"><span class="chip">Sin datos de pacientes</span></div>
     </div>
     <div class="body">
-      <div class="qr-tabs no-print" role="group" aria-label="Qué abre el QR">
-        <button type="button" class="btn sm" data-destino="sala" aria-pressed="true">Pantalla de la sala</button>
-        <button type="button" class="btn sm" data-destino="datos" aria-pressed="false">Datos (JSON, para sistemas)</button>
-      </div>
+      <!-- [Barby 31/10] Se sacó la opción «Datos (JSON, para sistemas)»: el QR abre solo la pantalla de la sala. -->
       <div class="banner" id="qrAviso" hidden role="alert"><b></b></div>
       <div class="qr-caja">
         <p class="qr-titulo" id="qrTitulo">Lista de espera de la Guardia</p>
@@ -55,22 +50,12 @@
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const TEXTOS = {
-    sala: ['Lista de espera de la Guardia', 'Muestra la fila por color y tiempo de espera. Se actualiza sola.'],
-    datos: ['Lista de espera en JSON', 'Para pantallas o sistemas que dibujan la fila por su cuenta (GET /api/sala/espera).']
-  };
-  let direcciones = null, destino = 'sala';
+  let direcciones = null;
   function pintar() {
-    document.querySelectorAll('[data-destino]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.destino === destino)));
-    $('qrTitulo').textContent = TEXTOS[destino][0];
-    $('qrAyuda').textContent = TEXTOS[destino][1];
-    $('qrImg').src = '/api/sala/qr.svg?destino=' + destino + '&t=' + Date.now();
-    if (direcciones) { $('qrUrl').textContent = direcciones[destino]; $('qrAbrir').href = direcciones[destino]; }
+    $('qrAyuda').textContent = 'Muestra la fila por color y tiempo de espera. Se actualiza sola.';
+    $('qrImg').src = '/api/sala/qr.svg?destino=sala&t=' + Date.now();
+    if (direcciones) { $('qrUrl').textContent = direcciones.sala; $('qrAbrir').href = direcciones.sala; }
   }
-  document.querySelector('.qr-tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-destino]'); if (!b) return;
-    destino = b.dataset.destino; pintar();
-  });
   if (location.protocol === 'file:') {
     $('qrUrl').textContent = 'Esta pantalla necesita el servidor: abrila desde http://127.0.0.1:5000/qr_sala.html';
     return;

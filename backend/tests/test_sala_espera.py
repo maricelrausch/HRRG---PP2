@@ -52,6 +52,6 @@ def test_qr_svg_y_direcciones(cliente):
     r = cliente.get("/api/sala/qr.svg?destino=sala", base_url="http://192.168.1.35:5000")
     assert r.status_code == 200 and r.mimetype == "image/svg+xml" and b"<svg" in r.data
     d = cliente.get("/api/sala/qr", base_url="http://192.168.1.35:5000").get_json()
-    assert d["direcciones"] == {"sala": "http://192.168.1.35:5000/sala.html",
-                                "datos": "http://192.168.1.35:5000/api/sala/espera"}
+    assert d["direcciones"] == {"sala": "http://192.168.1.35:5000/sala.html"}
     assert cliente.get("/api/sala/qr.svg?destino=otro").status_code == 400
+    assert cliente.get("/api/sala/qr.svg?destino=datos").status_code == 400   # [31/10] se sacó el QR al JSON

@@ -50,9 +50,8 @@ Invoke-RestMethod http://127.0.0.1:5000/api/sala/espera | ConvertTo-Json -Depth 
 
 | Ruta | Qué devuelve |
 |---|---|
-| `GET /api/sala/qr` | `{"direcciones": {"sala": "http://IP:5000/sala.html", "datos": "http://IP:5000/api/sala/espera"}}` |
+| `GET /api/sala/qr` | `{"direcciones": {"sala": "http://IP:5000/sala.html"}}` |
 | `GET /api/sala/qr.svg?destino=sala` | Imagen SVG del QR de la pantalla de sala |
-| `GET /api/sala/qr.svg?destino=datos` | Imagen SVG del QR del endpoint en JSON |
 
 Son públicas como la lista (sin datos de pacientes) y se apagan junto con ella (`HRRG_SALA_PUBLICA=0`). Necesitan la librería `segno` (está en `requirements.txt`).
 

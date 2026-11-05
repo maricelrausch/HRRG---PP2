@@ -307,7 +307,6 @@ HRRG---PP2/
 | Configuración de la IA | [`backend/docs/configuracion_ia.md`](backend/docs/configuracion_ia.md) |
 | Identificación cifrada | [`docs/identificacion_cifrada.md`](docs/identificacion_cifrada.md) |
 | Política de registros | [`docs/politica_registros.md`](docs/politica_registros.md) |
-| Guion de la demo | [`docs/guion_demo.md`](docs/guion_demo.md) |
 | Manual de instalación, minutas, retrospectivas y escalabilidad | Carpeta del proyecto en Google Drive |
 
 ---

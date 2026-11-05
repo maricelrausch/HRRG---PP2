@@ -224,7 +224,6 @@ Es una pantalla **de consulta** para un televisor de la sala de espera, una tabl
 - En el navegador del celular hay que escribir `http://<IP de la PC>:5000/sala.html`, por ejemplo `http://192.168.100.71:5000/sala.html`.
 - La IP de la PC y la configuración de la red las resuelve el área de informática.
 - **Más fácil, con el código QR:** en **En espera** tocá **QR de la sala**. Se abre una página con un código QR que ya trae la dirección correcta (con la IP de la PC). Apuntá la cámara del celular al código y tocá el enlace. La página se puede **imprimir** para pegar en la sala.
-  - Con la opción **Datos (JSON, para sistemas)**, el QR lleva al endpoint `/api/sala/espera` en lugar de a la pantalla.
 
 ![Código QR de la lista de espera](img/manual/19_qr_sala.png)
 
@@ -439,4 +438,4 @@ Son los rangos que ve Enfermería en el paso 2 (Medición), **según el grupo et
 
 ---
 
-*Cómo instalar y levantar el sistema: ver `README.md`. Conexión con otros sistemas (para informática): `docs/api_hospital.md` y `docs/endpoints_externos.md`. Detalle técnico de cada pantalla: `docs/frontend_cambios.md` y `docs/contrato_api.md`.*
+*Cómo instalar y levantar el sistema: ver `README.md`. Conexión con otros sistemas (para informática): `docs/api_hospital.md` y `docs/endpoints_externos.md`. Contrato técnico de la API: `docs/contrato_api.md`.*
