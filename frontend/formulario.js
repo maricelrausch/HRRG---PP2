@@ -106,8 +106,6 @@ function go(s){
   st.screen=s;
   ['ingreso','revision','resumen','espera'].forEach(x=>$('#s-'+x).hidden=x!==s);
   document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-current',b.dataset.go===s?'page':'false'));
-  document.querySelectorAll('#stepper span').forEach(sp=>sp.classList.toggle('on',sp.dataset.s===s));
-  $('#stepper').hidden=s==='espera';
   const sp=SPECS[s];
   $('#specs').innerHTML='<div class="eyebrow">Especificaciones</div><h2>'+sp.t+'</h2><ol>'+sp.items.map(i=>'<li><span class="n">'+i[0]+'</span><span>'+i[1]+'</span></li>').join('')+'</ol><div class="src">Fuente: '+sp.src+'</div>';
   if(s==='revision'){$('#epCode').textContent=st.ep;$('#dniTag').textContent=st.dni?'DNI '+fmtDni(st.dni):'Sin DNI';$('#reBadge').hidden=!st.prev;if(st.prev)$('#reBadge').textContent='Reevaluación · antes '+LEVELS[st.prev.lv][0]+', hace '+fmtMin(st.prev.min);$('#demoWorse').hidden=!st.prev;$('#demoVitals').hidden=!!st.prev;renderForm();updOllama();setTimeout(()=>{const i=$('#r-ta_sistolica');i&&!i.value&&i.focus()},0)}
@@ -116,7 +114,14 @@ function go(s){
   window.scrollTo({top:0});
 }
 document.addEventListener('click',e=>{const t=e.target.closest('[data-go]');if(t)go(t.dataset.go)});
-$('#sp').addEventListener('change',e=>document.body.classList.toggle('nospecs',!e.target.checked));
+document.body.classList.add('nospecs');
+$('#sp').setAttribute('aria-expanded', 'false');
+
+$('#sp').addEventListener('click', () => {
+  const oculto = document.body.classList.toggle('nospecs');
+  $('#sp').setAttribute('aria-expanded', String(!oculto));
+  $('#sp').textContent = oculto ? 'ⓘ Ayuda' : 'Cerrar ayuda';
+});
 
 /* Ingreso */
 let micTimer=null;
@@ -218,29 +223,58 @@ $('#extraer').addEventListener('click', async () => {
     /* Conserva el relato y los datos previos cuando falla la solicitud. */
     $('#hint').textContent = error.message || 'No se pudo completar la extracción.';
     $('#hint').classList.add('err');
-  } finally {
+    } finally {
     boton.disabled = false;
     boton.textContent = 'Extraer datos';
     $('#proc').hidden = true;
   }
+});
 
 function renderBotonIA(){
-  const boton = $('#ollama');
-  boton.textContent = st.ollama ? 'Usar IA: sí' : 'Usar IA: no';
-  boton.setAttribute('aria-pressed', String(st.ollama));
+  const boton = document.getElementById('ollama');
+  boton.textContent = st.ollama ? 'IA: activada' : 'IA: desactivada';
+  boton.setAttribute('role', 'switch');
+  boton.setAttribute('aria-checked', String(st.ollama));
+  boton.removeAttribute('aria-pressed');
   boton.title = st.ollama
-    ? 'Continuar sin extracción automática'
-    : 'Habilitar la extracción según el modo del servidor';
+    ? 'Desactivar la extracción automática'
+    : 'Activar la extracción automática';
 }
+
+
+function updOllama(cambioVoluntario = false){
+  renderSimbar();
+
+  if(!st.ollama){
+    $('#extraer').textContent = 'Continuar sin IA';
+
+    if(cambioVoluntario){
+      $('#errBanner').hidden = true;
+    } else {
+      $('#errTitle').textContent = 'La IA no está disponible.';
+      $('#errMsg').textContent =
+        'Seguí con el triage habitual: no se pierde nada de lo cargado.';
+      $('#errCode').textContent = '503 · ollama_no_disponible';
+      $('#errBanner').hidden = false;
+    }
+  } else {
+    $('#errBanner').hidden = true;
+    $('#extraer').textContent = 'Extraer datos';
+  }
+
+  $('#confirmar').textContent = st.ollama
+    ? 'Pedir sugerencia'
+    : 'Sin asistencia IA';
+
+  $('#sinIA').classList.toggle('primary', !st.ollama);
+
+  if(st.screen === 'revision') updControl();
+}
+
+$('#ollama').addEventListener('click', () => {
+  st.ollama = !st.ollama;
+  updOllama(true);
 });
-function updOllama(){
-  renderBotonIA();
-  if(!st.ollama){$('#errTitle').textContent='La IA no está disponible.';$('#errMsg').textContent='Seguí con el triage habitual: no se pierde nada de lo cargado.';$('#errCode').textContent='503 · ollama_no_disponible';$('#errBanner').hidden=false;$('#extraer').textContent='Continuar sin IA'}
-  else{$('#errBanner').hidden=true;$('#extraer').textContent='Extraer datos'}
-  const c=$('#confirmar');c.textContent=st.ollama?'Pedir sugerencia':'IA no disponible';$('#sinIA').classList.toggle('primary',!st.ollama);
-  if(st.screen==='revision')updControl();
-}
-$('#ollama').addEventListener('click',()=>{st.ollama=!st.ollama;updOllama()});
 
 /* Revisión */
 const num=v=>Number(String(v).replace(',','.'));
@@ -645,18 +679,12 @@ function renderInsuf(){
   const items=sinMedir.map(t=>'Medir: '+t).concat(otros.map(t=>'Completar: '+t));
   $('#insufList').innerHTML=(items.length?items:['Revisá los datos cargados']).map(t=>'<li>'+esc(t)+'</li>').join('');
 }
-/* Cartel de arriba: dice la verdad según de dónde vino la extracción. */
-function renderSimbar(){
-  /* Se recuerda el último modo que informó el servidor, aunque se empiece un caso nuevo. */
-  const ia=st.modoServidor==='ia';
 
-  function renderSimbar(){
-  /* Conserva el último modo informado por el servidor. */
-  const ia = st.modoServidor === 'ia';
-  $('#simChip').lastChild.textContent = ia ? 'IA LOCAL' : 'MODO SIMULADO';
+function renderSimbar(){
   renderBotonIA();
 }
-}
+
+
 function refreshSummary(){
   $('#summary').innerHTML=summaryRows().map(([l,val,c])=>'<div><span>'+l+'</span><b>'+(val==null?'<span class="st none">Sin información</span>':esc(val))+'</b>'+(c?'<em>'+c+'</em>':'')+'</div>').join('');
   const m=missing();$('#sumMiss').innerHTML=m.length?m.map(k=>'<span class="st none">'+ml(k)+'</span>').join(' '):'ninguno';
@@ -668,6 +696,13 @@ function refreshSummary(){
   $('#triageMiss').innerHTML=m.map(k=>'<li>'+ml(k)+'</li>').join('');$('#missBox').hidden=!m.length;
 }
 function renderReg(){
+    if (!st.manual && casoSinDatos()) {
+    $('#reg').textContent =
+      'Sugerencia: sin datos para evaluar.\n' +
+      'Prioridad: sin asignar.\n' +
+      'Decisión: pendiente.';
+    return;
+  }
   const R=st.decReg,d=R?R.d:null,l=R&&R.lv!=null?LEVELS[R.lv][0]:null;   /* [Dario 30/10] lo registrado */
   const sug=st.manual?'Sin asistencia IA':st.insuf?'Información insuficiente':(()=>{const c=calcSug();return LEVELS[SUG][0]+' ('+(c.M.fuente==='ia'?'MedGemma: '+LEVELS[c.M.lv][0]:'sin IA')+(c.H.length?' · reglas HRRG: '+c.H.map(x=>x.codigo+' v'+x.version).join(', '):'')+(c.R.length?' · reglas: '+c.R.map(x=>x.t).join(', '):'')+')'})();
   const dec=st.manual?(st.mlv!=null?'Manual · '+LEVELS[st.mlv][0]:'pendiente'):(d?(d==='aceptar'?'Aceptada · '+(l||LEVELS[SUG][0]):d==='modificar'?'Modificada · '+(l||'—'):'Rechazada · manual '+(l||'—')):'pendiente');
@@ -707,9 +742,52 @@ document.addEventListener('DOMContentLoaded',async function iniciarSesion(){
   if(st.user.rol==='admin'){location.href='admin.html';return}
   if(st.user.rol==='jefatura'){location.href='reglas.html';return}
   if(st.user.modoExtraccion){st.modoServidor=st.user.modoExtraccion;renderSimbar()}
-  const etiqueta=st.user.modo==='real'?'sesión del servidor':'acceso simulado';
-  $('#userChip').hidden=false;$('#userChip').innerHTML='<b>'+esc(st.user.u)+'</b> · '+esc(st.user.nom)+' · '+etiqueta+(st.user.rol==='auditor'&&st.user.modo==='real'?' · <a href="reglas.html">Reglas del hospital</a>':'')+' <button type="button" class="linkbtn" id="logout">Salir</button>';
-  $('#userChip').addEventListener('click',e=>{if(e.target.id==='logout')salir()});
+
+    const usuarioMenu = $('#userChip');
+  const nombreCuenta = st.user.nom || st.user.u;
+  const inicialesCuenta = nombreCuenta.trim().split(/\s+/)
+    .slice(0, 2).map(parte => parte[0]).join('').toUpperCase();
+
+  usuarioMenu.innerHTML = `
+    <details class="cuenta">
+      <summary class="cuenta-boton">
+        <span class="cuenta-avatar" aria-hidden="true">${esc(inicialesCuenta)}</span>
+        <span class="cuenta-nombre">${esc(nombreCuenta)}</span>
+        <span class="cuenta-flecha" aria-hidden="true">▾</span>
+      </summary>
+
+      <div class="cuenta-panel">
+        <span class="cuenta-etiqueta">Usuario</span>
+        <strong class="cuenta-usuario">${esc(st.user.u)}</strong>
+
+        ${st.user.rol === 'auditor' && st.user.modo === 'real'
+          ? '<a class="cuenta-enlace" href="reglas.html">Reglas del hospital</a>'
+          : ''}
+
+        <button type="button" id="logout">Cerrar sesión</button>
+      </div>
+    </details>
+  `;
+
+  usuarioMenu.hidden = false;
+
+  usuarioMenu.addEventListener('click', e => {
+    if (e.target.closest('#logout')) salir();
+  });
+
+  const cuenta = usuarioMenu.querySelector('.cuenta');
+
+  document.addEventListener('click', e => {
+    if (!usuarioMenu.contains(e.target)) cuenta.open = false;
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && cuenta.open) {
+      cuenta.open = false;
+      cuenta.querySelector('summary').focus();
+    }
+  });
+
   go(st.user.rol==='auditor'?'espera':'ingreso');
   cargarParametrosSignos();cargarReglasHospital();   /* [Dario 30/10] rangos de la tabla y reglas para las marcas rojas */
 });
