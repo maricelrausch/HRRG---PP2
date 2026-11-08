@@ -75,27 +75,184 @@ function calcSug(){
   const pl=st.prev&&st.prev.lv!=null?st.prev.lv:9,fin=Math.min(rl,M.lv,cl,pl,hl);
   return {R,M,C,H,rl,cl,pl,hl,fin};
 }
-function renderCard(){
-  const c=calcSug();SUG=c.fin;const L=LEVELS[SUG];
-  $('#tcPrev').hidden=!st.prev;if(st.prev)$('#tcPrev').textContent='Reevaluación · Antes: '+LEVELS[st.prev.lv][0]+' (hace '+fmtMin(st.prev.min)+')  →  Ahora: '+L[0];
-  $('#triageCard').style.setProperty('--mc','var('+L[1]+')');$('#triageCard').style.setProperty('--mi',L[2]);
-  $('#tcName').textContent=L[0];$('#tcDesc').textContent=DESC[SUG]+' [tiempo de ejemplo]';
-  /* [Dario 30/10] Mientras MedGemma responde (unos segundos) no se muestra un color grande que después cambia:
-     tarjeta gris «Analizando…» y, si una regla ya fija un piso, se avisa. Aceptar queda desactivado. */
-  if(c.M.fuente==='cargando'){$('#triageCard').style.setProperty('--mc','var(--muted)');$('#triageCard').style.setProperty('--mi','#FFFFFF');
-    $('#tcName').textContent='Analizando…';$('#tcDesc').textContent=c.hl<9?'MedGemma revisando · reglas: al menos '+LEVELS[c.hl][0]:'MedGemma revisando el caso';}
-  const FUENTE={ia:'Sugerencia de MedGemma con las reglas del hospital.',cargando:'Consultando a MedGemma… (color provisorio con las reglas del hospital)',insuf:'MedGemma: datos insuficientes · color con las reglas del hospital.',sin:'Sin IA · reglas del hospital.'};
-  $('#tcOrigin').innerHTML='<b>'+FUENTE[c.M.fuente]+'</b><span class="old">'+(c.H.length?'Coincide o supera las reglas del hospital.':'Reglas del hospital: ninguna se cumple.')+'</span>';
-  const ac=document.querySelector('[data-d="aceptar"]');if(ac){ac.disabled=c.M.fuente==='cargando';ac.title=c.M.fuente==='cargando'?'Esperá la respuesta de MedGemma':''}
-  if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv&&c.M.fuente!=='ia')$('#tcOrigin').innerHTML='<b>'+FUENTE[c.M.fuente]+'</b><span class="old">Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</span>';
-  else if(c.hl<9&&c.hl<=Math.min(c.rl,c.cl)&&c.hl<c.M.lv)$('#tcOrigin').innerHTML='<b>Color fijado por regla del hospital ('+esc(c.H[0].codigo)+').</b><span class="old">Sin esa regla la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Se administra en la pantalla de reglas (Jefatura de Guardia).</span>';
-  if(c.pl<Math.min(c.rl,c.M.lv,c.cl,c.hl))$('#tcOrigin').innerHTML='<b>Color mantenido por la clasificación anterior.</b><span class="old">Con los datos nuevos la sugerencia sería '+LEVELS[Math.min(c.rl,c.M.lv,c.cl)][0]+'. Para bajar la prioridad, usá Modificar con motivo.</span>';
-  $('#tcWhy').innerHTML=(c.pl<9?'<li><span class="src g">ANTES</span><span>Clasificación anterior: '+LEVELS[c.pl][0]+'</span></li>':'')+c.H.map(x=>'<li><span class="src h'+(x.origen==='provisoria'?' prov':'')+'" title="Regla '+esc(x.codigo)+' v'+x.version+'">'+esc(MotorReglas.etiqueta(x.origen,x.validada_por))+'</span><span>'+esc(x.texto)+' <span class="old">('+esc(x.codigo)+' · '+esc(x.color)+' · '+esc(MotorReglas.ORIGEN[x.origen]||x.origen)+' · '+(x.validada_por?'validada por '+esc(x.validada_por):'sin validar')+')</span></span></li>').join('')+(REGLAS_HRRG.error?'<li><span class="src r">AVISO</span><span>'+esc(REGLAS_HRRG.error)+'</span></li>':'')+c.R.map(x=>'<li><span class="src r">REGLA</span><span>'+esc(x.t)+'</span></li>').join('')+c.M.why.map((t,i)=>{if(c.M.fuente!=='ia')return '<li><span class="src g">INFO</span><span>'+esc(t)+'</span></li>';
-    /* MedGemma dice de dónde sale cada motivo: lo contó el paciente, lo midió enfermería o es criterio del modelo. */
-    const f=(c.M.fuentes||[])[i],et=f==='relato'?'IA · RELATO':f==='medido'?'IA · MEDIDO':'IA';
-    return '<li><span class="src ia">'+et+'</span><span>'+esc(t)+'</span></li>'}).join('');
+
+function casoSinDatos() {
+  const hayDatos = Object.entries(st.rev).some(([campo, valor]) => {
+    if (campo === 'pam') return false;
+    return valor !== null &&
+           valor !== undefined &&
+           valor !== false &&
+           String(valor).trim() !== '';
+  });
+
+  return !hayDatos &&
+         !relatoIA().trim() &&
+         st.prev?.lv == null &&
+         st.decReg == null;
+}
+function renderCard() {
+  const vacio = casoSinDatos();
+  const tarjeta = $('#triageCard');
+  const aceptar = document.querySelector('[data-d="aceptar"]');
+
+  document.querySelectorAll('[data-d]').forEach(b => {
+    b.disabled = vacio;
+  });
+  $('#chatBtn').disabled = vacio;
+
+  if (vacio) {
+    SUG = null;
+
+    tarjeta.style.setProperty('--mc', 'var(--panel-2)');
+    tarjeta.style.setProperty('--mi', 'var(--ink)');
+
+    $('#tcPrev').hidden = true;
+    $('#tcName').textContent = 'Sin sugerencia';
+    $('#tcDesc').textContent = 'Cargá los datos del caso para continuar.';
+    $('#tcOrigin').textContent = 'Todavía no hay una prioridad asignada.';
+    $('#tcWhy').innerHTML = '';
+
+    $('#triageCard .eyebrow').textContent = 'Evaluación pendiente';
+    $('#triageCard .ia-tag').textContent = 'Sin datos';
+
+    if (aceptar) {
+      aceptar.title = 'Primero cargá los datos del caso.';
+    }
+
+    $('#okMsg').hidden = true;
+    $('#modForm').hidden = true;
+    $('#motivoForm').hidden = true;
+    $('#chat').hidden = true;
+    $('#chatBtn').setAttribute('aria-expanded', 'false');
+    return;
+  }
+
+  const c = calcSug();
+  SUG = c.fin;
+  const L = LEVELS[SUG];
+
+  $('#tcPrev').hidden = !st.prev;
+  if (st.prev) {
+    $('#tcPrev').textContent =
+      'Reevaluación · Antes: ' + LEVELS[st.prev.lv][0] +
+      ' (hace ' + fmtMin(st.prev.min) + ') → Ahora: ' + L[0];
+  }
+
+  tarjeta.style.setProperty('--mc', 'var(' + L[1] + ')');
+  tarjeta.style.setProperty('--mi', L[2]);
+  $('#tcName').textContent = L[0];
+  $('#tcDesc').textContent = DESC[SUG] + ' [tiempo de ejemplo]';
+
+  if (c.M.fuente === 'cargando') {
+    tarjeta.style.setProperty('--mc', 'var(--muted)');
+    tarjeta.style.setProperty('--mi', '#FFFFFF');
+    $('#tcName').textContent = 'Analizando…';
+    $('#tcDesc').textContent = c.hl < 9
+      ? 'MedGemma revisando · reglas: al menos ' + LEVELS[c.hl][0]
+      : 'MedGemma revisando el caso';
+  }
+
+  const FUENTE = {
+    ia: 'Sugerencia de MedGemma con las reglas del hospital.',
+    cargando: 'Consultando a MedGemma… (color provisorio con las reglas del hospital)',
+    insuf: 'MedGemma: datos insuficientes · color con las reglas del hospital.',
+    sin: 'Sin IA · reglas del hospital.'
+  };
+
+  $('#tcOrigin').innerHTML =
+    '<b>' + FUENTE[c.M.fuente] + '</b><span class="old">' +
+    (c.H.length
+      ? 'Coincide o supera las reglas del hospital.'
+      : 'Reglas del hospital: ninguna se cumple.') +
+    '</span>';
+
+  if (aceptar) {
+    aceptar.disabled = c.M.fuente === 'cargando';
+    aceptar.title = c.M.fuente === 'cargando'
+      ? 'Esperá la respuesta de MedGemma'
+      : '';
+  }
+
+  if (
+    c.hl < 9 &&
+    c.hl <= Math.min(c.rl, c.cl) &&
+    c.hl < c.M.lv &&
+    c.M.fuente !== 'ia'
+  ) {
+    $('#tcOrigin').innerHTML =
+      '<b>' + FUENTE[c.M.fuente] + '</b>' +
+      '<span class="old">Color fijado por regla del hospital (' +
+      esc(c.H[0].codigo) + ').</span>';
+  } else if (
+    c.hl < 9 &&
+    c.hl <= Math.min(c.rl, c.cl) &&
+    c.hl < c.M.lv
+  ) {
+    $('#tcOrigin').innerHTML =
+      '<b>Color fijado por regla del hospital (' +
+      esc(c.H[0].codigo) + ').</b>' +
+      '<span class="old">Sin esa regla la sugerencia sería ' +
+      LEVELS[Math.min(c.rl, c.M.lv, c.cl)][0] +
+      '. Se administra en la pantalla de reglas (Jefatura de Guardia).</span>';
+  }
+
+  if (c.pl < Math.min(c.rl, c.M.lv, c.cl, c.hl)) {
+    $('#tcOrigin').innerHTML =
+      '<b>Color mantenido por la clasificación anterior.</b>' +
+      '<span class="old">Con los datos nuevos la sugerencia sería ' +
+      LEVELS[Math.min(c.rl, c.M.lv, c.cl)][0] +
+      '. Para bajar la prioridad, usá Modificar con motivo.</span>';
+  }
+
+  const anterior = c.pl < 9
+    ? '<li><span class="src g">ANTES</span>' +
+      '<span>Clasificación anterior: ' + LEVELS[c.pl][0] + '</span></li>'
+    : '';
+
+  const reglasHospital = c.H.map(x =>
+    '<li><span class="src h' +
+    (x.origen === 'provisoria' ? ' prov' : '') +
+    '" title="Regla ' + esc(x.codigo) + ' v' + x.version + '">' +
+    esc(MotorReglas.etiqueta(x.origen, x.validada_por)) +
+    '</span><span>' + esc(x.texto) +
+    ' <span class="old">(' + esc(x.codigo) + ' · ' +
+    esc(x.color) + ' · ' +
+    esc(MotorReglas.ORIGEN[x.origen] || x.origen) + ' · ' +
+    (x.validada_por ? 'validada por ' + esc(x.validada_por) : 'sin validar') +
+    ')</span></span></li>'
+  ).join('');
+
+  const aviso = REGLAS_HRRG.error
+    ? '<li><span class="src r">AVISO</span><span>' +
+      esc(REGLAS_HRRG.error) + '</span></li>'
+    : '';
+
+  const reglas = c.R.map(x =>
+    '<li><span class="src r">REGLA</span><span>' +
+    esc(x.t) + '</span></li>'
+  ).join('');
+
+  const motivos = c.M.why.map((texto, i) => {
+    if (c.M.fuente !== 'ia') {
+      return '<li><span class="src g">INFO</span><span>' +
+        esc(texto) + '</span></li>';
+    }
+
+    const fuente = (c.M.fuentes || [])[i];
+    const etiqueta = fuente === 'relato'
+      ? 'IA · RELATO'
+      : fuente === 'medido' ? 'IA · MEDIDO' : 'IA';
+
+    return '<li><span class="src ia">' + etiqueta +
+      '</span><span>' + esc(texto) + '</span></li>';
+  }).join('');
+
+  $('#tcWhy').innerHTML =
+    anterior + reglasHospital + aviso + reglas + motivos;
+
   pintarDecision();
 }
+  
 /* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
    La sugerencia original queda escrita debajo (trazabilidad). */
 function pintarDecision(){
@@ -128,6 +285,10 @@ function marcarRegistrado(d){document.querySelectorAll('[data-d]').forEach(x=>{c
   x.textContent=x.dataset.d===d?t[1]:t[0];x.classList.toggle('hecho',x.dataset.d===d)})}
 document.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{
   const d=b.dataset.d;
+  if (casoSinDatos()) {
+  renderCard();
+  return;
+  }
   if(d==='aceptar'&&st.registrado!=null&&SUG>st.registrado){
     $('#okMsg').hidden=false;$('#okMsg').innerHTML='<b>Ya registraste '+LEVELS[st.registrado][0]+'.</b> Para bajar a '+LEVELS[SUG][0]+' usá <b>Modificar</b> e indicá el motivo: queda registrado como discrepancia.';
     return}
@@ -143,6 +304,7 @@ $('#levels').addEventListener('click',e=>{const b=e.target.closest('.lvl');if(!b
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));
   $('#lowerTxt').textContent='Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.';
   $('#lowerOk').checked=false;$('#lowerBox').hidden=!(st.level>refBajar());updReg()});
+  
 function updReg(){
   const d=$('#registrar').dataset.d;let ok=!!$('#motivo').value;
   if(d==='modificar')ok=ok&&st.level!=null&&(st.level!==SUG||(st.registrado!=null&&st.level!==st.registrado));
