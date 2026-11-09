@@ -252,7 +252,6 @@ function renderCard() {
 
   pintarDecision();
 }
-  
 /* Si el profesional modificó o rechazó la sugerencia, el color grande muestra la clasificación final.
    La sugerencia original queda escrita debajo (trazabilidad). */
 function pintarDecision(){
@@ -304,7 +303,6 @@ $('#levels').addEventListener('click',e=>{const b=e.target.closest('.lvl');if(!b
   document.querySelectorAll('.lvl').forEach(x=>x.setAttribute('aria-pressed',x===b));
   $('#lowerTxt').textContent='Confirmo asignar una prioridad menor que la sugerida. Queda registrada como discrepancia.';
   $('#lowerOk').checked=false;$('#lowerBox').hidden=!(st.level>refBajar());updReg()});
-  
 function updReg(){
   const d=$('#registrar').dataset.d;let ok=!!$('#motivo').value;
   if(d==='modificar')ok=ok&&st.level!=null&&(st.level!==SUG||(st.registrado!=null&&st.level!==st.registrado));
