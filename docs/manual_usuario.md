@@ -1,7 +1,7 @@
 # Manual de usuario · Triage asistido por IA
 
 **Hospital Regional Río Grande (HRRG) · Equipo 1 · Prácticas Profesionalizantes II**
-**Versión:** prototipo local · **Actualizado:** 31/10/2026
+**Versión:** prototipo local · **Actualizado:** 11/11/2026
 
 > **Importante.** Es un **prototipo**. Usá solo **datos ficticios**: nada de nombres, domicilios, teléfonos ni casos reales.
 > El color lo sugiere **MedGemma** junto con las **reglas del hospital** (de referencia del Sistema Manchester y adaptaciones locales, **todavía sin validar** por Enfermería y Guardia del HRRG).
@@ -36,13 +36,16 @@ Ayuda a ordenar la atención en la guardia:
 5. El profesional **acepta, modifica o rechaza** la sugerencia. Todo queda registrado a su nombre.
 6. El paciente pasa a **En espera**, con un reloj que avisa cuándo hay que reevaluarlo.
 
-**Indicadores del encabezado:**
+**Lo que se ve arriba en todas las pantallas:**
 
-| Indicador | Qué significa |
+![Encabezado y menú del usuario](img/manual/22_menu_usuario.png)
+
+| Elemento | Qué hace |
 |---|---|
-| `enfermeria · Nombre · sesión del servidor` | Quién está usando el sistema. **Salir** cierra la sesión. |
-| **MODO SIMULADO** / **IA LOCAL · RESTO SIMULADO** | Si la extracción la hace MedGemma (IA local) o una simulación con casos de ejemplo. |
-| Banda amarilla | Recordatorio permanente: datos ficticios, la sugerencia es de demostración. |
+| **ⓘ Ayuda** | Abre y cierra un panel con la explicación de la pantalla en la que estás. |
+| **Menú del usuario** (tus iniciales y tu nombre) | Muestra con qué usuario entraste y tiene **Cerrar sesión**. Al perfil Auditoría también le muestra el enlace **Reglas del hospital**. |
+| **Pestañas 1 · Ingreso, 2 · Medición, 3 · Sugerencia, 4 · En espera** | Indican en qué paso estás. Se pueden tocar para ir de un paso a otro. |
+| **IA: activada / IA: desactivada** | Interruptor para usar o no la IA. Apagada, los datos del relato se completan a mano y el color sale de las reglas y del profesional (ver *Trabajar sin IA*, en la sección 4). |
 
 ---
 
@@ -65,6 +68,7 @@ Ayuda a ordenar la atención en la guardia:
 1. Escribí tu **usuario** y tu **contraseña**.
 2. Con el botón **Mostrar** ves lo que estás escribiendo. **Ocultar** lo vuelve a tapar.
 3. Tocá **Ingresar**.
+4. **¿Te olvidaste la contraseña?** Tocá **Olvidé mi contraseña**: te indica que la pidas a Administración con tu nombre de usuario. No compartas tu contraseña.
 
 **Clave temporal o contraseña vencida:** el sistema te lleva a **Cambiar contraseña** antes de seguir.
 
@@ -92,7 +96,7 @@ Ayuda a ordenar la atención en la guardia:
 
 ## 4. Triage paso a paso (Enfermería y Médico/a)
 
-Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**.
+Las pestañas de arriba muestran en qué paso estás: **1 · Ingreso**, **2 · Medición**, **3 · Sugerencia** y **4 · En espera**.
 
 ### Paso 1 · Ingreso (relato)
 
@@ -109,7 +113,7 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
    - Con **Dictar** se transcribe la voz al cuadro. Después se puede corregir a mano.
    - Si el relato tiene un DNI o un teléfono, el sistema **avisa y no lo manda a la IA**. Hay que sacarlo con **Quitar dato y continuar**.
 4. Tocá **Extraer datos**.
-   - Mientras procesa, el botón queda bloqueado y arriba aparece **"Consultando al servidor…"**.
+   - Mientras procesa, el botón queda bloqueado y aparece un aviso de que se está procesando.
    - Con MedGemma, la primera vez puede tardar **1 o 2 minutos**.
    - La **categoría del motivo** (dolor torácico, fiebre, trauma, etc.) sale de palabras del relato. Lo que el paciente **niega** no cuenta: *"no me golpeé"* no lo pone como trauma.
    - Si algo falla, **el texto no se pierde**.
@@ -129,7 +133,7 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
    **Lo que el paciente no dijo queda vacío, nunca en cero.**
    - El relato ya no se repite en esta pantalla: quedó en el paso 1.
 2. Completá **edad** y **sexo**. Si el relato los dice (*"tengo 27 años"*, *"soy mujer"*), ya vienen cargados y marcados para revisar.
-3. **Signos vitales** (①): TA, FC, FR, SpO₂, temperatura y glucemia (opcional).
+3. **Signos vitales:** TA, FC, FR, SpO₂, temperatura y glucemia (opcional).
    - **Enter** pasa al campo siguiente.
    - La **PAM** se calcula sola.
    - Debajo de cada campo está el **valor normal de referencia según la edad** del paciente (lactante, niño, adolescente, adulto o adulto mayor). Esos rangos los configura la Jefatura de Guardia (sección 8).
@@ -138,12 +142,21 @@ Arriba se ve en qué paso estás: **1 Ingreso › 2 Medición › 3 Sugerencia**
 4. **Conciencia, dolor y aspecto:**
    - Para la conciencia, alcanza con el **nivel de conciencia** *o* el **Glasgow**.
    - El **dolor** va de 0 a 10.
-5. **Banderas rojas** (②) y **Antecedentes** (③): se marcan con un toque. Lo que el paciente mencionó ya viene marcado (por ejemplo *"sangra"*, *"soy diabética"*), salvo que lo haya negado (*"sin sangrado"*). Revisalo siempre.
+5. **Banderas rojas** y **Antecedentes**: se marcan con un toque. Lo que el paciente mencionó ya viene marcado (por ejemplo *"sangra"*, *"soy diabética"*), salvo que lo haya negado (*"sin sangrado"*). Revisalo siempre.
 6. Abajo se avisa si **faltan datos**. Si faltan **3 o más signos vitales**, el sistema no sugiere color.
 7. Los botones:
-   - **Pedir sugerencia** (④): pasa al paso 3.
+   - **Pedir sugerencia:** pasa al paso 3.
    - **Clasificar sin IA**: elegís el color a mano. Está siempre disponible, por si la IA no anda.
    - **Volver al relato**: vuelve al paso 1.
+
+### Trabajar sin IA
+
+Si tocás el interruptor **IA: activada**, pasa a **IA: desactivada**:
+- En el paso 1, el botón dice **Continuar sin IA**: no se le manda el relato a la IA y los datos se completan a mano en el paso 2.
+- En el paso 2, el botón dice **Sin asistencia IA**, y **Clasificar sin IA** queda destacado: elegís el color vos.
+- Si la IA se cae sola, aparece el aviso **"La IA no está disponible"**. No se pierde nada de lo cargado.
+
+Para volver a usarla, tocá de nuevo el interruptor.
 
 ### Después de decidir: pantalla en blanco
 
@@ -153,10 +166,11 @@ Una vez que registraste la decisión (**Aceptar**, **Modificar** o **Rechazar**)
 
 ![Paso 3: sugerencia de color](img/manual/04_sugerencia.png)
 
-1. **Color sugerido** (①), con su tiempo de referencia. Arriba dice de dónde sale: *Prioridad sugerida · MedGemma y reglas*.
+1. **Color sugerido**, con su tiempo de referencia. Arriba dice de dónde sale: *Prioridad sugerida · MedGemma y reglas*.
    - Mientras MedGemma responde (unos segundos), la tarjeta queda gris con **"Analizando…"** y **Aceptar** está desactivado. Si una regla ya se cumple, avisa el color mínimo.
    - Si la IA no responde o está apagada, el color sale **solo de las reglas del hospital** (*Sin IA · reglas del hospital*). El triage sigue igual.
-2. **Por qué** (②): la explicación en palabras clínicas. Cada línea tiene una etiqueta que dice de dónde sale:
+   - Si entrás a **3 · Sugerencia** sin haber cargado el caso, la tarjeta dice **"Sin sugerencia · Cargá los datos del caso para continuar"** y muestra qué falta.
+2. **Por qué:** la explicación en palabras clínicas. Cada línea tiene una etiqueta que dice de dónde sale:
    - **MANCHESTER**, **HRRG** o **PROVISORIA**: una **regla del hospital** que se cumplió, con su código (por ejemplo R-014), su color y si está validada. La etiqueta indica el origen de la regla: Sistema Manchester, adaptación local del HRRG o provisoria (en revisión).
    - **IA · RELATO**: un motivo de MedGemma que sale de lo que contó el paciente.
    - **IA · MEDIDO**: un motivo de MedGemma que sale de lo que midió enfermería.
@@ -166,7 +180,7 @@ Una vez que registraste la decisión (**Aceptar**, **Modificar** o **Rechazar**)
    Las reglas fijan un piso: la IA no puede sugerir un color más bajo. Si una regla subió el color, la tarjeta lo dice (*"Color fijado por regla del hospital (R-…)"*). Las reglas que intervinieron quedan guardadas junto con tu decisión.
 3. **Falta:** si hay datos sin cargar, aparecen al lado del *Por qué*.
 4. **Consultar a la IA:** abre un chat con preguntas rápidas: *¿Por qué este color?*, *¿Qué datos faltan?*, *¿Qué lo haría subir?* (muestra las reglas del hospital que pondrían un color más urgente), *¿De dónde sale?* No diagnostica ni indica tratamientos.
-5. **Tu decisión** (③):
+5. **Tu decisión:**
    - **Aceptar:** con un toque queda registrado el color sugerido.
    - **Modificar** o **Rechazar:** elegís otro color (ROJO, NARANJA, AMARILLO o VERDE) y un **motivo (obligatorio)**, con un detalle opcional. Después tocás **Registrar decisión**.
      - Si elegís un color **más bajo** que el sugerido, hay que tildar la confirmación y queda registrado como **discrepancia**.
@@ -176,8 +190,8 @@ Una vez que registraste la decisión (**Aceptar**, **Modificar** o **Rechazar**)
 
    ![Modificar la sugerencia](img/manual/05_modificar.png)
 
-6. **Corregir datos del relato** (④): si la IA entendió algo mal, se corrige acá.
-7. **Ver datos del caso, correcciones y registro** (⑤): muestra el resumen con el origen de cada dato y el registro (fecha, usuario, decisión).
+6. **Corregir datos del relato:** si la IA entendió algo mal, se corrige acá.
+7. **Ver datos del caso, correcciones y registro:** muestra el resumen con el origen de cada dato y el registro (fecha, usuario, decisión).
 8. Los botones de abajo:
    - **Volver a medición**
    - **Ver en espera**
@@ -226,6 +240,8 @@ Es una pantalla **de consulta** para un televisor de la sala de espera, una tabl
 - **Más fácil, con el código QR:** en **En espera** tocá **QR de la sala**. Se abre una página con un código QR que ya trae la dirección correcta (con la IP de la PC). Apuntá la cámara del celular al código y tocá el enlace. La página se puede **imprimir** para pegar en la sala.
 
 ![Código QR de la lista de espera](img/manual/19_qr_sala.png)
+
+> **¿Lo pueden usar los pacientes con su celular?** Hoy, solo si su celular está conectado a la red del hospital. Para la sala de espera, lo recomendado es mostrar la lista en un televisor. Si el hospital quiere que los pacientes la vean en su celular, informática puede habilitar el acceso desde el Wi-Fi de invitados o publicar solo esta lista, que no tiene datos personales.
 
 | Vista pública · `sala.html` | Vista del personal · `sala.html?personal=1` |
 |---|---|
@@ -306,7 +322,7 @@ Tocá **Historial de casos**. El título cambia y la lista de espera se oculta. 
 
 ## 8. Reglas del hospital (Jefatura de Guardia)
 
-Los criterios clínicos **no están escritos en el programa**: las reglas, los tiempos por color y los rangos de los signos vitales están guardados en la base de datos y los administra la **Jefatura de Guardia** (perfil *Jefatura de Guardia*) en la pantalla **Reglas del hospital**. Auditoría la puede ver en solo lectura, desde el enlace *Reglas del hospital* del encabezado.
+Los criterios clínicos **no están escritos en el programa**: las reglas, los tiempos por color y los rangos de los signos vitales están guardados en la base de datos y los administra la **Jefatura de Guardia** (perfil *Jefatura de Guardia*) en la pantalla **Reglas del hospital**. Auditoría la puede ver en solo lectura, desde el enlace *Reglas del hospital* del **menú del usuario**.
 
 La pantalla tiene cinco pestañas: **Reglas**, **Tiempos por color**, **Signos vitales**, **Historial de cambios** y **Cómo funcionan**.
 
@@ -423,8 +439,8 @@ Son los rangos que ve Enfermería en el paso 2 (Medición), **según el grupo et
 | Me olvidé la contraseña | Administración te genera una **clave temporal**. Al entrar con ella, el sistema te pide una nueva. |
 | La extracción tarda mucho | Con MedGemma, la primera consulta puede tardar 1 o 2 minutos. El cartel "Sigue procesando…" es normal. |
 | La IA no responde | Seguí con **Clasificar sin IA**: el triage no depende de la IA. |
-| "Los datos de la exportación no son válidos" | El servidor quedó con una versión vieja. Cerrá la ventana del servidor y volvé a abrir `iniciar_con_ia.bat`. |
-| "Exportación bloqueada" | Pusiste mal la contraseña 3 veces. Cerrá sesión (**Salir**) y volvé a entrar. |
+| "Los datos de la exportación no son válidos" | El servidor quedó con una versión vieja. Cerrá la ventana del servidor y volvé a abrirlo. |
+| "Exportación bloqueada" | Pusiste mal la contraseña 3 veces. Cerrá sesión (**menú del usuario → Cerrar sesión**) y volvé a entrar. |
 | No puedo abrir el Excel o el PDF exportado | Te pide **tu** contraseña, la misma con la que entrás al sistema. |
 | El celular no abre `sala.html` | La PC y el celular tienen que estar en la misma red Wi-Fi, y la red tiene que permitir que los equipos se vean entre sí. Las redes de invitados suelen bloquearlo: consultá con informática. |
 | La pantalla de la sala dice "Sin conexión con el servidor" | Se cortó la red o se cerró el servidor. Mientras tanto se muestran los últimos datos; cuando vuelve la conexión, se actualiza sola. |
