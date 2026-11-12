@@ -16,7 +16,15 @@
   .qr-caja img{width:min(320px,80vw);height:auto;background:#fff;border-radius:12px;padding:8px;border:1px solid var(--line)}
   .qr-url{font-family:var(--f-mono);font-size:15px;word-break:break-all;background:var(--panel-2);border-radius:8px;padding:8px 12px}
   .qr-titulo{font-family:var(--f-display);font-size:24px;font-weight:600;margin:0}
-  @media print{.no-print{display:none!important}.app{border:0}.qr-caja img{width:90mm}}
+  /* [Barby 11/11] estilos.css oculta todo al imprimir (body *{visibility:hidden}) para que la pantalla de triage
+     imprima solo el resumen del caso. Acá se vuelve a mostrar todo, si no el QR sale en blanco. */
+  @media print{
+    body *{visibility:visible}
+    .no-print{display:none!important}
+    .app{border:0;box-shadow:none}
+    .qr-caja img{width:90mm;border:0}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
 </style>
 </head>
 <body>
